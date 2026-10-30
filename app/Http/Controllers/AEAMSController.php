@@ -32,6 +32,8 @@ class AEAMSController extends Controller
 
         $search = $request->string('search')->toString();
         $status = $request->string('status')->toString();
+        $requestSearch = $request->string('request_search')->toString();
+        $requestStatus = $request->string('request_status')->toString();
         $categoryId = $request->integer('category_id') ?: null;
         $assets = EquipmentAsset::query()
             ->with(['category', 'responsibleUser', 'maintenances' => fn ($query) => $query->whereIn('status', ['open', 'in_progress'])->latest()])
@@ -50,6 +52,12 @@ class AEAMSController extends Controller
         $requests = EquipmentRequest::query()
             ->with(['asset.category', 'farmer.user', 'requestedBy', 'reviewer'])
             ->when(! $isStaff, fn ($query) => $query->where('farmer_id', $farmer->id))
+            ->when(in_array($requestStatus, ['pending', 'approved', 'rejected', 'issued', 'returned', 'cancelled'], true), fn ($query) => $query->where('status', $requestStatus))
+            ->when($requestSearch, fn ($query, $value) => $query->where(function ($nested) use ($value) {
+                $nested->where('reference', 'like', '%'.$value.'%')
+                    ->orWhereHas('asset', fn ($assets) => $assets->where('asset_code', 'like', '%'.$value.'%')->orWhere('name', 'like', '%'.$value.'%'))
+                    ->orWhereHas('farmer', fn ($farmers) => $farmers->where('farmer_code', 'like', '%'.$value.'%')->orWhereHas('user', fn ($users) => $users->where('name', 'like', '%'.$value.'%')));
+            }))
             ->latest()
             ->paginate(15, ['*'], 'requests_page')
             ->withQueryString();
@@ -80,6 +88,7 @@ class AEAMSController extends Controller
             'canIssue' => $canIssue,
             'canReturn' => $canReturn,
             'canMaintenance' => $canMaintenance,
+            'canExport' => $this->canStaff($user, 'export'),
             'farmer' => $farmer,
             'stats' => [
                 'assets' => EquipmentAsset::count(),

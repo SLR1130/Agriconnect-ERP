@@ -281,4 +281,29 @@ class AEAMSEquipmentTest extends TestCase
             ])
             ->assertForbidden();
     }
+
+    public function test_staff_can_filter_equipment_requests_by_status_and_search(): void
+    {
+        $data = $this->setupData();
+        $this->submitRequest($this->window(), $data['farmerUser'], $data['asset'], 'filter-this-request')
+            ->assertRedirect();
+        $equipmentRequest = EquipmentRequest::where('idempotency_key', 'filter-this-request')->firstOrFail();
+
+        $this->actingAs($data['staff'])
+            ->get('/modules/aeams?workspace=requests&request_status=pending&request_search=Farm%20tractor')
+            ->assertOk()
+            ->assertSee($equipmentRequest->reference)
+            ->assertSee('data-erp-workspace-tab="requests"', false)
+            ->assertSee('Farm tractor');
+
+        $this->actingAs($data['staff'])
+            ->get('/modules/aeams?workspace=requests&request_status=rejected&request_search=Farm%20tractor')
+            ->assertOk()
+            ->assertDontSee($equipmentRequest->reference);
+
+        $this->actingAs($data['staff'])
+            ->get('/modules/aeams?workspace=requests&request_search=does-not-match')
+            ->assertOk()
+            ->assertSee('No equipment requests match these filters.');
+    }
 }

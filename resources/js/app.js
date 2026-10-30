@@ -76,6 +76,101 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-menu-toggle]').forEach((toggle) => { toggle.setAttribute('aria-expanded', 'false'); });
     });
 
+    document.addEventListener('submit', (event) => {
+        const form = event.target.closest('form[data-confirm-submit]');
+        if (form && !window.confirm(form.dataset.confirmSubmit)) event.preventDefault();
+    });
+
+    document.querySelectorAll('[data-erp-workspace]').forEach((workspace) => {
+        const tabs = [...workspace.querySelectorAll('[data-erp-workspace-tab]')];
+        const parameter = workspace.dataset.workspaceParam || 'workspace';
+        if (!tabs.length) return;
+
+        const updateWorkspace = (key, updateUrl = false) => {
+            const selected = tabs.some((tab) => tab.dataset.erpWorkspaceTab === key)
+                ? key
+                : (tabs[0].dataset.erpWorkspaceTab || 'overview');
+
+            tabs.forEach((tab) => {
+                const active = tab.dataset.erpWorkspaceTab === selected;
+                tab.setAttribute('aria-selected', String(active));
+                tab.tabIndex = active ? 0 : -1;
+                const panel = document.getElementById(tab.getAttribute('aria-controls'));
+                if (panel) panel.hidden = !active;
+            });
+
+            if (updateUrl) {
+                const url = new URL(window.location.href);
+                url.searchParams.set(parameter, selected);
+                window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+            }
+        };
+
+        tabs.forEach((tab) => {
+            tab.addEventListener('click', () => {
+                updateWorkspace(tab.dataset.erpWorkspaceTab, true);
+                tab.focus();
+            });
+            tab.addEventListener('keydown', (event) => {
+                let index = tabs.indexOf(tab);
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') index = (index + 1) % tabs.length;
+                else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') index = (index - 1 + tabs.length) % tabs.length;
+                else if (event.key === 'Home') index = 0;
+                else if (event.key === 'End') index = tabs.length - 1;
+                else return;
+                event.preventDefault();
+                tabs[index].focus();
+                tabs[index].click();
+            });
+        });
+
+        workspace.querySelectorAll('[data-erp-workspace-select]').forEach((trigger) => {
+            trigger.addEventListener('click', () => {
+                const key = trigger.dataset.erpWorkspaceSelect;
+                updateWorkspace(key, true);
+                tabs.find((tab) => tab.dataset.erpWorkspaceTab === key)?.focus();
+            });
+        });
+
+        workspace.querySelectorAll('form').forEach((form) => {
+            const panel = form.closest('[data-erp-workspace-panel]');
+            if (!panel) return;
+
+            form.addEventListener('submit', () => {
+                const selected = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true')?.dataset.erpWorkspaceTab
+                    || panel.dataset.erpWorkspacePanel;
+
+                if (form.method.toUpperCase() === 'GET') {
+                    let field = form.querySelector(`[name="${parameter}"]`);
+                    if (!field) {
+                        field = document.createElement('input');
+                        field.type = 'hidden';
+                        field.name = parameter;
+                        form.append(field);
+                    }
+                    field.value = selected;
+                    return;
+                }
+
+                let field = form.querySelector('[name="_erp_workspace"]');
+                if (!field) {
+                    field = document.createElement('input');
+                    field.type = 'hidden';
+                    field.name = '_erp_workspace';
+                    form.append(field);
+                }
+                field.value = selected;
+            });
+        });
+
+        const applyUrlWorkspace = () => {
+            const params = new URLSearchParams(window.location.search);
+            updateWorkspace(params.get(parameter) || workspace.dataset.workspaceInitial || workspace.dataset.workspaceDefault);
+        };
+        window.addEventListener('popstate', applyUrlWorkspace);
+        applyUrlWorkspace();
+    });
+
     const workspace = document.querySelector('[data-apms-workspace]');
 
     if (workspace) {

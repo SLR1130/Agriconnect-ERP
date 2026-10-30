@@ -60,6 +60,16 @@
             @endforeach
         </div>
 
+        <div class="erp-workspace" data-erp-workspace data-workspace-param="workspace" data-workspace-default="budget" data-workspace-initial="{{ old('_erp_workspace', request('workspace', 'budget')) }}">
+            <div class="erp-workspace-tabs" role="tablist" aria-label="Budget and procurement workspaces">
+                <button id="abpms-tab-budget" class="erp-workspace-tab" type="button" role="tab" aria-selected="true" aria-controls="abpms-panel-budget" data-erp-workspace-tab="budget">Budget management</button>
+                <button id="abpms-tab-procurement" class="erp-workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="abpms-panel-procurement" data-erp-workspace-tab="procurement">Procurement requests</button>
+                <button id="abpms-tab-orders" class="erp-workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="abpms-panel-orders" data-erp-workspace-tab="orders">Purchase orders &amp; receiving</button>
+                <button id="abpms-tab-equipment" class="erp-workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="abpms-panel-equipment" data-erp-workspace-tab="equipment">Equipment acquisitions</button>
+                <button id="abpms-tab-reports" class="erp-workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="abpms-panel-reports" data-erp-workspace-tab="reports">Reports &amp; history</button>
+            </div>
+
+            <section id="abpms-panel-budget" class="erp-workspace-panel space-y-5" role="tabpanel" aria-labelledby="abpms-tab-budget" tabindex="0" data-erp-workspace-panel="budget">
         @if($canManage)
             <div class="ab-forms grid grid-cols-2 gap-5">
                 <section class="ab-card p-5"><details class="ab-disclosure" @if(old('_abpms_form') === 'period' || $errors->has('year') || $errors->has('name') || $errors->has('starts_on') || $errors->has('ends_on')) open @endif><summary><span><span class="ab-disclosure-title">Open a budget period</span><span class="ab-disclosure-copy block">A period is the authoritative time boundary for budget allocations.</span></span><span class="ab-disclosure-toggle" aria-hidden="true"></span></summary><div class="ab-disclosure-body"><form method="POST" action="{{ route('modules.abpms.periods.store') }}" class="grid gap-3 sm:grid-cols-2">
@@ -131,6 +141,8 @@
             </tbody></table></div>
         </section>
 
+            </section>
+            <section id="abpms-panel-procurement" class="erp-workspace-panel space-y-5" role="tabpanel" aria-labelledby="abpms-tab-procurement" tabindex="0" data-erp-workspace-panel="procurement" hidden>
         @if($canCreate)
             <div class="ab-forms grid grid-cols-2 gap-5">
                 <section class="ab-card p-5"><details class="ab-disclosure" @if(old('_abpms_form') === 'supplier' || $errors->has('contact_person') || $errors->has('registration_reference') || $errors->has('email') || $errors->has('phone') || $errors->has('address') || $errors->has('name')) open @endif><summary><span><span class="ab-disclosure-title">Supplier registry</span><span class="ab-disclosure-copy block">Keep supplier identity and registration details in one shared procurement record.</span></span><span class="ab-disclosure-toggle" aria-hidden="true"></span></summary><div class="ab-disclosure-body"><form method="POST" action="{{ route('modules.abpms.suppliers.store') }}" class="grid gap-3 sm:grid-cols-2">
@@ -217,6 +229,8 @@
             <div class="mt-4">{{ $requests->links() }}</div>
         </section>
 
+            </section>
+            <section id="abpms-panel-orders" class="erp-workspace-panel space-y-5" role="tabpanel" aria-labelledby="abpms-tab-orders" tabindex="0" data-erp-workspace-panel="orders" hidden>
         <section class="ab-card p-5">
             <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><h2 class="text-lg font-bold text-forest-green">Purchase orders &amp; receiving</h2><p class="mt-1 text-sm text-slate-500">Approval commits budget. Inventory changes only when goods are physically received.</p></div><form method="GET" action="{{ route('modules.abpms.dashboard') }}" class="flex flex-wrap gap-2"><input class="ab-input !w-48" name="order_search" value="{{ request('order_search') }}" placeholder="Search purchase orders"><select class="ab-input !w-auto" name="order_status"><option value="">All order status</option>@foreach(['draft','approved','ordered','partially_received','received','cancelled'] as $orderStatus)<option value="{{ $orderStatus }}" @selected(request('order_status') === $orderStatus)>{{ str_replace('_', ' ', ucfirst($orderStatus)) }}</option>@endforeach</select><button class="ab-btn ab-muted" type="submit">Filter</button></form><span class="ab-pill ab-blue">{{ $purchaseOrders->total() }} orders</span></div>
             @if($canUpdate && $receivableItems->isNotEmpty())
@@ -274,6 +288,8 @@
             <div class="mt-4">{{ $purchaseOrders->links() }}</div>
         </section>
 
+            </section>
+            <section id="abpms-panel-equipment" class="erp-workspace-panel space-y-5" role="tabpanel" aria-labelledby="abpms-tab-equipment" tabindex="0" data-erp-workspace-panel="equipment" hidden>
         @if($canAcquireEquipment)
             <section class="ab-card p-5">
                 <div><h2 class="text-lg font-bold text-forest-green">Register equipment from a physical receipt</h2><p class="mt-1 text-sm text-slate-500">Choose only a received equipment line. Each unit becomes an individual AEAMS asset with its own identifier and shared PO, receipt, date, and per-unit cost references.</p></div>
@@ -316,6 +332,11 @@
             <div class="mt-4">{{ $equipmentAcquisitions->links() }}</div>
         </section>
 
+            </section>
+            <section id="abpms-panel-reports" class="erp-workspace-panel space-y-5" role="tabpanel" aria-labelledby="abpms-tab-reports" tabindex="0" data-erp-workspace-panel="reports" hidden>
+        @if($canExport)
+            <section class="ab-card flex flex-wrap items-center justify-between gap-4 p-5"><div><p class="text-xs font-bold uppercase tracking-wider text-emerald-green">Operational reports</p><h2 class="mt-1 text-lg font-bold text-forest-green">Budget, procurement and receiving exports</h2><p class="mt-1 text-sm text-slate-500">Download the existing report for the workflow you need to reconcile.</p></div><div class="flex flex-wrap gap-2"><a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'budget']) }}">Budget</a><a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'requests']) }}">Requests</a><a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'orders']) }}">Orders</a><a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'receipts']) }}">Receiving</a><a class="ab-btn ab-gold" href="{{ route('modules.abpms.export', ['report' => 'equipment']) }}">Equipment acquisitions</a></div></section>
+        @endif
         <div class="ab-two grid grid-cols-2 gap-5">
             <section class="ab-card p-5">
                 <h2 class="text-lg font-bold text-forest-green">Supplier directory</h2>
@@ -333,6 +354,8 @@
             <div class="ab-table-wrap mt-4"><table class="ab-table"><thead><tr><th>Receipt</th><th>Purchase order</th><th>Received by</th><th>Items</th></tr></thead><tbody>@forelse($receipts as $receipt)<tr><td><b>{{ $receipt->receipt_reference }}</b><div class="text-xs text-slate-500">{{ $receipt->received_on?->format('M d, Y') }}</div></td><td>{{ $receipt->purchaseOrder?->purchase_order_number }}</td><td>{{ $receipt->receiver?->name }}</td><td><ul>@foreach($receipt->items as $item)<li>{{ $item->quantity }} · {{ $item->batch_number ?: 'No batch' }}@if($item->inventory_movement_id) <span class="text-emerald-green">· AISMS movement #{{ $item->inventory_movement_id }}</span>@endif</li>@endforeach</ul></td></tr>@empty<tr><td colspan="4" class="py-8 text-center text-slate-500">No physical receipts recorded.</td></tr>@endforelse</tbody></table></div>
             <div class="mt-4">{{ $receipts->links() }}</div>
         </section>
+            </section>
+        </div>
     </div>
 
     <script>
