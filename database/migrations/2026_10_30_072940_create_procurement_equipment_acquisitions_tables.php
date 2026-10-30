@@ -10,11 +10,11 @@ return new class extends Migration
     {
         Schema::create('procurement_equipment_acquisitions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('purchase_order_item_id')->constrained('purchase_order_items')->restrictOnDelete();
-            $table->foreignId('procurement_receipt_item_id')->constrained('procurement_receipt_items')->restrictOnDelete();
-            $table->foreignId('category_id')->constrained('equipment_categories')->restrictOnDelete();
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
-            $table->string('idempotency_key')->unique();
+            $table->foreignId('purchase_order_item_id');
+            $table->foreignId('procurement_receipt_item_id');
+            $table->foreignId('category_id');
+            $table->foreignId('created_by');
+            $table->string('idempotency_key')->unique('abpms_eq_acq_idem_uk');
             $table->unsignedInteger('quantity');
             $table->string('asset_name', 150);
             $table->string('condition', 30)->default('good');
@@ -25,14 +25,16 @@ return new class extends Migration
 
             $table->index(['purchase_order_item_id', 'created_at'], 'abpms_equipment_acquisition_item_idx');
             $table->index(['procurement_receipt_item_id', 'created_at'], 'abpms_equipment_acquisition_receipt_idx');
+            $table->foreign('purchase_order_item_id', 'abpms_eq_acq_po_item_fk')->references('id')->on('purchase_order_items')->restrictOnDelete();
+            $table->foreign('procurement_receipt_item_id', 'abpms_eq_acq_receipt_fk')->references('id')->on('procurement_receipt_items')->restrictOnDelete();
+            $table->foreign('category_id', 'abpms_eq_acq_category_fk')->references('id')->on('equipment_categories')->restrictOnDelete();
+            $table->foreign('created_by', 'abpms_eq_acq_created_by_fk')->references('id')->on('users')->restrictOnDelete();
         });
 
         Schema::create('procurement_equipment_acquisition_assets', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('procurement_equipment_acquisition_id')
-                ->constrained('procurement_equipment_acquisitions')
-                ->cascadeOnDelete();
-            $table->foreignId('equipment_asset_id')->unique()->constrained('equipment_assets')->restrictOnDelete();
+            $table->foreignId('procurement_equipment_acquisition_id');
+            $table->foreignId('equipment_asset_id')->unique('abpms_eq_acq_asset_uk');
             $table->unsignedInteger('unit_number');
             $table->timestamps();
 
@@ -40,6 +42,10 @@ return new class extends Migration
                 ['procurement_equipment_acquisition_id', 'unit_number'],
                 'abpms_equipment_acquisition_unit_unique',
             );
+            $table->foreign('procurement_equipment_acquisition_id', 'abpms_eq_acq_asset_parent_fk')
+                ->references('id')->on('procurement_equipment_acquisitions')->cascadeOnDelete();
+            $table->foreign('equipment_asset_id', 'abpms_eq_acq_asset_fk')
+                ->references('id')->on('equipment_assets')->restrictOnDelete();
         });
     }
 
