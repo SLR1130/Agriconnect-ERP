@@ -11,6 +11,12 @@
 
     <div class="space-y-6">
         @if(session('status'))<div class="ae-card border-l-4 border-emerald-600 px-5 py-4 text-sm text-emerald-800">{{ session('status') }}</div>@endif
+        @if($errors->any())
+            <div class="ae-card border-l-4 border-red-500 px-5 py-4 text-sm text-red-700" role="alert">
+                <b>Asset action needs attention.</b>
+                <ul class="mt-1 list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            </div>
+        @endif
         <a href="{{ route('modules.aeams.dashboard') }}" class="inline-flex rounded-xl border border-emerald-200 px-4 py-2 text-sm font-bold text-forest-green hover:bg-emerald-50">← Back to equipment workspace</a>
 
         <section class="ae-card p-6">

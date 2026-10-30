@@ -82,6 +82,19 @@ class CoreOperationsCompletionTest extends TestCase
         $this->actingAs($staff)->get('/modules/apms/export')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
     }
 
+    public function test_apms_browser_forms_render_authoritative_farmer_and_farm_selectors(): void
+    {
+        $staff = $this->staff('apms');
+        $this->farmerAndFarm();
+
+        $this->actingAs($staff)
+            ->get('/modules/apms')
+            ->assertOk()
+            ->assertSee("name='farmer_id'", false)
+            ->assertSee("name='farm_id'", false)
+            ->assertDontSee("@include('apms.farm-fields')", false);
+    }
+
     public function test_aasms_program_update_exposes_and_persists_eligibility_without_touching_applications(): void
     {
         $staff = $this->staff('aasms');
