@@ -1,20 +1,164 @@
 <?php
+
 namespace Tests\Feature;
-use App\Models\{AssistanceApplication,AssistanceDistribution,AssistanceProgram,Farmer,InventoryLocation,Role,SupplyBatch,SupplyCategory,SupplyItem,UnitOfMeasurement,User};
-use App\Services\{AssistanceService,InventoryService};
+
+use App\Models\AssistanceApplication;
+use App\Models\AssistanceDistribution;
+use App\Models\AssistanceProgram;
+use App\Models\Farmer;
+use App\Models\InventoryLocation;
+use App\Models\Role;
+use App\Models\SupplyBatch;
+use App\Models\SupplyCategory;
+use App\Models\SupplyItem;
+use App\Models\UnitOfMeasurement;
+use App\Models\User;
+use App\Services\AssistanceService;
+use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
- class AASMSAssistanceTest extends TestCase { use RefreshDatabase; private function setupData():array{$role=Role::create(['name'=>'MAO','slug'=>'mao','permissions'=>['modules.aasms.*'],'is_active'=>true]);$staff=User::factory()->create();$staff->roles()->attach($role);$farmerRole=Role::create(['name'=>'Farmer','slug'=>'farmer','permissions'=>[],'is_active'=>true]);$fu=User::factory()->create();$fu->roles()->attach($farmerRole);$farmer=Farmer::create(['user_id'=>$fu->id,'farmer_code'=>'F-1','registration_status'=>'verified']);$program=AssistanceProgram::create(['name'=>'Seed Support','status'=>'open']);$app=AssistanceApplication::create(['program_id'=>$program->id,'farmer_id'=>$farmer->id,'status'=>'approved']);$cat=SupplyCategory::firstOrCreate(['name'=>'Seeds'],['is_active'=>true]);$unit=UnitOfMeasurement::firstOrCreate(['name'=>'Kilogram'],['symbol'=>'kg']);$loc=InventoryLocation::create(['name'=>'Store','is_active'=>true]);$item=SupplyItem::create(['category_id'=>$cat->id,'unit_id'=>$unit->id,'code'=>'S-1','name'=>'Seed','minimum_stock'=>0,'status'=>'active']);$batch=app(InventoryService::class)->receive(['supply_item_id'=>$item->id,'location_id'=>$loc->id,'batch_number'=>'B','received_on'=>now()->toDateString(),'quantity'=>5],$staff->id);return compact('staff','fu','program','app','batch');}
- public function test_farmer_application_and_staff_distribution_are_persisted():void{$x=$this->setupData();$this->actingAs($x['fu'])->post('/assistance/programs/'.$x['program']->id.'/apply',[])->assertRedirect();$this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute',['supply_batch_id'=>$x['batch']->supply_batch_id,'quantity'=>2])->assertRedirect();$this->assertDatabaseHas('assistance_distributions',['application_id'=>$x['app']->id,'quantity'=>2]);$this->assertSame('3.00',(string)SupplyBatch::first()->fresh()->quantity_available);}
- public function test_only_approved_application_can_be_distributed():void{$x=$this->setupData();$x['app']->update(['status'=>'submitted']);$this->expectException(ValidationException::class);app(AssistanceService::class)->distribute($x['app'],['supply_batch_id'=>$x['batch']->supply_batch_id,'quantity'=>1],$x['staff']->id,app(InventoryService::class));}
- public function test_unauthorized_staff_cannot_open_aasms():void{$u=User::factory()->create();$this->actingAs($u)->get('/modules/aasms')->assertForbidden();}
- public function test_mao_can_approve_selected_pending_application_and_history_is_saved():void{$x=$this->setupData();$x['app']->update(['status'=>'submitted']);$this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/review',['status'=>'approved'])->assertRedirect();$this->assertDatabaseHas('assistance_applications',['id'=>$x['app']->id,'status'=>'approved','reviewed_by'=>$x['staff']->id]);$this->assertDatabaseHas('assistance_status_histories',['application_id'=>$x['app']->id,'from_status'=>'submitted','to_status'=>'approved']);}
- public function test_mao_can_reject_or_return_only_with_a_reason():void{$x=$this->setupData();$x['app']->update(['status'=>'submitted']);$this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/review',['status'=>'rejected','review_notes'=>'Missing requirement'])->assertRedirect();$this->assertDatabaseHas('assistance_applications',['id'=>$x['app']->id,'status'=>'rejected']);$second=AssistanceApplication::create(['program_id'=>$x['program']->id,'farmer_id'=>Farmer::create(['user_id'=>User::factory()->create()->id,'farmer_code'=>'F-2','registration_status'=>'verified'])->id,'status'=>'submitted']);$this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$second->id.'/review',['status'=>'returned','review_notes'=>'Attach proof'])->assertRedirect();$this->assertDatabaseHas('assistance_applications',['id'=>$second->id,'status'=>'returned']);}
- public function test_review_form_uses_each_application_id_and_unauthorized_review_is_blocked():void{$x=$this->setupData();$x['app']->update(['status'=>'submitted']);$this->actingAs($x['staff'])->get('/modules/aasms')->assertOk()->assertSee('/modules/aasms/applications/'.$x['app']->id.'/review');$this->actingAs($x['fu'])->post('/modules/aasms/applications/'.$x['app']->id.'/review',['status'=>'approved'])->assertForbidden();}
- public function test_distribution_deducts_stock_once_for_a_retry():void{$x=$this->setupData();app(InventoryService::class)->receive(['supply_item_id'=>SupplyBatch::find($x['batch']->supply_batch_id)->supply_item_id,'location_id'=>SupplyBatch::find($x['batch']->supply_batch_id)->location_id,'batch_number'=>'B','received_on'=>now()->toDateString(),'quantity'=>95],$x['staff']->id);$payload=['supply_batch_id'=>$x['batch']->supply_batch_id,'quantity'=>20,'idempotency_key'=>'distribution-retry'];$this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute',$payload)->assertRedirect();$this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute',$payload)->assertRedirect();$this->assertSame('80.00',(string)SupplyBatch::find($x['batch']->supply_batch_id)->fresh()->quantity_available);$this->assertDatabaseCount('assistance_distributions',1);$this->assertDatabaseCount('inventory_movements',3);}
- public function test_distribution_form_is_scoped_to_approved_application():void{$x=$this->setupData();$this->actingAs($x['staff'])->get('/modules/aasms')->assertOk()->assertSee('/modules/aasms/applications/'.$x['app']->id.'/distribute');}
- public function test_distribution_respects_approved_entitlement():void{$x=$this->setupData();$x['app']->update(['approved_quantity'=>1]);$this->expectException(ValidationException::class);app(AssistanceService::class)->distribute($x['app'],['supply_batch_id'=>$x['batch']->supply_batch_id,'quantity'=>2],$x['staff']->id,app(InventoryService::class));}
- public function test_farmer_assistance_page_is_owner_scoped():void{$x=$this->setupData();$this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute',['supply_batch_id'=>$x['batch']->supply_batch_id,'quantity'=>1,'idempotency_key'=>'owner-history'])->assertRedirect();$reference=AssistanceDistribution::first()->reference;$this->actingAs($x['fu'])->get('/farmer/assistance')->assertOk()->assertSee('Seed Support')->assertSee($reference);}
-  public function test_dashboard_counts_are_not_limited_to_the_current_page_and_hides_closed_review_controls():void{$x=$this->setupData();$x['app']->update(['status'=>'approved']);$secondUser=User::factory()->create();$secondFarmer=Farmer::create(['user_id'=>$secondUser->id,'farmer_code'=>'F-2','registration_status'=>'verified']);AssistanceApplication::create(['program_id'=>$x['program']->id,'farmer_id'=>$secondFarmer->id,'status'=>'submitted']);$response=$this->actingAs($x['staff'])->get('/modules/aasms?status=approved')->assertOk();$response->assertSee('data-aasms-stat="pending-applications"',false)->assertSee('data-aasms-stat="approved-applications"',false)->assertSee('data-aasms-stat="pending-applications" class="mt-2 text-3xl font-bold text-agricultural-gold">1</p',false)->assertSee('data-aasms-stat="approved-applications" class="mt-2 text-3xl font-bold text-emerald-green">1</p',false)->assertDontSee(route('modules.aasms.review',$x['app']),false);}
+
+class AASMSAssistanceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function setupData(): array
+    {
+        $role = Role::create(['name' => 'MAO', 'slug' => 'mao', 'permissions' => ['modules.aasms.*'], 'is_active' => true]);
+        $staff = User::factory()->create();
+        $staff->roles()->attach($role);
+        $farmerRole = Role::create(['name' => 'Farmer', 'slug' => 'farmer', 'permissions' => [], 'is_active' => true]);
+        $fu = User::factory()->create();
+        $fu->roles()->attach($farmerRole);
+        $farmer = Farmer::create(['user_id' => $fu->id, 'farmer_code' => 'F-1', 'registration_status' => 'verified']);
+        $program = AssistanceProgram::create(['name' => 'Seed Support', 'status' => 'open']);
+        $app = AssistanceApplication::create(['program_id' => $program->id, 'farmer_id' => $farmer->id, 'status' => 'approved']);
+        $cat = SupplyCategory::firstOrCreate(['name' => 'Seeds'], ['is_active' => true]);
+        $unit = UnitOfMeasurement::firstOrCreate(['name' => 'Kilogram'], ['symbol' => 'kg']);
+        $loc = InventoryLocation::create(['name' => 'Store', 'is_active' => true]);
+        $item = SupplyItem::create(['category_id' => $cat->id, 'unit_id' => $unit->id, 'code' => 'S-1', 'name' => 'Seed', 'minimum_stock' => 0, 'status' => 'active']);
+        $batch = app(InventoryService::class)->receive(['supply_item_id' => $item->id, 'location_id' => $loc->id, 'batch_number' => 'B', 'received_on' => now()->toDateString(), 'quantity' => 5], $staff->id);
+
+        return compact('staff', 'fu', 'program', 'app', 'batch');
+    }
+
+    public function test_farmer_application_and_staff_distribution_are_persisted(): void
+    {
+        $x = $this->setupData();
+        $this->actingAs($x['fu'])->post('/assistance/programs/'.$x['program']->id.'/apply', [])->assertRedirect();
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 2])->assertRedirect();
+        $this->assertDatabaseHas('assistance_distributions', ['application_id' => $x['app']->id, 'quantity' => 2]);
+        $this->assertSame('3.00', (string) SupplyBatch::first()->fresh()->quantity_available);
+    }
+
+    public function test_only_approved_application_can_be_distributed(): void
+    {
+        $x = $this->setupData();
+        $x['app']->update(['status' => 'submitted']);
+        $this->expectException(ValidationException::class);
+        app(AssistanceService::class)->distribute($x['app'], ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 1], $x['staff']->id, app(InventoryService::class));
+    }
+
+    public function test_unauthorized_staff_cannot_open_aasms(): void
+    {
+        $u = User::factory()->create();
+        $this->actingAs($u)->get('/modules/aasms')->assertForbidden();
+    }
+
+    public function test_mao_can_approve_selected_pending_application_and_history_is_saved(): void
+    {
+        $x = $this->setupData();
+        $x['app']->update(['status' => 'submitted']);
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/review', ['status' => 'approved'])->assertRedirect();
+        $this->assertDatabaseHas('assistance_applications', ['id' => $x['app']->id, 'status' => 'approved', 'reviewed_by' => $x['staff']->id]);
+        $this->assertDatabaseHas('assistance_status_histories', ['application_id' => $x['app']->id, 'from_status' => 'submitted', 'to_status' => 'approved']);
+    }
+
+    public function test_mao_can_reject_or_return_only_with_a_reason(): void
+    {
+        $x = $this->setupData();
+        $x['app']->update(['status' => 'submitted']);
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/review', ['status' => 'rejected', 'review_notes' => 'Missing requirement'])->assertRedirect();
+        $this->assertDatabaseHas('assistance_applications', ['id' => $x['app']->id, 'status' => 'rejected']);
+        $second = AssistanceApplication::create(['program_id' => $x['program']->id, 'farmer_id' => Farmer::create(['user_id' => User::factory()->create()->id, 'farmer_code' => 'F-2', 'registration_status' => 'verified'])->id, 'status' => 'submitted']);
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$second->id.'/review', ['status' => 'returned', 'review_notes' => 'Attach proof'])->assertRedirect();
+        $this->assertDatabaseHas('assistance_applications', ['id' => $second->id, 'status' => 'returned']);
+    }
+
+    public function test_review_form_uses_each_application_id_and_unauthorized_review_is_blocked(): void
+    {
+        $x = $this->setupData();
+        $x['app']->update(['status' => 'submitted']);
+        $this->actingAs($x['staff'])->get('/modules/aasms')->assertOk()->assertSee('/modules/aasms/applications/'.$x['app']->id.'/review');
+        $this->actingAs($x['fu'])->post('/modules/aasms/applications/'.$x['app']->id.'/review', ['status' => 'approved'])->assertForbidden();
+    }
+
+    public function test_distribution_deducts_stock_once_for_a_retry(): void
+    {
+        $x = $this->setupData();
+        app(InventoryService::class)->receive(['supply_item_id' => SupplyBatch::find($x['batch']->supply_batch_id)->supply_item_id, 'location_id' => SupplyBatch::find($x['batch']->supply_batch_id)->location_id, 'batch_number' => 'B', 'received_on' => now()->toDateString(), 'quantity' => 95], $x['staff']->id);
+        $payload = ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 20, 'idempotency_key' => 'distribution-retry'];
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', $payload)->assertRedirect();
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', $payload)->assertRedirect();
+        $this->assertSame('80.00', (string) SupplyBatch::find($x['batch']->supply_batch_id)->fresh()->quantity_available);
+        $this->assertDatabaseCount('assistance_distributions', 1);
+        $this->assertDatabaseCount('inventory_movements', 3);
+    }
+
+    public function test_distribution_form_is_scoped_to_approved_application(): void
+    {
+        $x = $this->setupData();
+        $this->actingAs($x['staff'])->get('/modules/aasms')->assertOk()->assertSee('/modules/aasms/applications/'.$x['app']->id.'/distribute');
+    }
+
+    public function test_distribution_respects_approved_entitlement(): void
+    {
+        $x = $this->setupData();
+        $x['app']->update(['approved_quantity' => 1]);
+        $this->expectException(ValidationException::class);
+        app(AssistanceService::class)->distribute($x['app'], ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 2], $x['staff']->id, app(InventoryService::class));
+    }
+
+    public function test_completed_distribution_records_one_status_transition_on_retry(): void
+    {
+        $x = $this->setupData();
+        $payload = [
+            'supply_batch_id' => $x['batch']->supply_batch_id,
+            'quantity' => 2,
+            'idempotency_key' => 'completion-history-retry',
+        ];
+
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', $payload)->assertRedirect();
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', $payload)->assertRedirect();
+
+        $this->assertDatabaseHas('assistance_status_histories', [
+            'application_id' => $x['app']->id,
+            'from_status' => 'approved',
+            'to_status' => 'completed',
+            'changed_by' => $x['staff']->id,
+        ]);
+        $this->assertDatabaseCount('assistance_status_histories', 1);
+        $this->assertDatabaseCount('assistance_distributions', 1);
+        $this->assertSame('3.00', (string) SupplyBatch::first()->fresh()->quantity_available);
+    }
+
+    public function test_farmer_assistance_page_is_owner_scoped(): void
+    {
+        $x = $this->setupData();
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 1, 'idempotency_key' => 'owner-history'])->assertRedirect();
+        $reference = AssistanceDistribution::first()->reference;
+        $this->actingAs($x['fu'])->get('/farmer/assistance')->assertOk()->assertSee('Seed Support')->assertSee($reference);
+    }
+
+    public function test_dashboard_counts_are_not_limited_to_the_current_page_and_hides_closed_review_controls(): void
+    {
+        $x = $this->setupData();
+        $x['app']->update(['status' => 'approved']);
+        $secondUser = User::factory()->create();
+        $secondFarmer = Farmer::create(['user_id' => $secondUser->id, 'farmer_code' => 'F-2', 'registration_status' => 'verified']);
+        AssistanceApplication::create(['program_id' => $x['program']->id, 'farmer_id' => $secondFarmer->id, 'status' => 'submitted']);
+        $response = $this->actingAs($x['staff'])->get('/modules/aasms?status=approved')->assertOk();
+        $response->assertSee('data-aasms-stat="pending-applications"', false)->assertSee('data-aasms-stat="approved-applications"', false)->assertSee('data-aasms-stat="pending-applications" class="mt-2 text-3xl font-bold text-agricultural-gold">1</p',false)->assertSee('data-aasms-stat="approved-applications" class="mt-2 text-3xl font-bold text-emerald-green">1</p',false)->assertDontSee(route('modules.aasms.review',$x['app']),false);
+    }
 }

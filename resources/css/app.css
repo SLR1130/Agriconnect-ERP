@@ -49,11 +49,13 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 .erp-field-label { display: block; margin-bottom: .3rem; color: var(--ink); font-size: .72rem; font-weight: 750; }
 .erp-empty-cell { padding: 2rem 1rem; color: var(--muted); text-align: center; }
 
-.ffrms-table { table-layout: fixed; border-collapse: collapse; }
+.ffrms-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: .75rem; scrollbar-width: thin; }
+.ffrms-table { width: 100%; min-width: 40rem; table-layout: fixed; border-collapse: collapse; }
 .ffrms-table th, .ffrms-table td { padding: .7rem .75rem; border-bottom: 1px solid #e7eee8; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 .ffrms-table th { color: var(--muted); font-size: .65rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .ffrms-table td { color: #405048; font-size: .8rem; }
 .ffrms-code, .ffrms-email { color: var(--muted); font-size: .7rem; }
+.ffrms-mobile-meta { display: none; }
 .ffrms-table-secondary { width: 5rem; }
 .ffrms-record-action { width: 8rem; }
 .ffrms-record-details { position: relative; }
@@ -95,9 +97,15 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
     .ffrms-association-row { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
+    .ffrms-table { min-width: 0; table-layout: fixed; }
     .ffrms-table th, .ffrms-table td { padding: .55rem .4rem; font-size: .7rem; }
-    .ffrms-table-secondary, .ffrms-email { display: none; }
-    .ffrms-record-action { width: 6.5rem; }
+    .ffrms-table th:nth-child(2), .ffrms-table td:nth-child(2), .ffrms-table-secondary, .ffrms-email { display: none; }
+    .ffrms-table th:nth-child(4), .ffrms-table td:nth-child(4) { width: 6rem; }
+    .ffrms-table th:nth-child(4) { font-size: .58rem; letter-spacing: .02em; white-space: nowrap; }
+    .ffrms-record-action, .ffrms-table th:nth-child(5) { width: 7rem; }
+    .ffrms-record-details > summary { padding: .55rem .6rem; font-size: .68rem; white-space: nowrap; }
+    .ffrms-table td:first-child strong { display: block; }
+    .ffrms-mobile-meta { display: block; margin-top: .2rem; color: var(--muted); font-size: .62rem; }
     .ffrms-field-grid { grid-template-columns: minmax(0, 1fr); }
     .ffrms-field-wide { grid-column: auto; }
     .ffrms-association-member-form { align-items: stretch; flex-direction: column; }

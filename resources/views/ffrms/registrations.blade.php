@@ -45,14 +45,14 @@
                     <div class="flex items-end gap-2"><button class="erp-button erp-button-primary" type="submit">Apply filters</button><a class="erp-button erp-button-secondary" href="{{ route('modules.ffrms.dashboard', ['workspace' => 'farmers']) }}">Clear</a></div>
                 </form>
 
-                <div class="erp-table-wrap mt-5">
-                    <table class="erp-table w-full">
+                <div class="ffrms-table-wrap mt-5">
+                    <table class="ffrms-table w-full">
                         <thead><tr><th scope="col">Farmer</th><th scope="col">Barangay</th><th class="ffrms-table-secondary" scope="col">Farms</th><th scope="col">Registration</th><th scope="col"><span class="sr-only">Record actions</span></th></tr></thead>
                         <tbody>
                             @forelse($farmers as $farmer)
                                 @php($farmerDetailsOpen = (string) old('_ffrms_farmer_id') === (string) $farmer->id)
                                 <tr>
-                                    <td><strong>{{ $farmer->user->name }}</strong><span class="ffrms-code block">{{ $farmer->farmer_code }}</span><span class="ffrms-email block">{{ $farmer->user->email }}</span></td>
+                                    <td><strong>{{ $farmer->user->name }}</strong><span class="ffrms-code block">{{ $farmer->farmer_code }}</span><span class="ffrms-email block">{{ $farmer->user->email }}</span><span class="ffrms-mobile-meta">{{ $farmer->barangay ?: 'Not recorded' }} · {{ $farmer->farms_count }} farm(s)</span></td>
                                     <td>{{ $farmer->barangay ?: 'Not recorded' }}</td>
                                     <td class="ffrms-table-secondary">{{ $farmer->farms_count }}</td>
                                     <td><span class="erp-pill {{ $farmer->registration_status === 'verified' ? 'erp-pill-success' : ($farmer->registration_status === 'rejected' ? 'erp-pill-warning' : 'erp-pill-neutral') }}">{{ ucfirst($farmer->registration_status) }}</span></td>
