@@ -1,17 +1,17 @@
 <?php
 
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\AASMSController;
+use App\Http\Controllers\ABPMSController;
+use App\Http\Controllers\AEAMSController;
+use App\Http\Controllers\AISMSController;
+use App\Http\Controllers\APMSController;
 use App\Http\Controllers\Auth\AccountSetupController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ERP\AdministrationController;
 use App\Http\Controllers\ERP\DashboardController;
-use App\Http\Controllers\FFRMSController;
 use App\Http\Controllers\FarmerPortalController;
-use App\Http\Controllers\APMSController;
+use App\Http\Controllers\FFRMSController;
 use App\Http\Controllers\SetupStatusController;
-use App\Http\Controllers\AISMSController;
-use App\Http\Controllers\AASMSController;
-use App\Http\Controllers\AEAMSController;
-use App\Http\Controllers\ABPMSController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [SetupStatusController::class, 'home'])->name('home');
@@ -118,6 +118,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/abpms/purchase-orders/{purchaseOrder}/cancel', [ABPMSController::class, 'cancelPurchaseOrder'])->name('modules.abpms.purchase-orders.cancel');
         Route::post('/abpms/receipts', [ABPMSController::class, 'receive'])->name('modules.abpms.receipts.store');
         Route::post('/abpms/purchase-order-items/{purchaseOrderItem}/link-equipment', [ABPMSController::class, 'linkEquipment'])->name('modules.abpms.purchase-order-items.link-equipment');
+        Route::post('/abpms/receipts/{procurementReceiptItem}/equipment-assets', [ABPMSController::class, 'createEquipmentAssets'])->name('modules.abpms.receipts.equipment-assets.store');
         Route::get('/abpms/export', [ABPMSController::class, 'export'])->name('modules.abpms.export');
     });
 

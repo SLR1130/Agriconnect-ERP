@@ -80,7 +80,15 @@
         <section class="ab-card p-5">
             <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
                 <div><h2 class="text-lg font-bold text-forest-green">Budget allocations</h2><p class="mt-1 text-sm text-slate-500">Authorized, committed, actual, and available amounts come from the budget ledger.</p></div>
-                <a class="ab-btn ab-muted" href="{{ route('modules.abpms.export') }}">Download CSV report</a>
+                @if($canExport)
+                    <div class="flex flex-wrap gap-2">
+                        <a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'budget']) }}">Budget balances CSV</a>
+                        <a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'requests']) }}">Requests CSV</a>
+                        <a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'orders']) }}">Orders CSV</a>
+                        <a class="ab-btn ab-muted" href="{{ route('modules.abpms.export', ['report' => 'receipts']) }}">Receiving CSV</a>
+                        <a class="ab-btn ab-gold" href="{{ route('modules.abpms.export', ['report' => 'equipment']) }}">Equipment acquisitions CSV</a>
+                    </div>
+                @endif
             </div>
             <div class="ab-table-wrap mt-5"><table class="ab-table"><thead><tr><th>Reference</th><th>Period / program</th><th>Authorized</th><th>Committed</th><th>Actual</th><th>Available</th>@if($canManage)<th>Ledger action</th>@endif</tr></thead><tbody>
                 @forelse($allocations as $allocation)
@@ -143,8 +151,9 @@
                         <div class="rounded-xl border border-sage bg-off-white p-3">
                             <div class="mb-2 flex items-center justify-between"><b class="text-sm text-forest-green">Requested item</b><button type="button" class="ab-btn ab-muted text-xs" id="add-procurement-item">Add item</button></div>
                             <div id="procurement-items" class="space-y-2">
-                                <div class="procurement-item grid gap-2 md:grid-cols-4">
-                                    <select class="ab-input md:col-span-1" name="items[0][supply_item_id]"><option value="">Optional AISMS supply</option>@foreach($supplyItems as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</select>
+                <div class="procurement-item grid gap-2 md:grid-cols-5">
+                                    <select class="ab-input" name="items[0][item_type]" data-item-type-select required><option value="supply">AISMS supply</option><option value="equipment">Equipment asset</option></select>
+                                    <select class="ab-input" name="items[0][supply_item_id]" data-supply-select required><option value="">Select AISMS supply</option>@foreach($supplyItems as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</select>
                                     <input class="ab-input" name="items[0][description]" placeholder="Item description" required>
                                     <input class="ab-input" name="items[0][quantity]" type="number" min=".01" step=".01" placeholder="Quantity" required>
                                     <input class="ab-input" name="items[0][estimated_unit_price]" type="number" min="0" step=".01" placeholder="Unit price" required>
@@ -164,7 +173,7 @@
                     <tr>
                         <td><b class="text-forest-green">{{ $procurementRequest->request_number }}</b><div class="mt-1 text-xs text-slate-500">{{ $procurementRequest->created_at?->format('M d, Y H:i') }}</div><div class="mt-1 max-w-xs text-xs text-slate-500">{{ $procurementRequest->purpose }}</div></td>
                         <td>{{ $procurementRequest->requester?->name ?: 'Unknown' }}<div class="text-xs text-slate-500">{{ $procurementRequest->requesting_office }}</div></td>
-                        <td><ul class="space-y-1">@foreach($procurementRequest->items as $item)<li>{{ $item->description }} · {{ $item->quantity }} × ₱{{ $money($item->estimated_unit_price) }}</li>@endforeach</ul></td>
+                        <td><ul class="space-y-1">@foreach($procurementRequest->items as $item)<li><span class="ab-pill {{ $item->item_type === 'equipment' ? 'ab-blue' : 'ab-green' }}">{{ ucfirst($item->item_type) }}</span> {{ $item->description }} · {{ $item->quantity }} × ₱{{ $money($item->estimated_unit_price) }}</li>@endforeach</ul></td>
                         <td>₱{{ $money($procurementRequest->estimated_total) }}</td>
                         <td><span class="ab-pill {{ $statusClass($procurementRequest->status) }}">{{ str_replace('_', ' ', $procurementRequest->status) }}</span>@if($procurementRequest->review_notes)<div class="mt-2 max-w-xs text-xs text-slate-500">Note: {{ $procurementRequest->review_notes }}</div>@endif</td>
                         <td class="min-w-[250px]">
@@ -196,13 +205,13 @@
                     <p class="mt-1 text-xs text-slate-600">For AISMS supplies, select a batch and inventory location. The existing InventoryService records the stock movement exactly once per idempotency key.</p>
                     <form method="POST" action="{{ route('modules.abpms.receipts.store') }}" class="mt-4 grid gap-3 md:grid-cols-3">
                         @csrf
-                        <select class="ab-input md:col-span-2" name="purchase_order_item_id" required><option value="">Purchase order item</option>@foreach($receivableItems as $item)<option value="{{ $item->id }}">{{ $item->purchaseOrder?->purchase_order_number }} · {{ $item->description }} · remaining {{ number_format((float)$item->ordered_quantity - (float)$item->received_quantity, 2) }}</option>@endforeach</select>
+                        <select class="ab-input md:col-span-2" name="purchase_order_item_id" data-receive-item required><option value="">Purchase order item</option>@foreach($receivableItems as $item)<option value="{{ $item->id }}" data-item-type="{{ $item->item_type }}">{{ $item->purchaseOrder?->purchase_order_number }} · {{ ucfirst($item->item_type) }} · {{ $item->description }} · remaining {{ number_format((float)$item->ordered_quantity - (float)$item->received_quantity, 2) }}</option>@endforeach</select>
                         <input class="ab-input" name="quantity" type="number" min=".01" step=".01" placeholder="Received quantity" required>
                         <input class="ab-input" name="received_on" type="date" value="{{ now()->toDateString() }}" required>
-                        <input class="ab-input" name="batch_number" placeholder="AISMS batch number">
+                        <input class="ab-input" name="batch_number" data-receive-supply-field placeholder="AISMS batch number">
                         <input class="ab-input" name="expires_on" type="date" placeholder="Expiration date">
-                        <select class="ab-input" name="location_id"><option value="">AISMS inventory location</option>@foreach($locations as $location)<option value="{{ $location->id }}">{{ $location->name }}</option>@endforeach</select>
-                        <input class="ab-input md:col-span-2" name="idempotency_key" placeholder="Required receipt retry key" required>
+                        <select class="ab-input" name="location_id" data-receive-supply-field><option value="">AISMS inventory location</option>@foreach($locations as $location)<option value="{{ $location->id }}">{{ $location->name }}</option>@endforeach</select>
+                        <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                         <input class="ab-input md:col-span-3" name="notes" placeholder="Receiving notes">
                         <button class="ab-btn ab-primary md:col-span-3" type="submit">Record physical receipt</button>
                     </form>
@@ -222,7 +231,10 @@
                                     <li>
                                         <b>{{ $item->description }}</b>
                                         <div class="text-xs text-slate-500">{{ $item->received_quantity }} / {{ $item->ordered_quantity }} received @if($item->equipmentAsset) · linked to {{ $item->equipmentAsset->asset_code }} @endif</div>
-                                        @if($canUpdate && $item->supply_item_id === null && $item->equipment_asset_id === null && (float)$item->received_quantity >= (float)$item->ordered_quantity && $equipmentAssets->isNotEmpty())
+                                        @if($item->equipmentAcquisitions->isNotEmpty())
+                                            <div class="mt-2 space-y-1 text-xs text-emerald-800">@foreach($item->equipmentAcquisitions as $acquisition)@foreach($acquisition->assets as $acquiredAsset)<div>{{ $acquiredAsset->equipmentAsset?->asset_code }} · {{ $acquiredAsset->equipmentAsset?->name }} · ₱{{ $money($acquisition->unit_acquisition_cost) }}</div>@endforeach @endforeach</div>
+                                        @endif
+                                        @if($canLinkEquipment && $item->item_type === 'equipment' && $item->equipment_asset_id === null && $item->equipmentAcquisitions->isEmpty() && (float)$item->ordered_quantity === 1.0 && (float)$item->received_quantity >= (float)$item->ordered_quantity && $equipmentAssets->isNotEmpty())
                                             <form method="POST" action="{{ route('modules.abpms.purchase-order-items.link-equipment', $item) }}" class="mt-2 flex gap-2">
                                                 @csrf
                                                 <select class="ab-input" name="equipment_asset_id" required><option value="">Link existing AEAMS asset</option>@foreach($equipmentAssets as $asset)<option value="{{ $asset->id }}">{{ $asset->asset_code }} · {{ $asset->name }}</option>@endforeach</select>
@@ -240,6 +252,48 @@
                 @endforelse
             </tbody></table></div>
             <div class="mt-4">{{ $purchaseOrders->links() }}</div>
+        </section>
+
+        @if($canAcquireEquipment)
+            <section class="ab-card p-5">
+                <div><h2 class="text-lg font-bold text-forest-green">Register equipment from a physical receipt</h2><p class="mt-1 text-sm text-slate-500">Choose only a received equipment line. Each unit becomes an individual AEAMS asset with its own identifier and shared PO, receipt, date, and per-unit cost references.</p></div>
+                @if($equipmentReceiptItems->isNotEmpty())
+                    <form method="POST" action="{{ route('modules.abpms.receipts.equipment-assets.store', ['procurementReceiptItem' => '__receipt__']) }}" data-equipment-acquisition-form class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        @csrf
+                        <select class="ab-input sm:col-span-2" name="procurement_receipt_item_id" data-acquisition-receipt required aria-label="Equipment receipt">
+                            <option value="">Select physical equipment receipt</option>
+                            @foreach($equipmentReceiptItems as $receiptItem)
+                                @php($registeredUnits = (int) $receiptItem->purchaseOrderItem->equipmentAcquisitions->where('procurement_receipt_item_id', $receiptItem->id)->sum('quantity'))
+                                @php($availableUnits = max(0, (int) floor((float) $receiptItem->quantity) - $registeredUnits))
+                                <option value="{{ $receiptItem->id }}" data-action="{{ route('modules.abpms.receipts.equipment-assets.store', $receiptItem) }}" data-available-units="{{ $availableUnits }}">
+                                    {{ $receiptItem->receipt?->receipt_reference }} · {{ $receiptItem->purchaseOrderItem?->purchaseOrder?->purchase_order_number }} · {{ $receiptItem->purchaseOrderItem?->description }} · {{ $availableUnits }} unit(s) not registered
+                                </option>
+                            @endforeach
+                        </select>
+                        <select class="ab-input" name="category_id" required aria-label="Equipment category"><option value="">Asset category</option>@foreach($equipmentCategories as $category)<option value="{{ $category->id }}">{{ $category->name }}</option>@endforeach</select>
+                        <input class="ab-input" type="number" name="quantity" min="1" max="1" value="1" data-acquisition-quantity required aria-label="Number of units to register">
+                        <input class="ab-input sm:col-span-2" name="asset_name" maxlength="150" placeholder="Asset name or naming prefix" required>
+                        <select class="ab-input" name="condition" required aria-label="Initial condition"><option value="good">Good condition</option><option value="fair">Fair condition</option><option value="damaged">Damaged condition</option></select>
+                        <input class="ab-input" name="assigned_location" maxlength="150" placeholder="Assigned location (optional)">
+                        <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                        <button class="ab-btn ab-primary sm:col-span-2 xl:col-span-4" type="submit">Create AEAMS asset record(s)</button>
+                    </form>
+                @else
+                    <div class="mt-4 rounded-xl bg-off-white p-4 text-sm text-slate-500">No unregistered equipment units have a physical goods receipt.</div>
+                @endif
+            </section>
+        @endif
+
+        <section class="ab-card p-5">
+            <div class="flex flex-wrap items-end justify-between gap-3"><div><h2 class="text-lg font-bold text-forest-green">Equipment acquisition register</h2><p class="mt-1 text-sm text-slate-500">Each listed asset traces to its procurement line and physical receipt.</p></div><span class="ab-pill ab-blue">{{ $equipmentAcquisitions->total() }} linked asset(s)</span></div>
+            <div class="ab-table-wrap mt-4"><table class="ab-table"><thead><tr><th>AEAMS asset</th><th>PO / physical receipt</th><th>Acquired on</th><th>Unit cost</th><th>Recorded by</th></tr></thead><tbody>
+                @forelse($equipmentAcquisitions as $assetLink)
+                    @php($acquisition = $assetLink->acquisition)
+                    @php($asset = $assetLink->equipmentAsset)
+                    <tr><td><b class="text-forest-green">{{ $asset?->asset_code }}</b><div>{{ $asset?->name }}</div><div class="text-xs text-slate-500">{{ $asset?->category?->name }} · {{ ucfirst($asset?->condition ?? 'unknown') }} · {{ $asset?->assigned_location ?: 'No assigned location' }}</div></td><td><b>{{ $acquisition?->purchaseOrderItem?->purchaseOrder?->purchase_order_number }}</b><div class="text-xs text-slate-500">{{ $acquisition?->receiptItem?->receipt?->receipt_reference }}</div></td><td>{{ $acquisition?->acquired_on?->format('M d, Y') }}</td><td>₱{{ $money($acquisition?->unit_acquisition_cost ?? 0) }}</td><td>{{ $acquisition?->creator?->name ?: 'Unknown' }}</td></tr>
+                @empty<tr><td colspan="5" class="py-8 text-center text-slate-500">No procurement-linked AEAMS assets yet.</td></tr>@endforelse
+            </tbody></table></div>
+            <div class="mt-4">{{ $equipmentAcquisitions->links() }}</div>
         </section>
 
         <div class="ab-two grid grid-cols-2 gap-5">
@@ -265,16 +319,69 @@
         document.addEventListener('DOMContentLoaded', function () {
             const addButton = document.getElementById('add-procurement-item');
             const items = document.getElementById('procurement-items');
-            if (!addButton || !items) return;
-            addButton.addEventListener('click', function () {
-                const index = items.querySelectorAll('.procurement-item').length;
-                const row = items.querySelector('.procurement-item').cloneNode(true);
-                row.querySelectorAll('input, select').forEach(function (field) {
-                    field.name = field.name.replace(/\[\d+\]/, '[' + index + ']');
-                    field.value = '';
+            const configureItemRow = function (row) {
+                const type = row.querySelector('[data-item-type-select]');
+                const supply = row.querySelector('[data-supply-select]');
+                const quantity = row.querySelector('input[name$="[quantity]"]');
+                const updateType = function () {
+                    const isSupply = type.value === 'supply';
+                    supply.required = isSupply;
+                    supply.disabled = !isSupply;
+                    supply.classList.toggle('hidden', !isSupply);
+                    if (!isSupply) supply.value = '';
+                    quantity.step = isSupply ? '.01' : '1';
+                    quantity.min = isSupply ? '.01' : '1';
+                };
+                type.addEventListener('change', updateType);
+                updateType();
+            };
+            if (items) {
+                items.querySelectorAll('.procurement-item').forEach(configureItemRow);
+            }
+            if (addButton && items) {
+                addButton.addEventListener('click', function () {
+                    const index = items.querySelectorAll('.procurement-item').length;
+                    const row = items.querySelector('.procurement-item').cloneNode(true);
+                    row.querySelectorAll('input, select').forEach(function (field) {
+                        field.name = field.name.replace(/\[\d+\]/, '[' + index + ']');
+                        field.value = '';
+                    });
+                    row.querySelector('[data-item-type-select]').value = 'supply';
+                    configureItemRow(row);
+                    items.appendChild(row);
                 });
-                items.appendChild(row);
-            });
+            }
+
+            const receiveItem = document.querySelector('[data-receive-item]');
+            if (receiveItem) {
+                const supplyFields = document.querySelectorAll('[data-receive-supply-field]');
+                const configureReceipt = function () {
+                    const isSupply = receiveItem.options[receiveItem.selectedIndex]?.dataset.itemType === 'supply';
+                    supplyFields.forEach(function (field) {
+                        field.required = isSupply;
+                        field.disabled = !isSupply;
+                        field.classList.toggle('hidden', !isSupply);
+                        if (!isSupply) field.value = '';
+                    });
+                };
+                receiveItem.addEventListener('change', configureReceipt);
+                configureReceipt();
+            }
+
+            const acquisitionForm = document.querySelector('[data-equipment-acquisition-form]');
+            const receiptSelect = document.querySelector('[data-acquisition-receipt]');
+            const acquisitionQuantity = document.querySelector('[data-acquisition-quantity]');
+            if (acquisitionForm && receiptSelect && acquisitionQuantity) {
+                const configureAcquisition = function () {
+                    const option = receiptSelect.options[receiptSelect.selectedIndex];
+                    acquisitionForm.action = option?.dataset.action || acquisitionForm.action;
+                    const maxUnits = option?.dataset.availableUnits || '1';
+                    acquisitionQuantity.max = maxUnits;
+                    acquisitionQuantity.value = Math.min(Number(acquisitionQuantity.value || 1), Number(maxUnits));
+                };
+                receiptSelect.addEventListener('change', configureAcquisition);
+                configureAcquisition();
+            }
         });
     </script>
 </x-layouts.app>

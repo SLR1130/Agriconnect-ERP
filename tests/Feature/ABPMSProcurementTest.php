@@ -4,14 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\BudgetAllocation;
 use App\Models\BudgetPeriod;
+use App\Models\EquipmentAcquisition;
+use App\Models\EquipmentAcquisitionAsset;
 use App\Models\EquipmentAsset;
 use App\Models\EquipmentCategory;
 use App\Models\InventoryLocation;
+use App\Models\ProcurementReceipt;
+use App\Models\ProcurementReceiptItem;
 use App\Models\ProcurementRequest;
-use App\Models\ProcurementStatusHistory;
 use App\Models\ProcurementSupplier;
 use App\Models\PurchaseOrder;
 use App\Models\Role;
+use App\Models\SupplyBatch;
 use App\Models\SupplyCategory;
 use App\Models\SupplyItem;
 use App\Models\UnitOfMeasurement;
@@ -28,7 +32,7 @@ class ABPMSProcurementTest extends TestCase
         $managerRole = Role::create([
             'name' => 'ABPMS Manager',
             'slug' => 'abpms_manager',
-            'permissions' => ['modules.abpms.*'],
+            'permissions' => ['modules.abpms.*', 'modules.aisms.receive', 'modules.aeams.create', 'modules.aeams.update'],
             'is_active' => true,
         ]);
         $creatorRole = Role::create([
@@ -106,6 +110,7 @@ class ABPMSProcurementTest extends TestCase
             'justification' => 'The existing stock level does not cover the approved program plan.',
             'idempotency_key' => $key,
             'items' => [[
+                'item_type' => 'supply',
                 'supply_item_id' => $data['supplyItem']->id,
                 'description' => 'Rice seed',
                 'quantity' => '2',
@@ -133,6 +138,39 @@ class ABPMSProcurementTest extends TestCase
             ->assertRedirect();
 
         return PurchaseOrder::latest('id')->firstOrFail();
+    }
+
+    private function createReceivedEquipmentItem(array $data, int $units = 2, string $key = 'equipment-multi'): array
+    {
+        $payload = $this->requestPayload($data, $key.'-request');
+        $payload['items'][0]['item_type'] = 'equipment';
+        $payload['items'][0]['supply_item_id'] = null;
+        $payload['items'][0]['description'] = 'Irrigation pump';
+        $payload['items'][0]['quantity'] = (string) $units;
+        $payload['items'][0]['estimated_unit_price'] = '500';
+
+        $this->actingAs($data['creator'])->post('/modules/abpms/requests', $payload)->assertRedirect();
+        $request = ProcurementRequest::where('idempotency_key', $key.'-request')->firstOrFail();
+        $this->actingAs($data['manager'])->post('/modules/abpms/requests/'.$request->id.'/review', ['status' => 'approved'])->assertRedirect();
+        $this->actingAs($data['creator'])->post('/modules/abpms/requests/'.$request->id.'/purchase-orders', [
+            'supplier_id' => $data['supplier']->id,
+            'idempotency_key' => $key.'-po',
+        ])->assertRedirect();
+        $order = PurchaseOrder::where('procurement_request_id', $request->id)->firstOrFail();
+        $this->actingAs($data['manager'])->post('/modules/abpms/purchase-orders/'.$order->id.'/approve')->assertRedirect();
+        $this->actingAs($data['manager'])->post('/modules/abpms/purchase-orders/'.$order->id.'/order')->assertRedirect();
+        $item = $order->items()->firstOrFail();
+        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', [
+            'purchase_order_item_id' => $item->id,
+            'quantity' => (string) $units,
+            'received_on' => '2026-10-29',
+            'idempotency_key' => $key.'-receipt',
+            'notes' => 'Equipment delivery physically inspected.',
+        ])->assertRedirect();
+        $receipt = ProcurementReceipt::where('idempotency_key', $key.'-receipt')->firstOrFail();
+        $receiptItem = $receipt->items()->firstOrFail();
+
+        return compact('request', 'order', 'item', 'receipt', 'receiptItem');
     }
 
     public function test_manager_can_create_period_and_allocation_and_dashboard_uses_real_records(): void
@@ -221,7 +259,7 @@ class ABPMSProcurementTest extends TestCase
     {
         $data = $this->setupAbpms();
 
-        $this->actingAs($data['viewer'])->get('/modules/abpms')->assertOk()->assertSee('Budget allocations')->assertDontSee('Create budget period');
+        $this->actingAs($data['viewer'])->get('/modules/abpms')->assertOk()->assertSee('Budget allocations')->assertSee('Budget balances CSV')->assertDontSee('Create budget period');
         $this->actingAs($data['viewer'])->post('/modules/abpms/periods', [
             'year' => 2027,
             'name' => 'Unauthorized',
@@ -230,6 +268,17 @@ class ABPMSProcurementTest extends TestCase
         ])->assertForbidden();
         $outsider = User::factory()->create();
         $this->actingAs($outsider)->get('/modules/abpms')->assertForbidden();
+    }
+
+    public function test_export_controls_and_direct_csv_route_require_effective_export_permission(): void
+    {
+        $data = $this->setupAbpms();
+
+        $this->actingAs($data['creator'])->get('/modules/abpms')
+            ->assertOk()
+            ->assertDontSee('Budget balances CSV');
+        $this->actingAs($data['creator'])->get('/modules/abpms/export')->assertForbidden();
+        $this->actingAs($data['viewer'])->get('/modules/abpms/export?report=orders')->assertOk()->assertSee('Item type');
     }
 
     public function test_manager_review_records_approval_rejection_and_invalid_transition(): void
@@ -336,12 +385,15 @@ class ABPMSProcurementTest extends TestCase
 
         $this->actingAs($data['manager'])->post('/modules/abpms/receipts', $payload)->assertRedirect();
         $this->actingAs($data['manager'])->post('/modules/abpms/receipts', $payload)->assertRedirect();
+        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', array_merge($payload, ['quantity' => '1']))
+            ->assertSessionHasErrors('idempotency_key');
 
         $this->assertDatabaseCount('procurement_receipts', 1);
         $this->assertDatabaseCount('inventory_movements', 1);
         $this->assertDatabaseHas('inventory_movements', ['movement_type' => 'receipt', 'quantity' => '2.00']);
         $this->assertDatabaseHas('supply_batches', ['batch_number' => 'ABPMS-BATCH-001', 'quantity_available' => '2.00']);
         $this->assertDatabaseHas('purchase_order_items', ['id' => $item->id, 'received_quantity' => '2.00']);
+        $this->assertDatabaseCount('inventory_movements', 1);
     }
 
     public function test_equipment_link_requires_receipt_and_reuses_existing_aeams_asset(): void
@@ -349,6 +401,7 @@ class ABPMSProcurementTest extends TestCase
         $data = $this->setupAbpms();
         $requestPayload = $this->requestPayload($data, 'equipment-request');
         $requestPayload['items'][0]['supply_item_id'] = null;
+        $requestPayload['items'][0]['item_type'] = 'equipment';
         $requestPayload['items'][0]['description'] = 'Irrigation pump';
         $requestPayload['items'][0]['quantity'] = '1';
         $requestPayload['items'][0]['estimated_unit_price'] = '500';
@@ -430,5 +483,161 @@ class ABPMSProcurementTest extends TestCase
             'id' => $item->id,
             'equipment_asset_id' => $data['equipment']->id,
         ]);
+        $receiptItem = ProcurementReceiptItem::query()->firstOrFail();
+        $this->actingAs($data['manager'])
+            ->post('/modules/abpms/receipts/'.$receiptItem->id.'/equipment-assets', [
+                'category_id' => $data['equipment']->category_id,
+                'quantity' => 1,
+                'asset_name' => 'Incorrect supply asset',
+                'condition' => 'good',
+                'idempotency_key' => 'invalid-supply-asset',
+            ])
+            ->assertSessionHasErrors('procurement_receipt_item_id');
+        $this->assertDatabaseCount('procurement_equipment_acquisitions', 0);
+    }
+
+    public function test_equipment_request_quantities_must_be_whole_units(): void
+    {
+        $data = $this->setupAbpms();
+        $payload = $this->requestPayload($data, 'fractional-equipment');
+        $payload['items'][0]['item_type'] = 'equipment';
+        $payload['items'][0]['supply_item_id'] = null;
+        $payload['items'][0]['quantity'] = '1.5';
+
+        $this->actingAs($data['creator'])
+            ->post('/modules/abpms/requests', $payload)
+            ->assertSessionHasErrors('items');
+        $this->assertDatabaseCount('procurement_requests', 0);
+    }
+
+    public function test_partial_purchase_order_receipts_update_stock_and_status_without_over_receiving(): void
+    {
+        $data = $this->setupAbpms();
+        $order = $this->createApprovedOrder($data, 'partial-receipt');
+        $this->actingAs($data['manager'])->post('/modules/abpms/purchase-orders/'.$order->id.'/approve')->assertRedirect();
+        $this->actingAs($data['manager'])->post('/modules/abpms/purchase-orders/'.$order->id.'/order')->assertRedirect();
+        $item = $order->items()->firstOrFail();
+
+        $basePayload = [
+            'purchase_order_item_id' => $item->id,
+            'quantity' => '1',
+            'received_on' => '2026-10-29',
+            'batch_number' => 'PARTIAL-ABPMS',
+            'location_id' => $data['location']->id,
+            'notes' => 'Partial delivery',
+        ];
+        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', array_merge($basePayload, ['idempotency_key' => 'partial-one']))->assertRedirect();
+        $this->assertDatabaseHas('purchase_order_items', ['id' => $item->id, 'received_quantity' => '1.00']);
+        $this->assertDatabaseHas('purchase_orders', ['id' => $order->id, 'status' => 'partially_received']);
+        $this->assertSame('1.00', (string) SupplyBatch::where('batch_number', 'PARTIAL-ABPMS')->value('quantity_available'));
+
+        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', array_merge($basePayload, ['idempotency_key' => 'partial-two']))->assertRedirect();
+        $this->assertDatabaseHas('purchase_order_items', ['id' => $item->id, 'received_quantity' => '2.00']);
+        $this->assertDatabaseHas('purchase_orders', ['id' => $order->id, 'status' => 'received']);
+        $this->assertSame('2.00', (string) SupplyBatch::where('batch_number', 'PARTIAL-ABPMS')->value('quantity_available'));
+
+        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', array_merge($basePayload, ['idempotency_key' => 'partial-over']))->assertSessionHasErrors('purchase_order_item_id');
+        $this->assertDatabaseCount('procurement_receipts', 2);
+        $this->assertDatabaseCount('inventory_movements', 2);
+    }
+
+    public function test_physical_equipment_receipt_creates_multiple_linked_assets_exactly_once(): void
+    {
+        $data = $this->setupAbpms();
+        $workflow = $this->createReceivedEquipmentItem($data, 3, 'equipment-three');
+        $payload = [
+            'category_id' => $data['equipment']->category_id,
+            'quantity' => 3,
+            'asset_name' => 'Irrigation pump',
+            'condition' => 'good',
+            'assigned_location' => 'Municipal equipment yard',
+            'idempotency_key' => 'equipment-acquisition-3',
+        ];
+        $url = '/modules/abpms/receipts/'.$workflow['receiptItem']->id.'/equipment-assets';
+
+        $this->actingAs($data['manager'])->get('/modules/abpms')
+            ->assertOk()
+            ->assertSee('Register equipment from a physical receipt')
+            ->assertSee('/modules/abpms/receipts/'.$workflow['receiptItem']->id.'/equipment-assets', false);
+
+        $this->actingAs($data['manager'])->post($url, $payload)->assertRedirect();
+        $acquisition = EquipmentAcquisition::where('idempotency_key', 'equipment-acquisition-3')->firstOrFail();
+        $this->assertSame($workflow['item']->id, $acquisition->purchase_order_item_id);
+        $this->assertSame($workflow['receiptItem']->id, $acquisition->procurement_receipt_item_id);
+        $this->assertSame(3, $acquisition->quantity);
+        $this->assertSame('500.00', (string) $acquisition->unit_acquisition_cost);
+        $this->assertSame('2026-10-29', $acquisition->acquired_on->toDateString());
+        $this->assertDatabaseCount('procurement_equipment_acquisition_assets', 3);
+        $this->assertDatabaseCount('equipment_assets', 4);
+        $this->assertDatabaseCount('inventory_movements', 0);
+        $this->assertDatabaseHas('procurement_receipt_items', [
+            'id' => $workflow['receiptItem']->id,
+            'inventory_movement_id' => null,
+        ]);
+
+        $assets = EquipmentAcquisitionAsset::with('equipmentAsset')->get();
+        $this->assertCount(3, $assets);
+        $this->assertSame(['Irrigation pump #01', 'Irrigation pump #02', 'Irrigation pump #03'], $assets->pluck('equipmentAsset.name')->sort()->values()->all());
+        $this->assertSame(3, $assets->pluck('equipmentAsset.asset_code')->unique()->count());
+        $this->assertSame('500.00', (string) $assets->first()->equipmentAsset->acquisition_cost);
+
+        $this->actingAs($data['manager'])->post($url, $payload)->assertRedirect();
+        $this->assertDatabaseCount('equipment_assets', 4);
+        $this->assertDatabaseCount('procurement_equipment_acquisition_assets', 3);
+        $this->actingAs($data['manager'])->post($url, array_merge($payload, ['quantity' => 2]))
+            ->assertSessionHasErrors('idempotency_key');
+        $this->actingAs($data['manager'])->post($url, array_merge($payload, [
+            'quantity' => 1,
+            'idempotency_key' => 'equipment-acquisition-another-key',
+        ]))->assertSessionHasErrors('quantity');
+        $this->actingAs($data['manager'])
+            ->post('/modules/abpms/purchase-order-items/'.$workflow['item']->id.'/link-equipment', ['equipment_asset_id' => $data['equipment']->id])
+            ->assertSessionHasErrors('equipment_asset_id');
+        $this->assertDatabaseCount('equipment_assets', 4);
+
+        $this->actingAs($data['viewer'])->get('/modules/abpms/export?report=equipment')
+            ->assertOk()
+            ->assertSee('AGR-EQ-')
+            ->assertSee($workflow['order']->purchase_order_number);
+    }
+
+    public function test_equipment_acquisition_is_hidden_and_forbidden_without_aeams_create_permission(): void
+    {
+        $data = $this->setupAbpms();
+        $workflow = $this->createReceivedEquipmentItem($data, 1, 'equipment-no-aeams');
+        $url = '/modules/abpms/receipts/'.$workflow['receiptItem']->id.'/equipment-assets';
+        $payload = [
+            'category_id' => $data['equipment']->category_id,
+            'quantity' => 1,
+            'asset_name' => 'Unauthorized pump',
+            'condition' => 'good',
+            'idempotency_key' => 'unauthorized-equipment',
+        ];
+
+        $this->actingAs($data['creator'])->get('/modules/abpms')
+            ->assertOk()
+            ->assertDontSee('Create AEAMS asset record(s)');
+        $this->actingAs($data['creator'])->post($url, $payload)->assertForbidden();
+        $this->assertDatabaseCount('procurement_equipment_acquisitions', 0);
+    }
+
+    public function test_municipal_agriculturist_cannot_use_legacy_broad_abpms_grants_to_approve_procurement(): void
+    {
+        $data = $this->setupAbpms();
+        $order = $this->createApprovedOrder($data, 'agri-no-approval');
+        $agriculturistRole = Role::create([
+            'name' => 'Municipal Agriculturist',
+            'slug' => 'municipal_agriculturist',
+            'permissions' => ['modules.abpms.*'],
+            'is_active' => true,
+        ]);
+        $agriculturist = User::factory()->create();
+        $agriculturist->roles()->attach($agriculturistRole);
+
+        $this->actingAs($agriculturist)->get('/modules/abpms')->assertForbidden();
+        $this->actingAs($agriculturist)
+            ->post('/modules/abpms/purchase-orders/'.$order->id.'/approve')
+            ->assertForbidden();
+        $this->assertDatabaseHas('purchase_orders', ['id' => $order->id, 'status' => 'draft']);
     }
 }

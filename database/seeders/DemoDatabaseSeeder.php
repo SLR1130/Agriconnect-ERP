@@ -280,7 +280,7 @@ class DemoDatabaseSeeder extends Seeder
             'location_id' => $location->id,
             'notes' => 'DEMO DATA: partial physical delivery; 25 of 40 received.',
             'idempotency_key' => 'DEMO-GRN-SUPPLY-001',
-        ], $modulePersonnel);
+        ], $director);
 
         $procurementAsset = $equipment->registerAsset([
             'asset_code' => 'DEMO-ABPMS-ASSET-001',
@@ -317,7 +317,7 @@ class DemoDatabaseSeeder extends Seeder
             'received_on' => now()->toDateString(),
             'notes' => 'DEMO DATA: physical equipment receipt.',
             'idempotency_key' => 'DEMO-GRN-EQUIPMENT-001',
-        ], $modulePersonnel);
+        ], $director);
         $procurement->linkEquipment($equipmentOrder->items->first(), $procurementAsset, $director);
 
         $this->command?->info('DEMO DATABASE READY');

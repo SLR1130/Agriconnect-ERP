@@ -38,7 +38,7 @@ class AASMSController extends Controller
             ->latest()
             ->paginate(20)
             ->withQueryString();
-        $batches = SupplyBatch::with('item')->where('quantity_available','>',0)
+        $batches = SupplyBatch::with('item')->where('status','available')->where('quantity_available','>',0)
             ->where(fn ($query) => $query->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
             ->get();
         $distributions = $this->filters($request)->latest()->paginate(15,['*'],'distribution_page')->withQueryString();

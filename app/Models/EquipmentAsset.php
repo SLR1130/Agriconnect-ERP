@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class EquipmentAsset extends Model
 {
@@ -49,5 +50,15 @@ class EquipmentAsset extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(EquipmentTransaction::class, 'equipment_asset_id');
+    }
+
+    public function procurementAcquisition(): HasOne
+    {
+        return $this->hasOne(EquipmentAcquisitionAsset::class, 'equipment_asset_id');
+    }
+
+    public function purchaseOrderItems(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderItem::class, 'equipment_asset_id');
     }
 }
