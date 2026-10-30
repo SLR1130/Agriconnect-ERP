@@ -222,7 +222,7 @@
                                     <li>
                                         <b>{{ $item->description }}</b>
                                         <div class="text-xs text-slate-500">{{ $item->received_quantity }} / {{ $item->ordered_quantity }} received @if($item->equipmentAsset) · linked to {{ $item->equipmentAsset->asset_code }} @endif</div>
-                                        @if($canUpdate && $item->equipment_asset_id === null && (float)$item->received_quantity >= (float)$item->ordered_quantity && $equipmentAssets->isNotEmpty())
+                                        @if($canUpdate && $item->supply_item_id === null && $item->equipment_asset_id === null && (float)$item->received_quantity >= (float)$item->ordered_quantity && $equipmentAssets->isNotEmpty())
                                             <form method="POST" action="{{ route('modules.abpms.purchase-order-items.link-equipment', $item) }}" class="mt-2 flex gap-2">
                                                 @csrf
                                                 <select class="ab-input" name="equipment_asset_id" required><option value="">Link existing AEAMS asset</option>@foreach($equipmentAssets as $asset)<option value="{{ $asset->id }}">{{ $asset->asset_code }} · {{ $asset->name }}</option>@endforeach</select>

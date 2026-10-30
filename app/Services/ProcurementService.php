@@ -303,6 +303,9 @@ class ProcurementService
             if ($item->equipment_asset_id) {
                 throw ValidationException::withMessages(['equipment_asset_id' => 'This purchase order item is already linked to an AEAMS asset.']);
             }
+            if ($item->supply_item_id !== null) {
+                throw ValidationException::withMessages(['equipment_asset_id' => 'Only equipment purchase items may be linked to an AEAMS asset.']);
+            }
             if (PurchaseOrderItem::where('equipment_asset_id', $asset->id)->exists()) {
                 throw ValidationException::withMessages(['equipment_asset_id' => 'This AEAMS asset is already linked to another purchase order item.']);
             }

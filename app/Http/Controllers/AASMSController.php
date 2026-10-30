@@ -29,13 +29,22 @@ class AASMSController extends Controller
     {
         $this->staff($request, 'view');
         $programs = AssistanceProgram::with(['supplyItem','applications'])->latest()->get();
+        $applicationCounts = AssistanceApplication::query()
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
         $applications = AssistanceApplication::with(['program','farmer.user','farmer.farms','history','approvedSupplyItem'])
-            ->when($request->filled('status'), fn($q)=>$q->where('status',$request->status))->latest()->paginate(20);
-        $batches = SupplyBatch::with('item')->where('quantity_available','>',0)->get();
+            ->when($request->filled('status'), fn($q)=>$q->where('status',$request->status))
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+        $batches = SupplyBatch::with('item')->where('quantity_available','>',0)
+            ->where(fn ($query) => $query->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
+            ->get();
         $distributions = $this->filters($request)->latest()->paginate(15,['*'],'distribution_page')->withQueryString();
         return view('modules.aasms.dashboard', compact('programs','applications','batches','distributions') + [
             'items'=>SupplyItem::where('status','active')->orderBy('name')->get(),
-            'pending'=>$applications->where('status','submitted')->count(),'approved'=>$applications->where('status','approved')->count(),'rejected'=>$applications->where('status','rejected')->count(),'completed'=>$applications->where('status','completed')->count(),
+            'pending'=>(int) $applicationCounts->get('submitted', 0),'approved'=>(int) $applicationCounts->get('approved', 0),'rejected'=>(int) $applicationCounts->get('rejected', 0),'completed'=>(int) $applicationCounts->get('completed', 0),
             'canCreate'=>$request->user()->canModuleAction('aasms','create'),
             'canUpdate'=>$request->user()->canModuleAction('aasms','update'),
             'canReview'=>$request->user()->canModuleAction('aasms','review'),
@@ -89,6 +98,15 @@ class AASMSController extends Controller
     public function farmerPrograms(Request $request): View
     {
         $farmer=$request->user()->farmer; abort_unless($farmer && $farmer->registration_status==='verified',403);
-        return view('farmer.assistance',['programs'=>AssistanceProgram::with('supplyItem')->where('status','open')->latest()->get(),'applications'=>AssistanceApplication::with(['program.supplyItem','approvedSupplyItem','distributions.batch.item','history'])->where('farmer_id',$farmer->id)->latest()->get(),'notifications'=>$request->user()->notifications()->latest()->take(10)->get()]);
+        return view('farmer.assistance',[
+            'programs' => AssistanceProgram::with('supplyItem')
+                ->where('status', 'open')
+                ->where(fn ($query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', today()))
+                ->where(fn ($query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', today()))
+                ->latest()
+                ->get(),
+            'applications' => AssistanceApplication::with(['program.supplyItem','approvedSupplyItem','distributions.batch.item','history'])->where('farmer_id',$farmer->id)->latest()->get(),
+            'notifications' => $request->user()->notifications()->latest()->take(10)->get(),
+        ]);
     }
 }

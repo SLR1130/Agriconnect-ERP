@@ -397,4 +397,38 @@ class ABPMSProcurementTest extends TestCase
             ->assertSee('BA-2026-001');
         $this->assertDatabaseHas('budget_transactions', ['entry_type' => 'adjustment', 'direction' => 'credit', 'amount' => '25.00']);
     }
+
+    public function test_supply_purchase_items_cannot_be_linked_to_aeams_assets(): void
+    {
+        $data = $this->setupAbpms();
+        $order = $this->createApprovedOrder($data, 'supply-equipment-link');
+        $item = $order->items()->firstOrFail();
+
+        $this->actingAs($data['manager'])
+            ->post('/modules/abpms/purchase-orders/'.$order->id.'/approve')
+            ->assertRedirect();
+        $this->actingAs($data['manager'])
+            ->post('/modules/abpms/purchase-orders/'.$order->id.'/order')
+            ->assertRedirect();
+        $this->actingAs($data['manager'])
+            ->post('/modules/abpms/receipts', [
+                'purchase_order_item_id' => $item->id,
+                'quantity' => '2',
+                'received_on' => '2026-10-29',
+                'batch_number' => 'SUPPLY-LINK-BATCH',
+                'location_id' => $data['location']->id,
+                'idempotency_key' => 'supply-equipment-link-receipt',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($data['manager'])
+            ->post('/modules/abpms/purchase-order-items/'.$item->id.'/link-equipment', [
+                'equipment_asset_id' => $data['equipment']->id,
+            ])
+            ->assertSessionHasErrors('equipment_asset_id');
+        $this->assertDatabaseMissing('purchase_order_items', [
+            'id' => $item->id,
+            'equipment_asset_id' => $data['equipment']->id,
+        ]);
+    }
 }

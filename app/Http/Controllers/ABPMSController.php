@@ -228,7 +228,7 @@ class ABPMSController extends Controller
             'quantity' => ['required', 'numeric', 'min:0.01'],
             'received_on' => ['required', 'date'],
             'batch_number' => ['nullable', 'string', 'max:100'],
-            'expires_on' => ['nullable', 'date'],
+            'expires_on' => ['nullable', 'date', 'after_or_equal:received_on'],
             'location_id' => ['nullable', 'exists:inventory_locations,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'idempotency_key' => ['required', 'string', 'max:100'],
