@@ -7,6 +7,7 @@ use App\Models\BudgetPeriod;
 use App\Models\BudgetTransaction;
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -143,6 +144,55 @@ class BudgetService
             'available_cents' => $authorized + $credits - $debits,
             'available' => $this->money($authorized + $credits - $debits),
         ];
+    }
+
+    /**
+     * Calculate the same ledger summary for several allocations with one grouped
+     * query, avoiding four or more ledger scans for every dashboard row.
+     *
+     * @param  Collection<int, BudgetAllocation>  $allocations
+     * @return array<int, array<string, int|string>>
+     */
+    public function summaries(Collection $allocations): array
+    {
+        if ($allocations->isEmpty()) {
+            return [];
+        }
+
+        $ledger = BudgetTransaction::query()
+            ->whereIn('budget_allocation_id', $allocations->pluck('id'))
+            ->select('budget_allocation_id', 'direction', 'entry_type', DB::raw('SUM(amount) as total'))
+            ->groupBy('budget_allocation_id', 'direction', 'entry_type')
+            ->get()
+            ->groupBy('budget_allocation_id');
+        $summaries = [];
+
+        foreach ($allocations as $allocation) {
+            $entries = $ledger->get($allocation->id, collect());
+            $sum = fn (string $direction, ?string $entryType = null): int => $entries
+                ->filter(fn (BudgetTransaction $entry) => $entry->direction === $direction
+                    && ($entryType === null || $entry->entry_type === $entryType))
+                ->sum(fn (BudgetTransaction $entry) => $this->cents((string) $entry->total));
+
+            $authorized = $this->cents((string) $allocation->authorized_amount);
+            $credits = $sum('credit');
+            $debits = $sum('debit');
+            $commitments = $sum('debit', 'commitment') - $sum('credit', 'commitment_release');
+            $actual = $sum('debit', 'expenditure');
+            $adjustments = $sum('credit', 'adjustment') - $sum('debit', 'adjustment');
+
+            $summaries[$allocation->id] = [
+                'authorized_cents' => $authorized,
+                'authorized' => $this->money($authorized),
+                'adjustments' => $this->money($adjustments),
+                'committed' => $this->money($commitments),
+                'actual' => $this->money($actual),
+                'available_cents' => $authorized + $credits - $debits,
+                'available' => $this->money($authorized + $credits - $debits),
+            ];
+        }
+
+        return $summaries;
     }
 
     public function cents(string|int|float $amount): int

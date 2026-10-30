@@ -4,12 +4,15 @@ namespace App\Http\Controllers\ERP;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\AgriculturalSeason;
 use App\Models\Module;
 use App\Models\Role;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\UserModuleAccess;
+use App\Services\AgriculturalAnalyticsService;
 use App\Services\ErpAuthorizationService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,12 +22,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdministrationController extends Controller
 {
-    public function __construct(private readonly ErpAuthorizationService $authorization)
-    {
-    }
+    public function __construct(private readonly ErpAuthorizationService $authorization) {}
 
     public function users(Request $request): View
     {
@@ -335,22 +337,88 @@ class AdministrationController extends Controller
         $validated = $request->validate([
             'is_enabled' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
-            'development_progress' => ['required', 'integer', 'min:0', 'max:100'],
         ]);
 
-        $oldValues = $module->only(['is_enabled', 'is_active', 'development_progress']);
+        $oldValues = $module->only(['is_enabled', 'is_active']);
         $module->update($validated);
 
-        ActivityLog::log('updated', 'Module '.$module->name.' settings updated', $module->slug, $request->user()->id, $module->slug, $oldValues, $module->only(['is_enabled', 'is_active', 'development_progress']));
+        ActivityLog::log('updated', 'Module '.$module->name.' settings updated', $module->slug, $request->user()->id, $module->slug, $oldValues, $module->only(['is_enabled', 'is_active']));
 
         return back()->with('status', 'Module settings updated.');
     }
 
-    public function reports(Request $request): View
+    public function reports(Request $request, AgriculturalAnalyticsService $analytics): View|StreamedResponse
     {
-        abort_unless($this->canViewReports($request->user()), 403);
+        $availableReports = $analytics->availableReports($request->user());
+        abort_if($availableReports === [], 403);
+        $reportKey = (string) $request->input('report', array_key_first($availableReports));
+        abort_unless(array_key_exists($reportKey, $availableReports), 403);
+        $statusOptions = match ($reportKey) {
+            'ffrms' => ['pending', 'verified', 'rejected', 'returned'],
+            'aasms' => ['submitted', 'approved', 'rejected', 'returned', 'completed', 'distributed'],
+            'aeams' => ['available', 'issued', 'maintenance', 'archived', 'pending', 'approved', 'rejected', 'cancelled', 'returned'],
+            'procurement' => ['submitted', 'under_review', 'approved', 'rejected', 'draft', 'ordered', 'partially_received', 'received', 'cancelled'],
+            default => [],
+        };
+        $filters = $request->validate([
+            'report' => ['nullable', Rule::in(array_keys($availableReports))],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'season' => ['nullable', 'integer', 'exists:agricultural_seasons,id'],
+            'status' => ['nullable', Rule::in($statusOptions)],
+            'format' => ['nullable', Rule::in(['csv'])],
+        ]);
+        $to = CarbonImmutable::parse($filters['to'] ?? today()->toDateString())->startOfDay();
+        $from = CarbonImmutable::parse($filters['from'] ?? $to->startOfMonth()->toDateString())->startOfDay();
+        $seasonId = isset($filters['season']) && $request->user()->canModuleAction('apms', 'view')
+            ? (int) $filters['season']
+            : null;
+        $report = $analytics->report($request->user(), $reportKey, $from, $to, $seasonId, $filters['status'] ?? null);
 
-        return $this->table('Consolidated Reports', 'Report records will appear here as the six agricultural modules publish data.', [], []);
+        if (($filters['format'] ?? null) === 'csv') {
+            $module = $report['module'];
+            abort_unless($request->user()->canModuleAction($module, 'export'), 403);
+            $filename = 'agriconnect-'.$reportKey.'-report-'.$from->format('Ymd').'-'.$to->format('Ymd').'.csv';
+            $generatedAt = now()->format('Y-m-d H:i:s T');
+            $safe = static function (mixed $value): string {
+                $text = (string) ($value ?? '');
+
+                return preg_match('/^[\x00-\x20]*[=+\-@]/u', $text) ? "'".$text : $text;
+            };
+
+            return response()->streamDownload(function () use ($report, $filters, $from, $to, $generatedAt, $safe): void {
+                $stream = fopen('php://output', 'w');
+                fputcsv($stream, ['Report', $report['title']]);
+                fputcsv($stream, ['Date range', $from->toDateString(), $to->toDateString()]);
+                fputcsv($stream, ['Agricultural season ID', $filters['season'] ?? 'All']);
+                fputcsv($stream, ['Status filter', $filters['status'] ?? 'All']);
+                fputcsv($stream, ['Generated at', $generatedAt]);
+                fputcsv($stream, []);
+                fputcsv($stream, $report['columns']);
+                foreach ($report['rows'] as $row) {
+                    fputcsv($stream, array_map($safe, $row));
+                }
+                fclose($stream);
+            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        return view('erp.reports.index', [
+            'reports' => $availableReports,
+            'report' => $report,
+            'reportKey' => $reportKey,
+            'statusOptions' => $statusOptions,
+            'filters' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'season' => $seasonId,
+                'status' => $filters['status'] ?? '',
+            ],
+            'seasons' => $request->user()->canModuleAction('apms', 'view')
+                ? AgriculturalSeason::query()->orderByDesc('starts_on')->get(['id', 'name'])
+                : collect(),
+            'canExport' => $request->user()->canModuleAction($report['module'], 'export'),
+            'generatedAt' => now(),
+        ]);
     }
 
     public function activityLogs(Request $request): View
@@ -623,10 +691,5 @@ class AdministrationController extends Controller
     private function authorizeSuperAdmin(Request $request): void
     {
         abort_unless($request->user()?->isSuperAdministrator(), 403);
-    }
-
-    private function canViewReports(?User $user): bool
-    {
-        return $user?->canErp('reports.view') || $user?->canErp('reports.generate');
     }
 }

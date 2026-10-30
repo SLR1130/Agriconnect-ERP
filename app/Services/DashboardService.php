@@ -3,152 +3,123 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
-use App\Models\AssistanceApplication;
-use App\Models\AssistanceDistribution;
-use App\Models\CropProductionRecord;
-use App\Models\EquipmentRequest;
-use App\Models\Farmer;
-use App\Models\FarmMonitoringRecord;
-use App\Models\InventoryMovement;
 use App\Models\Module;
-use App\Models\ProcurementRequest;
-use App\Models\SupplyBatch;
 use App\Models\User;
 use App\Models\WorkflowRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
-    public function getDashboardStats(): array
+    /** @return array<string, array{value: int, description: string}> */
+    public function getSystemStats(): array
     {
-        $pendingItems = WorkflowRequest::query()
-            ->whereIn('status', ['pending', 'in_review', 'returned'])
-            ->count();
-
         return [
-            'total_users' => $this->stat(User::query()->count(), 'System users registered'),
-            'active_roles' => $this->stat(DB::table('roles')->where('is_active', true)->count(), 'Active user roles configured'),
-            'enabled_modules' => $this->stat(DB::table('modules')->where('is_enabled', true)->count(), 'Agricultural modules enabled'),
-            'activity_logs' => $this->stat(DB::table('activity_logs')->count(), 'System activities recorded'),
-            'pending_items' => $this->stat($pendingItems, 'Workflow requests awaiting action'),
+            'total_users' => $this->stat(User::query()->count(), 'Accounts, including farmer portal users.'),
+            'active_users' => $this->stat(User::query()->where('is_active', true)->whereNull('suspended_at')->count(), 'Accounts currently permitted to sign in.'),
+            'active_roles' => $this->stat(DB::table('roles')->where('is_active', true)->count(), 'Role definitions enabled for assignment.'),
+            'enabled_modules' => $this->stat(Module::query()->where('is_enabled', true)->count(), 'Modules marked enabled in the shared registry.'),
+            'activity_logs' => $this->stat(ActivityLog::query()->count(), 'Audit events recorded by the application.'),
         ];
     }
 
+    /** @return array{role_label: string, dashboard_title: string, eyebrow: string, headline: string, description: string} */
     public function getRoleContext(User $user): array
     {
+        if ($user->isSuperAdministrator()) {
+            return [
+                'role_label' => 'Super Administrator',
+                'dashboard_title' => 'Administrator Command Center',
+                'eyebrow' => 'ERP-wide administration',
+                'headline' => 'A shared operational view of municipal agriculture.',
+                'description' => 'Review connected services, administrative activity, and authorized operational summaries from one AgriConnect workspace.',
+            ];
+        }
+
         if ($user->hasRole('mao_admin')) {
             return [
-                'eyebrow' => 'MAO management queue',
-                'headline' => 'Coordinate the decisions that keep municipal agriculture moving.',
-                'description' => 'Review operational queues, manage assistance programs, and monitor connected agricultural services.',
-                'cards' => [
-                    $this->roleCard('Farmer reviews', Farmer::whereIn('registration_status', ['pending', 'returned'])->count(), 'FFRMS registrations awaiting action'),
-                    $this->roleCard('Assistance queue', AssistanceApplication::where('status', 'submitted')->count(), 'AASMS applications awaiting review'),
-                    $this->roleCard('Procurement queue', ProcurementRequest::whereIn('status', ['submitted', 'under_review'])->count(), 'ABPMS requests under review'),
-                    $this->roleCard('Equipment queue', EquipmentRequest::where('status', 'pending')->count(), 'AEAMS requests awaiting decision'),
-                ],
+                'role_label' => 'MAO Administrator',
+                'dashboard_title' => 'MAO Operations Dashboard',
+                'eyebrow' => 'Municipal operations',
+                'headline' => 'Coordinate the work that keeps agricultural services moving.',
+                'description' => 'Monitor current queues and service records across the agricultural modules available to your role.',
             ];
         }
 
         if ($user->hasRole('municipal_agriculturist')) {
             return [
-                'eyebrow' => 'Technical agriculture workspace',
-                'headline' => 'Turn field records into timely agricultural decisions.',
-                'description' => 'Focus on farmer assessments, production monitoring, and technical eligibility recommendations.',
-                'cards' => [
-                    $this->roleCard('Verified farmers', Farmer::where('registration_status', 'verified')->count(), 'Authoritative FFRMS identities'),
-                    $this->roleCard('Crop records', CropProductionRecord::count(), 'APMS production observations'),
-                    $this->roleCard('Monitoring visits', FarmMonitoringRecord::count(), 'Recorded farm monitoring activity'),
-                    $this->roleCard('Technical reviews', AssistanceApplication::where('status', 'submitted')->count(), 'Assistance applications for assessment'),
-                ],
+                'role_label' => 'Municipal Agriculturist',
+                'dashboard_title' => 'MAO Operations Dashboard',
+                'eyebrow' => 'Technical agriculture',
+                'headline' => 'Use field records to guide timely agricultural decisions.',
+                'description' => 'Review farmer, production, monitoring, and technical assistance information within your assigned authority.',
             ];
         }
 
         if ($user->hasRole('module_personnel')) {
-            $cards = [];
-
-            if ($user->canModuleAction('aisms')) {
-                $cards[] = $this->roleCard('Available batches', SupplyBatch::where('quantity_available', '>', 0)->count(), 'AISMS batches with stock');
-                $cards[] = $this->roleCard('Inventory movements', InventoryMovement::count(), 'AISMS movement history');
-            }
-
-            if ($user->canModuleAction('apms')) {
-                $cards[] = $this->roleCard('Production records', CropProductionRecord::count(), 'APMS records assigned to this role');
-            }
-
             return [
+                'role_label' => 'Module Personnel',
+                'dashboard_title' => 'Assigned Operations Dashboard',
                 'eyebrow' => 'Assigned operations',
-                'headline' => 'Work only the modules assigned to your personnel role.',
-                'description' => 'Your shortcuts and operational queues are limited by explicit module assignments and action permissions.',
-                'cards' => $cards ?: [$this->roleCard('Assigned modules', 0, 'No operational assignment is active')],
+                'headline' => 'Work from the agricultural responsibilities assigned to you.',
+                'description' => 'The summaries and shortcuts below follow your effective module and action permissions.',
             ];
         }
 
         if ($user->hasRole('authorized_viewer')) {
             return [
+                'role_label' => 'Auditor',
+                'dashboard_title' => 'Agricultural Oversight Dashboard',
                 'eyebrow' => 'Read-only oversight',
-                'headline' => 'Inspect ERP activity without changing operational records.',
-                'description' => 'This account can review authorized module pages, reports, and audit history only.',
-                'cards' => [
-                    $this->roleCard('Activity events', ActivityLog::count(), 'Read-only audit history'),
-                    $this->roleCard('Registered farmers', Farmer::count(), 'FFRMS records'),
-                    $this->roleCard('Assistance distributions', AssistanceDistribution::count(), 'AASMS completed history'),
-                    $this->roleCard('Inventory movements', InventoryMovement::count(), 'AISMS transaction history'),
-                ],
+                'headline' => 'Review authorized operational and financial records.',
+                'description' => 'This workspace provides read-only summaries and reports for the records available to your account.',
             ];
         }
 
         return [
-            'eyebrow' => 'ERP workspace',
+            'role_label' => 'ERP Staff',
+            'dashboard_title' => 'Agricultural Management Dashboard',
+            'eyebrow' => 'Authorized operations',
             'headline' => 'Connected agricultural operations in one system.',
-            'description' => 'Live records and authorized module workspaces are available from the shared ERP shell.',
-            'cards' => array_values(array_map(
-                fn (array $stat) => $this->roleCard($stat['title'], $stat['value'], $stat['description']),
-                [
-                    ['title' => 'Registered users', 'value' => User::count(), 'description' => 'System users registered'],
-                    ['title' => 'Active roles', 'value' => DB::table('roles')->where('is_active', true)->count(), 'description' => 'Active role definitions'],
-                    ['title' => 'Enabled modules', 'value' => DB::table('modules')->where('is_enabled', true)->count(), 'description' => 'Agricultural modules enabled'],
-                    ['title' => 'Activity events', 'value' => ActivityLog::count(), 'description' => 'System activities recorded'],
-                ],
-            )),
+            'description' => 'Your dashboard content follows the effective permissions assigned to this account.',
         ];
     }
 
-    public function getRecentActivities(int $limit = 10): array
+    /** Return only a sanitized database engine label for the authenticated dashboard. */
+    public function getDatabaseLabel(): string
     {
-        return ActivityLog::query()
-            ->with('causer')
-            ->latest()
-            ->limit($limit)
-            ->get()
-            ->map(fn (ActivityLog $activity) => [
-                'type' => $activity->action_type,
-                'description' => $activity->description,
-                'user' => $activity->causer?->name ?? 'System',
-                'time' => $activity->created_at?->diffForHumans() ?? 'Unknown time',
-                'icon' => $this->getIconForAction($activity->action_type),
-            ])
-            ->all();
+        try {
+            $connection = DB::connection();
+
+            return match ($connection->getDriverName()) {
+                'mysql', 'mariadb' => 'MySQL',
+                'sqlite' => $connection->getDatabaseName() === ':memory:' ? 'Isolated SQLite' : 'SQLite',
+                'pgsql' => 'PostgreSQL',
+                'sqlsrv' => 'SQL Server',
+                default => 'Configured database',
+            };
+        } catch (\Throwable) {
+            return 'Configured database';
+        }
     }
 
+    /** @return array<string, array{name: string, description: string, enabled: bool}> */
     public function getModuleStatus(): array
     {
         return Module::query()
             ->orderBy('sort_order')
-            ->get()
+            ->get(['name', 'slug', 'description', 'is_enabled'])
             ->mapWithKeys(fn (Module $module) => [
                 $module->slug => [
                     'name' => $module->name,
-                    'developer' => $module->developer,
                     'description' => $module->description,
                     'enabled' => $module->is_enabled,
-                    'status' => $module->is_active ? 'active' : 'in-development',
-                    'progress' => $module->development_progress,
                 ],
             ])
             ->all();
     }
 
+    /** @return array{connected: bool, database: string|null, checked_at: Carbon} */
     public function getSystemHealth(): array
     {
         try {
@@ -166,7 +137,7 @@ class DashboardService
                 },
                 'checked_at' => now(),
             ];
-        } catch (\Throwable $exception) {
+        } catch (\Throwable) {
             return [
                 'connected' => false,
                 'database' => null,
@@ -175,14 +146,45 @@ class DashboardService
         }
     }
 
-    public function getUpcomingDeadlines(int $limit = 5): array
+    /** @return list<array{description: string, user: string, time: string, module: string}> */
+    public function getRecentActivities(User $user, int $limit = 8): array
     {
-        return WorkflowRequest::query()
+        if (! $user->canErp('activity_logs.view')) {
+            return [];
+        }
+
+        return ActivityLog::query()
+            ->with('causer')
+            ->latest()
+            ->limit(max(1, min($limit, 20)))
+            ->get()
+            ->map(fn (ActivityLog $activity) => [
+                'description' => $activity->description,
+                'user' => $activity->causer?->name ?? 'System',
+                'time' => $activity->created_at?->diffForHumans() ?? 'Unknown time',
+                'module' => $activity->module ?: 'ERP Core',
+            ])
+            ->all();
+    }
+
+    /** @return list<array{title: string, deadline: Carbon, priority: string}> */
+    public function getUpcomingDeadlines(User $user, int $limit = 5): array
+    {
+        $query = WorkflowRequest::query()
             ->whereIn('status', ['pending', 'in_review', 'returned'])
             ->whereNotNull('due_at')
-            ->where('due_at', '>=', now())
-            ->orderBy('due_at')
-            ->limit($limit)
+            ->where('due_at', '>=', now());
+
+        if (! $user->isSuperAdministrator()) {
+            $moduleIds = Module::query()->whereIn('slug', app(ErpAuthorizationService::class)->visibleModules($user))->pluck('id');
+            if ($moduleIds->isEmpty()) {
+                return [];
+            }
+
+            $query->whereIn('module_id', $moduleIds);
+        }
+
+        return $query->orderBy('due_at')->limit(max(1, min($limit, 20)))
             ->get(['title', 'due_at', 'status'])
             ->map(fn (WorkflowRequest $request) => [
                 'title' => $request->title,
@@ -192,28 +194,9 @@ class DashboardService
             ->all();
     }
 
+    /** @return array{value: int, description: string} */
     private function stat(int $value, string $description): array
     {
-        return [
-            'value' => $value,
-            'description' => $description,
-        ];
-    }
-
-    private function roleCard(string $label, int $value, string $description): array
-    {
-        return compact('label', 'value', 'description');
-    }
-
-    private function getIconForAction(?string $actionType): string
-    {
-        return match ($actionType) {
-            'created' => 'plus-circle',
-            'updated' => 'edit',
-            'deleted' => 'trash',
-            'approved' => 'check-circle',
-            'rejected' => 'x-circle',
-            default => 'activity',
-        };
+        return compact('value', 'description');
     }
 }

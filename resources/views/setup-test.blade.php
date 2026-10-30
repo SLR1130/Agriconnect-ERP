@@ -36,8 +36,6 @@
         .module-status { padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
         .status-active { background: #D4EDDA; color: #155724; }
         .status-development { background: #FFF3CD; color: #856404; }
-        .progress-bar { height: 7px; background: #EAF2E8; border-radius: 5px; margin-top: 15px; overflow: hidden; }
-        .progress-fill { height: 100%; background: #237A52; border-radius: 5px; }
         .details { background: #F8FAF7; border: 1px solid #EAF2E8; border-radius: 10px; padding: 16px; margin-bottom: 25px; }
         .details dl { display: grid; grid-template-columns: 150px 1fr; gap: 8px 15px; font-size: 0.9rem; }
         .details dt { font-weight: 600; color: #163D2A; }
@@ -105,8 +103,6 @@
                             <div class='module-status {{ $module['registered'] && $module['enabled'] ? 'status-active' : 'status-development' }}'>{{ $module['registered'] ? ($module['enabled'] ? 'Registered' : 'Disabled') : 'Missing' }}</div>
                         </div>
                         <div class='module-description'>{{ $module['name'] }}</div>
-                        <div class='module-description'>Developer: {{ $module['developer'] }}</div>
-                        <div class='progress-bar'><div class='progress-fill' style='width: {{ $module['progress'] }}%'></div></div>
                     </div>
                 @endforeach
             </div>

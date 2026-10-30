@@ -3,36 +3,24 @@
 namespace App\Http\Controllers\ERP;
 
 use App\Http\Controllers\Controller;
+use App\Services\AgriculturalAnalyticsService;
 use App\Services\DashboardService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    protected $dashboardService;
+    public function __construct(
+        private readonly DashboardService $dashboardService,
+        private readonly AgriculturalAnalyticsService $analytics,
+    ) {}
 
-    public function __construct(DashboardService $dashboardService)
+    public function index(Request $request): View
     {
-        $this->dashboardService = $dashboardService;
-    }
+        abort_unless($request->user()?->canErp('dashboard.view'), 403);
 
-    public function index(Request $request)
-    {
-        abort_unless($this->canOpenStaffOverview($request->user()), 403);
-
-        $stats = $this->dashboardService->getDashboardStats();
-        $activities = $this->dashboardService->getRecentActivities();
-        $modules = $this->dashboardService->getModuleStatus();
-        $health = $this->dashboardService->getSystemHealth();
-        $deadlines = $this->dashboardService->getUpcomingDeadlines();
-
-        return view('dashboard.index', [
-            'stats' => $stats,
-            'activities' => $activities,
-            'modules' => $modules,
-            'health' => $health,
-            'deadlines' => $deadlines,
-            'roleContext' => $this->dashboardService->getRoleContext($request->user()),
-        ]);
+        return $this->managementDashboard($request);
     }
 
     public function overview()
@@ -40,25 +28,49 @@ class DashboardController extends Controller
         return redirect()->route('dashboard');
     }
 
-    public function admin(Request $request)
+    public function admin(Request $request): View
     {
-        abort_unless($request->user()->isSuperAdministrator(), 403);
-        return view('dashboard.admin', $this->data());
+        abort_unless($request->user()?->isSuperAdministrator(), 403);
+
+        return $this->managementDashboard($request);
     }
 
-    public function mao(Request $request)
+    public function mao(Request $request): View
     {
-        abort_unless($request->user()->canErp('dashboard.view') && ! $request->user()->hasRole('farmer'), 403);
-        return view('dashboard.mao', $this->data($request->user()));
+        abort_unless($request->user()?->canErp('dashboard.view') && ! $request->user()->hasRole('farmer'), 403);
+
+        return $this->managementDashboard($request);
     }
 
-    private function data($user = null): array
+    private function managementDashboard(Request $request): View
     {
-        return ['stats'=>$this->dashboardService->getDashboardStats(),'activities'=>$this->dashboardService->getRecentActivities(),'modules'=>$this->dashboardService->getModuleStatus(),'health'=>$this->dashboardService->getSystemHealth(),'deadlines'=>$this->dashboardService->getUpcomingDeadlines(),'roleContext'=>$user ? $this->dashboardService->getRoleContext($user) : null];
-    }
+        $filters = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'season' => ['nullable', 'integer', 'exists:agricultural_seasons,id'],
+        ]);
+        $to = CarbonImmutable::parse($filters['to'] ?? today()->toDateString())->startOfDay();
+        $from = CarbonImmutable::parse($filters['from'] ?? $to->startOfMonth()->toDateString())->startOfDay();
+        $user = $request->user();
+        $modules = array_filter(
+            $this->dashboardService->getModuleStatus(),
+            fn (array $module, string $slug) => $user->canModuleAction($slug, 'view'),
+            ARRAY_FILTER_USE_BOTH,
+        );
+        $reportCount = count($this->analytics->availableReports($user));
 
-    private function canOpenStaffOverview($user): bool
-    {
-        return $user && $user->canErp('dashboard.view');
+        return view('dashboard.management', [
+            'roleContext' => $this->dashboardService->getRoleContext($user),
+            'databaseLabel' => $this->dashboardService->getDatabaseLabel(),
+            'analytics' => $this->analytics->dashboard($user, $from, $to, isset($filters['season']) ? (int) $filters['season'] : null),
+            'modules' => $modules,
+            'systemStats' => $user->isSuperAdministrator() ? $this->dashboardService->getSystemStats() : [],
+            'health' => $user->isSuperAdministrator() ? $this->dashboardService->getSystemHealth() : null,
+            'activities' => $this->dashboardService->getRecentActivities($user),
+            'deadlines' => $this->dashboardService->getUpcomingDeadlines($user),
+            'canViewReports' => $reportCount > 0,
+            'reportCount' => $reportCount,
+            'dashboardRoute' => $request->route()?->getName() ?: 'dashboard',
+        ]);
     }
 }

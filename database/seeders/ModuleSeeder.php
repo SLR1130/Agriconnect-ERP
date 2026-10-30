@@ -20,7 +20,6 @@ class ModuleSeeder extends Seeder
                 'sort_order' => 1,
                 'is_enabled' => true,
                 'is_active' => true,
-                'development_progress' => 100,
             ],
             [
                 'name' => 'Agricultural Production & Monitoring System',
@@ -32,7 +31,6 @@ class ModuleSeeder extends Seeder
                 'sort_order' => 2,
                 'is_enabled' => true,
                 'is_active' => true,
-                'development_progress' => 100,
             ],
             [
                 'name' => 'Agricultural Inventory & Supply Management System',
@@ -44,7 +42,6 @@ class ModuleSeeder extends Seeder
                 'sort_order' => 3,
                 'is_enabled' => true,
                 'is_active' => false,
-                'development_progress' => 75,
             ],
             [
                 'name' => 'Agricultural Assistance & Subsidy Management System',
@@ -56,7 +53,6 @@ class ModuleSeeder extends Seeder
                 'sort_order' => 4,
                 'is_enabled' => true,
                 'is_active' => false,
-                'development_progress' => 60,
             ],
             [
                 'name' => 'Agricultural Equipment & Asset Management System',
@@ -68,7 +64,6 @@ class ModuleSeeder extends Seeder
                 'sort_order' => 5,
                 'is_enabled' => true,
                 'is_active' => true,
-                'development_progress' => 100,
             ],
             [
                 'name' => 'Agricultural Budget & Procurement Management System',
@@ -80,7 +75,6 @@ class ModuleSeeder extends Seeder
                 'sort_order' => 6,
                 'is_enabled' => true,
                 'is_active' => false,
-                'development_progress' => 30,
             ],
         ];
 
@@ -93,7 +87,7 @@ class ModuleSeeder extends Seeder
         DB::table('modules')->upsert(
             $modules,
             ['slug'],
-            ['name', 'developer', 'description', 'route_prefix', 'icon', 'sort_order', 'is_enabled', 'is_active', 'development_progress', 'updated_at'],
+            ['name', 'developer', 'description', 'route_prefix', 'icon', 'sort_order', 'is_enabled', 'is_active', 'updated_at'],
         );
     }
 }

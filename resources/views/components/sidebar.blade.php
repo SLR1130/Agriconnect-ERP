@@ -5,7 +5,7 @@
     $authorization = app(\App\Services\ErpAuthorizationService::class);
     $canAccessModule = fn (string $slug): bool => $authorization->canModule($currentUser, $slug);
     $isSuperAdmin = $authorization->isSuperAdmin($currentUser);
-    $canReports = $currentUser?->canErp('reports.view') || $currentUser?->canErp('reports.generate');
+    $canReports = $currentUser?->canErp('reports.view') || $currentUser?->canErp('reports.generate') || $authorization->visibleModules($currentUser) !== [];
     $canActivity = $currentUser?->canErp('activity_logs.view');
     $canOverview = $currentUser?->canErp('dashboard.view');
     $canFarmerServices = $currentUser?->hasRole('farmer') && $currentUser?->farmer?->isVerified();

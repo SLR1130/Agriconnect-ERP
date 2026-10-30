@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Module extends Model
 {
@@ -18,7 +18,6 @@ class Module extends Model
         'sort_order',
         'is_enabled',
         'is_active',
-        'development_progress',
         'config',
     ];
 
@@ -26,7 +25,6 @@ class Module extends Model
         'config' => 'array',
         'is_enabled' => 'boolean',
         'is_active' => 'boolean',
-        'development_progress' => 'integer',
     ];
 
     /**

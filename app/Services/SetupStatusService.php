@@ -168,7 +168,7 @@ class SetupStatusService
             try {
                 $registered = Module::query()
                     ->whereIn('slug', $slugs)
-                    ->get(['slug', 'is_enabled', 'is_active', 'development_progress'])
+                    ->get(['slug', 'is_enabled', 'is_active'])
                     ->keyBy('slug');
             } catch (Throwable) {
                 Log::warning('AgriConnect module health check failed.');
@@ -181,12 +181,10 @@ class SetupStatusService
             return [
                 'slug' => $slug,
                 'name' => $config['name'],
-                'developer' => $config['developer'],
                 'description' => $config['description'],
                 'registered' => $record !== null,
                 'enabled' => (bool) ($record?->is_enabled ?? false),
                 'active' => (bool) ($record?->is_active ?? false),
-                'progress' => (int) ($record?->development_progress ?? 0),
             ];
         })->values();
 
