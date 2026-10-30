@@ -27,6 +27,58 @@ class EquipmentService
         });
     }
 
+    public function updateAsset(EquipmentAsset $asset, array $data, User $actor): EquipmentAsset
+    {
+        return DB::transaction(function () use ($asset, $data, $actor) {
+            $locked = EquipmentAsset::query()->lockForUpdate()->findOrFail($asset->id);
+            if ($locked->availability_status === 'issued') {
+                throw ValidationException::withMessages(['asset' => 'Issued equipment must be returned before its master record can be edited.']);
+            }
+            $old = $locked->only(array_keys($data));
+            $locked->update($data);
+            $this->record($locked, null, 'updated', $actor, $locked->condition, 'Equipment asset details updated.');
+            ActivityLog::log('updated', 'Equipment asset '.$locked->asset_code.' updated.', $locked->asset_code, $actor->id, 'aeams', $old, $locked->fresh()->only(array_keys($data)));
+
+            return $locked->refresh()->load('category');
+        });
+    }
+
+    public function archiveAsset(EquipmentAsset $asset, User $actor): EquipmentAsset
+    {
+        return DB::transaction(function () use ($asset, $actor) {
+            $locked = EquipmentAsset::query()->lockForUpdate()->findOrFail($asset->id);
+            if ($locked->availability_status === 'issued') {
+                throw ValidationException::withMessages(['asset' => 'Issued equipment cannot be archived.']);
+            }
+            if ($locked->maintenances()->whereIn('status', ['open', 'in_progress'])->exists()) {
+                throw ValidationException::withMessages(['asset' => 'Complete open maintenance before archiving this asset.']);
+            }
+            if ($locked->requests()->whereIn('status', ['pending', 'approved', 'issued'])->exists()) {
+                throw ValidationException::withMessages(['asset' => 'An asset with active requests cannot be archived.']);
+            }
+            $locked->update(['availability_status' => 'archived']);
+            $this->record($locked, null, 'archived', $actor, $locked->condition, 'Equipment asset archived.');
+            ActivityLog::log('archived', 'Equipment asset '.$locked->asset_code.' archived.', $locked->asset_code, $actor->id, 'aeams');
+
+            return $locked->refresh();
+        });
+    }
+
+    public function restoreAsset(EquipmentAsset $asset, User $actor): EquipmentAsset
+    {
+        return DB::transaction(function () use ($asset, $actor) {
+            $locked = EquipmentAsset::query()->lockForUpdate()->findOrFail($asset->id);
+            if ($locked->availability_status !== 'archived') {
+                throw ValidationException::withMessages(['asset' => 'Only archived assets can be restored.']);
+            }
+            $locked->update(['availability_status' => 'available']);
+            $this->record($locked, null, 'restored', $actor, $locked->condition, 'Equipment asset restored to available inventory.');
+            ActivityLog::log('updated', 'Equipment asset '.$locked->asset_code.' restored.', $locked->asset_code, $actor->id, 'aeams');
+
+            return $locked->refresh();
+        });
+    }
+
     public function requestForUser(User $actor, array $data): EquipmentRequest
     {
         $farmer = $actor->farmer;

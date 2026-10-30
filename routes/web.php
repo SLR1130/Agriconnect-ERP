@@ -52,16 +52,26 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::prefix('modules')->group(function () {
         Route::get('/ffrms', [FFRMSController::class, 'registrations'])->name('modules.ffrms.dashboard');
         Route::post('/ffrms/registrations/{farmer}/review', [FFRMSController::class, 'review'])->name('modules.ffrms.review');
+        Route::patch('/ffrms/registrations/{farmer}', [FFRMSController::class, 'updateFarmer'])->name('modules.ffrms.registrations.update');
+        Route::patch('/ffrms/farms/{farm}', [FFRMSController::class, 'updateFarm'])->name('modules.ffrms.farms.update');
+        Route::get('/ffrms/export', [FFRMSController::class, 'export'])->name('modules.ffrms.export');
         Route::post('/ffrms/associations', [FFRMSController::class, 'storeAssociation'])->name('modules.ffrms.associations.store');
         Route::post('/ffrms/associations/{association}/members', [FFRMSController::class, 'addMember'])->name('modules.ffrms.associations.members.store');
 
         Route::get('/apms', [APMSController::class, 'index'])->name('modules.apms.dashboard');
         Route::post('/apms/seasons', [APMSController::class, 'season'])->name('modules.apms.seasons.store');
+        Route::patch('/apms/seasons/{season}', [APMSController::class, 'updateSeason'])->name('modules.apms.seasons.update');
         Route::post('/apms/crops', [APMSController::class, 'crop'])->name('modules.apms.crops.store');
+        Route::patch('/apms/crops/{record}', [APMSController::class, 'updateCrop'])->name('modules.apms.crops.update');
         Route::post('/apms/livestock', [APMSController::class, 'livestock'])->name('modules.apms.livestock.store');
+        Route::patch('/apms/livestock/{record}', [APMSController::class, 'updateLivestock'])->name('modules.apms.livestock.update');
         Route::post('/apms/fisheries', [APMSController::class, 'fishery'])->name('modules.apms.fisheries.store');
+        Route::patch('/apms/fisheries/{record}', [APMSController::class, 'updateFishery'])->name('modules.apms.fisheries.update');
         Route::post('/apms/incidents', [APMSController::class, 'incident'])->name('modules.apms.incidents.store');
+        Route::patch('/apms/incidents/{record}', [APMSController::class, 'updateIncident'])->name('modules.apms.incidents.update');
         Route::post('/apms/monitoring', [APMSController::class, 'monitoring'])->name('modules.apms.monitoring.store');
+        Route::patch('/apms/monitoring/{record}', [APMSController::class, 'updateMonitoring'])->name('modules.apms.monitoring.update');
+        Route::get('/apms/export', [APMSController::class, 'export'])->name('modules.apms.export');
 
         Route::get('/aisms', [AISMSController::class, 'index'])->name('modules.aisms.dashboard');
         Route::post('/aisms/items', [AISMSController::class, 'item'])->name('modules.aisms.items.store');
@@ -82,6 +92,10 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/aeams', [AEAMSController::class, 'index'])->name('modules.aeams.dashboard');
         Route::post('/aeams/equipment', [AEAMSController::class, 'storeAsset'])->name('modules.aeams.equipment.store');
         Route::get('/aeams/equipment/{equipmentAsset}', [AEAMSController::class, 'show'])->name('modules.aeams.equipment.show');
+        Route::patch('/aeams/equipment/{equipmentAsset}', [AEAMSController::class, 'updateAsset'])->name('modules.aeams.equipment.update');
+        Route::post('/aeams/equipment/{equipmentAsset}/archive', [AEAMSController::class, 'archiveAsset'])->name('modules.aeams.equipment.archive');
+        Route::post('/aeams/equipment/{equipmentAsset}/restore', [AEAMSController::class, 'restoreAsset'])->name('modules.aeams.equipment.restore');
+        Route::get('/aeams/export', [AEAMSController::class, 'export'])->name('modules.aeams.export');
         Route::post('/aeams/requests', [AEAMSController::class, 'storeRequest'])->name('modules.aeams.requests.store');
         Route::post('/aeams/requests/{equipmentRequest}/review', [AEAMSController::class, 'review'])->name('modules.aeams.requests.review');
         Route::post('/aeams/requests/{equipmentRequest}/cancel', [AEAMSController::class, 'cancelRequest'])->name('modules.aeams.requests.cancel');

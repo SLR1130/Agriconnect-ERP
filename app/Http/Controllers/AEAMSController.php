@@ -36,7 +36,7 @@ class AEAMSController extends Controller
         $assets = EquipmentAsset::query()
             ->with(['category', 'responsibleUser', 'maintenances' => fn ($query) => $query->whereIn('status', ['open', 'in_progress'])->latest()])
             ->when(! $isStaff, fn ($query) => $query->where('availability_status', 'available'))
-            ->when(in_array($status, ['available', 'issued', 'maintenance'], true), fn ($query) => $query->where('availability_status', $status))
+            ->when(in_array($status, ['available', 'issued', 'maintenance', 'archived'], true), fn ($query) => $query->where('availability_status', $status))
             ->when($categoryId, fn ($query) => $query->where('category_id', $categoryId))
             ->when($search, fn ($query, $value) => $query->where(function ($nested) use ($value) {
                 $nested->where('asset_code', 'like', '%'.$value.'%')
@@ -112,7 +112,11 @@ class AEAMSController extends Controller
             ->latest()
             ->get();
 
-        return view('modules.aeams.show', compact('asset', 'requests', 'transactions', 'isStaff'));
+        return view('modules.aeams.show', compact('asset', 'requests', 'transactions', 'isStaff') + [
+            'canUpdate' => $this->canStaff($user, 'update'),
+            'equipmentCategories' => EquipmentCategory::query()->where('is_active', true)->orderBy('name')->get(),
+            'personnelUsers' => User::query()->whereDoesntHave('roles', fn ($query) => $query->where('slug', 'farmer'))->orderBy('name')->get(),
+        ]);
     }
 
     public function storeAsset(Request $request, EquipmentService $service): RedirectResponse
@@ -133,6 +137,51 @@ class AEAMSController extends Controller
 
         $service->registerAsset($data, $request->user());
         return back()->with('status', 'Equipment asset registered.');
+    }
+
+    public function updateAsset(Request $request, EquipmentAsset $equipmentAsset, EquipmentService $service): RedirectResponse
+    {
+        $this->authorizeStaff($request, 'update');
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'category_id' => ['required', 'exists:equipment_categories,id'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'acquired_on' => ['nullable', 'date'],
+            'acquisition_cost' => ['nullable', 'numeric', 'min:0'],
+            'condition' => ['required', 'in:good,fair,damaged'],
+            'assigned_location' => ['nullable', 'string', 'max:150'],
+            'responsible_user_id' => ['nullable', 'exists:users,id'],
+        ]);
+        $service->updateAsset($equipmentAsset, $data, $request->user());
+        return back()->with('status', 'Equipment asset details updated and audited.');
+    }
+
+    public function archiveAsset(Request $request, EquipmentAsset $equipmentAsset, EquipmentService $service): RedirectResponse
+    {
+        $this->authorizeStaff($request, 'update');
+        $service->archiveAsset($equipmentAsset, $request->user());
+        return back()->with('status', 'Equipment asset archived without deleting its history.');
+    }
+
+    public function restoreAsset(Request $request, EquipmentAsset $equipmentAsset, EquipmentService $service): RedirectResponse
+    {
+        $this->authorizeStaff($request, 'update');
+        $service->restoreAsset($equipmentAsset, $request->user());
+        return back()->with('status', 'Equipment asset restored to available inventory.');
+    }
+
+    public function export(Request $request)
+    {
+        $this->authorizeStaff($request, 'export');
+        $assets = EquipmentAsset::with(['category', 'responsibleUser'])->withCount(['requests', 'transactions', 'maintenances'])->latest()->get();
+        $safe = fn ($value) => preg_match('/^[=+\-@]/', (string) $value) ? "'".$value : $value;
+
+        return response()->streamDownload(function () use ($assets, $safe) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Asset code', 'Name', 'Category', 'Condition', 'Availability', 'Location', 'Responsible', 'Requests', 'Transactions', 'Maintenance records']);
+            foreach ($assets as $asset) fputcsv($out, [$safe($asset->asset_code), $safe($asset->name), $safe($asset->category?->name), $asset->condition, $asset->availability_status, $safe($asset->assigned_location), $safe($asset->responsibleUser?->name), $asset->requests_count, $asset->transactions_count, $asset->maintenances_count]);
+            fclose($out);
+        }, 'aeams-equipment-utilization.csv', ['Content-Type' => 'text/csv']);
     }
 
     public function storeRequest(Request $request, EquipmentService $service): RedirectResponse
