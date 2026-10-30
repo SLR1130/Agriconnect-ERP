@@ -1,0 +1,21 @@
+<x-layouts.app>
+    <x-slot name="header">Farmer Registration Management</x-slot>
+    <x-slot name="description">Review pending farmer applications and access shared FFRMS identity records.</x-slot>
+
+    @if(session('status'))<div class="erp-alert erp-alert-success mb-6">{{ session('status') }}</div>@endif
+    @if($errors->any())<div class="erp-alert erp-alert-danger mb-6"><ul class="list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+
+    <section class="erp-surface mb-6 p-5">
+        <div class="erp-section-header"><div><p class="erp-page-eyebrow">FFRMS queue</p><h2 class="erp-section-title text-xl">Farmer registrations</h2></div><span class="erp-pill">{{ $farmers->total() }} records</span></div>
+        <form class="flex flex-wrap gap-3" method="GET"><input class="erp-input max-w-sm" name="search" value="{{ request('search') }}" placeholder="Name, code, or barangay"><select class="erp-input w-auto" name="status"><option value="">All statuses</option>@foreach(['pending','verified','returned','rejected'] as $status)<option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>@endforeach</select><button class="erp-button erp-button-primary" type="submit">Filter</button></form>
+    </section>
+
+    <div class="space-y-4">@forelse($farmers as $farmer)
+        <article class="erp-surface p-5"><div class="flex flex-wrap items-start justify-between gap-4"><div><p class="erp-page-eyebrow">{{ $farmer->farmer_code }}</p><h2 class="font-semibold text-dark-slate">{{ $farmer->user->name }}</h2><p class="text-sm text-gray-600">{{ $farmer->barangay }} · {{ $farmer->farms_count }} farm(s) · {{ $farmer->user->email }}</p><p class="mt-2 text-sm">Status: <span class="erp-pill {{ $farmer->registration_status === 'verified' ? 'erp-pill-success' : ($farmer->registration_status === 'rejected' ? 'erp-pill-warning' : 'erp-pill-neutral') }}">{{ ucfirst($farmer->registration_status) }}</span></p></div>@if($canReview)<form method="POST" action="{{ route('modules.ffrms.review', $farmer) }}" class="flex max-w-xl flex-wrap gap-2">@csrf<select name="status" class="erp-input w-auto"><option value="verified">Verify</option><option value="returned">Return for correction</option><option value="rejected">Reject</option></select><input name="reason" class="erp-input min-w-[220px] flex-1" placeholder="Review note or reason"><button class="erp-button erp-button-primary" type="submit">Save review</button></form>@else<span class="erp-pill erp-pill-neutral">Read-only access</span>@endif</div></article>
+    @empty<div class="erp-surface erp-empty">No farmer registrations found.</div>@endforelse</div>
+    <div class="mt-6">{{ $farmers->links() }}</div>
+
+    @if($canManageAssociations)
+        <section class="erp-surface mt-8 p-5"><div class="erp-section-header"><div><p class="erp-page-eyebrow">Shared farmer groups</p><h2 class="erp-section-title">Farmer associations</h2></div></div><form method="POST" action="{{ route('modules.ffrms.associations.store') }}" class="mt-4 flex flex-wrap gap-2">@csrf<input name="name" required placeholder="Association name" class="erp-input"><input name="registration_reference" placeholder="Registration no." class="erp-input"><input name="barangay" placeholder="Barangay" class="erp-input"><button class="erp-button erp-button-secondary" type="submit">Add association</button></form><div class="mt-4 space-y-2">@forelse($associations as $association)<div class="flex flex-wrap items-center justify-between gap-3 border-t pt-3"><span>{{ $association->name }} <small class="text-gray-500">({{ $association->members_count }} members)</small></span><form method="POST" action="{{ route('modules.ffrms.associations.members.store', $association) }}" class="flex gap-2">@csrf<select name="farmer_id" required class="erp-input">@foreach($farmers as $farmer)<option value="{{ $farmer->id }}">{{ $farmer->user->name }} — {{ $farmer->farmer_code }}</option>@endforeach</select><button class="erp-button erp-button-secondary" type="submit">Add member</button></form></div>@empty<p class="mt-3 text-sm text-gray-500">No associations registered.</p>@endforelse</div></section>
+    @endif
+</x-layouts.app>
