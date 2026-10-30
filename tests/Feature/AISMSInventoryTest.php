@@ -290,6 +290,37 @@ class AISMSInventoryTest extends TestCase
             ->assertSee('Filter transactions');
     }
 
+    public function test_transaction_forms_are_disclosed_and_reopen_for_server_validation(): void
+    {
+        $data = $this->setupInventory();
+
+        $this->actingAs($data['user'])
+            ->get('/modules/aisms')
+            ->assertOk()
+            ->assertSee('data-aisms-open-form="receive-stock"', false)
+            ->assertSee('data-aisms-form="receive"', false)
+            ->assertSee('data-aisms-form="release"', false)
+            ->assertSee('data-aisms-form="adjust"', false)
+            ->assertSee('data-aisms-form="item"', false)
+            ->assertDontSee('data-aisms-form="receive" open', false)
+            ->assertSee(route('modules.aisms.receipts.store'), false)
+            ->assertSee(route('modules.aisms.releases.store'), false)
+            ->assertSee(route('modules.aisms.adjustments.store'), false)
+            ->assertSee(route('modules.aisms.items.store'), false);
+
+        $response = $this->actingAs($data['user'])
+            ->from('/modules/aisms')
+            ->followingRedirects()
+            ->post('/modules/aisms/receipts', ['_aisms_form' => 'receive'])
+            ->assertOk()
+            ->assertSee('The supply item id field is required.');
+
+        preg_match('/<details id="receive-stock"[^>]*>/', $response->getContent(), $receiveDetails);
+        $this->assertNotEmpty($receiveDetails);
+        $this->assertStringContainsString('open', $receiveDetails[0], $receiveDetails[0]);
+        $this->assertDatabaseCount('inventory_movements', 0);
+    }
+
     public function test_authorized_user_can_register_supply_with_catalog_requirements(): void
     {
         $data = $this->setupInventory();

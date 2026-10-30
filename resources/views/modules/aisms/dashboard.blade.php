@@ -37,7 +37,7 @@
                 <div><h2 class="text-lg font-bold text-forest-green">Supply management</h2><p class="mt-1 text-sm text-gray-500">Search the live supply catalog and review current usable balances.</p></div>
                 <div class="flex flex-wrap gap-2">
                     @if($canExport)<a class="inv-btn inv-sage" href="{{ route('modules.aisms.export', request()->query()) }}">Export filtered transactions</a>@endif
-                    @if($canReceive)<a class="inv-btn inv-gold" href="#receive-stock">Receive stock</a>@endif
+                    @if($canReceive)<button class="inv-btn inv-gold" type="button" data-aisms-open-form="receive-stock" aria-controls="receive-stock">Receive stock</button>@endif
                 </div>
             </div>
             <form method="GET" action="{{ route('modules.aisms.dashboard') }}" class="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -54,10 +54,11 @@
             <div class="mt-4">{{ $items->links() }}</div>
         </section>
 
-        <div id="receive-stock" class="inv-forms grid grid-cols-3 gap-5">
+        <div class="inv-forms grid grid-cols-3 gap-5">
             @if($canReceive)
-                <section class="inv-card p-5"><h2 class="text-lg font-bold text-forest-green">Receive stock</h2><p class="mt-1 text-sm text-gray-500">Post a delivery to an active inventory location.</p>
-                    <form method="POST" action="{{ route('modules.aisms.receipts.store') }}" class="mt-5 space-y-3">@csrf
+                <details id="receive-stock" class="inv-card inv-disclosure erp-form-disclosure" data-aisms-form="receive" @if(old('_aisms_form') === 'receive') open @endif>
+    <summary class="p-5"><span><h2 class="text-lg font-bold text-forest-green">Receive stock</h2><p class="mt-1 text-sm text-gray-500">Post a delivery to an active inventory location.</p></span><span class="erp-form-disclosure-icon" aria-hidden="true"></span></summary>
+    <div class="inv-disclosure-body p-5 pt-0"><form method="POST" action="{{ route('modules.aisms.receipts.store') }}" class="space-y-3">@csrf<input type="hidden" name="_aisms_form" value="receive">
                         <select class="inv-input" name="supply_item_id" aria-label="Supply item" required><option value="">Select supply</option>{!! $itemOptions !!}</select>
                         <select class="inv-input" name="location_id" aria-label="Inventory location" required><option value="">Select location</option>{!! $locationOptions !!}</select>
                         <input class="inv-input" name="batch_number" aria-label="Batch number" placeholder="Batch number" required>
@@ -65,13 +66,14 @@
                         <input class="inv-input" name="quantity" type="number" min=".01" step=".01" placeholder="Quantity" required>
                         <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                         <button class="inv-btn inv-primary w-full" type="submit">Post receipt</button>
-                    </form>
-                </section>
+                    </form></div>
+</details>
             @endif
 
             @if($canRelease)
-                <section class="inv-card p-5"><h2 class="text-lg font-bold text-forest-green">Release stock</h2><p class="mt-1 text-sm text-gray-500">Expired batches are excluded; available stock is checked again on submission.</p>
-                    <form method="POST" action="{{ route('modules.aisms.releases.store') }}" class="mt-5 space-y-3">@csrf
+                <details id="release-stock" class="inv-card inv-disclosure erp-form-disclosure" data-aisms-form="release" @if(old('_aisms_form') === 'release') open @endif>
+    <summary class="p-5"><span><h2 class="text-lg font-bold text-forest-green">Release stock</h2><p class="mt-1 text-sm text-gray-500">Expired batches are excluded; available stock is checked again on submission.</p></span><span class="erp-form-disclosure-icon" aria-hidden="true"></span></summary>
+    <div class="inv-disclosure-body p-5 pt-0"><form method="POST" action="{{ route('modules.aisms.releases.store') }}" class="space-y-3">@csrf<input type="hidden" name="_aisms_form" value="release">
                         <select class="inv-input" name="supply_batch_id" data-stock-select="release" aria-label="Usable batch" required><option value="">Select usable batch</option>{!! $releaseBatchOptions !!}</select>
                         <p data-stock-availability="release" class="text-xs text-gray-500" aria-live="polite">Choose a batch to see its current available quantity.</p>
                         <input class="inv-input" name="quantity" type="number" min=".01" step=".01" placeholder="Quantity" required>
@@ -79,21 +81,22 @@
                         <textarea class="inv-input" name="purpose" rows="3" placeholder="Purpose" required></textarea>
                         <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                         <button class="inv-btn inv-primary w-full" type="submit">Post release</button>
-                    </form>
-                </section>
+                    </form></div>
+</details>
             @endif
 
             @if($canAdjust)
-                <section class="inv-card p-5"><h2 class="text-lg font-bold text-forest-green">Adjust stock</h2><p class="mt-1 text-sm text-gray-500">Record a signed physical-count correction. Negative adjustments cannot exceed the balance.</p>
-                    <form method="POST" action="{{ route('modules.aisms.adjustments.store') }}" class="mt-5 space-y-3">@csrf
+                <details id="adjust-stock" class="inv-card inv-disclosure erp-form-disclosure" data-aisms-form="adjust" @if(old('_aisms_form') === 'adjust') open @endif>
+    <summary class="p-5"><span><h2 class="text-lg font-bold text-forest-green">Adjust stock</h2><p class="mt-1 text-sm text-gray-500">Record a signed physical-count correction. Negative adjustments cannot exceed the balance.</p></span><span class="erp-form-disclosure-icon" aria-hidden="true"></span></summary>
+    <div class="inv-disclosure-body p-5 pt-0"><form method="POST" action="{{ route('modules.aisms.adjustments.store') }}" class="space-y-3">@csrf<input type="hidden" name="_aisms_form" value="adjust">
                         <select class="inv-input" name="supply_batch_id" data-stock-select="adjust" aria-label="Batch to adjust" required><option value="">Select batch</option>{!! $batchOptions !!}</select>
                         <p data-stock-availability="adjust" class="text-xs text-gray-500" aria-live="polite">Choose a batch to see its current available quantity.</p>
                         <input class="inv-input" name="quantity" type="number" step=".01" placeholder="Adjustment quantity, e.g. 2 or -2" required>
                         <textarea class="inv-input" name="adjustment_reason" rows="3" placeholder="Mandatory reason" required></textarea>
                         <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                         <button class="inv-btn inv-gold w-full" type="submit">Save adjustment</button>
-                    </form>
-                </section>
+                    </form></div>
+</details>
             @endif
             @unless($canReceive || $canRelease || $canAdjust)
                 <div class="inv-card p-5 text-sm text-gray-600 sm:col-span-3">Read-only access: balances and transaction history are visible, but no stock-changing actions are assigned to this account.</div>
@@ -101,15 +104,16 @@
         </div>
 
         @if($canCreate)
-            <section class="inv-card p-5"><h2 class="text-lg font-bold text-forest-green">Register a supply item</h2><p class="mt-1 text-sm text-gray-500">Add an item to the shared supply catalog before receiving its first batch.</p>
-                <form method="POST" action="{{ route('modules.aisms.items.store') }}" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">@csrf
+            <details class="inv-card inv-disclosure erp-form-disclosure" data-aisms-form="item" @if(old('_aisms_form') === 'item') open @endif>
+    <summary class="p-5"><span><h2 class="text-lg font-bold text-forest-green">Register a supply item</h2><p class="mt-1 text-sm text-gray-500">Add an item to the shared supply catalog before receiving its first batch.</p></span><span class="erp-form-disclosure-icon" aria-hidden="true"></span></summary>
+    <div class="inv-disclosure-body p-5 pt-0"><form method="POST" action="{{ route('modules.aisms.items.store') }}" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">@csrf<input type="hidden" name="_aisms_form" value="item">
                     <input class="inv-input" name="code" placeholder="Item code" required><input class="inv-input" name="name" placeholder="Supply name" required>
                     <select class="inv-input" name="category_id" aria-label="Category" required><option value="">Category</option>@foreach($categories as $category)<option value="{{ $category->id }}">{{ $category->name }}</option>@endforeach</select>
                     <select class="inv-input" name="unit_id" aria-label="Unit" required><option value="">Unit</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->name }}</option>@endforeach</select>
                     <input class="inv-input" name="minimum_stock" type="number" min="0" step=".01" value="0" placeholder="Minimum stock" required>
                     <button class="inv-btn inv-sage" type="submit">Register supply</button>
-                </form>
-            </section>
+                </form></div>
+</details>
         @endif
 
         <div class="inv-panels grid grid-cols-2 gap-5">
@@ -144,6 +148,16 @@
     </div>
 
     <script>
+        document.querySelectorAll('[data-aisms-open-form]').forEach(function (button) {
+            button.addEventListener("click", function () {
+                const details = document.getElementById(button.dataset.aismsOpenForm);
+                if (!details) return;
+                details.open = true;
+                details.scrollIntoView({ behavior: "smooth", block: "center" });
+                details.querySelector("summary")?.focus();
+            });
+        });
+
         document.querySelectorAll('[data-stock-select]').forEach(function (select) {
             const kind = select.dataset.stockSelect;
             const availability = document.querySelector('[data-stock-availability="' + kind + '"]');

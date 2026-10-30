@@ -27,6 +27,16 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 [hidden] { display: none !important; }
 :focus-visible { outline: 3px solid rgba(38, 134, 92, .62); outline-offset: 3px; }
 
+.erp-form-disclosure { overflow: hidden; }
+.erp-form-disclosure > summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; list-style: none; cursor: pointer; }
+.erp-form-disclosure > summary::-webkit-details-marker { display: none; }
+.erp-form-disclosure > summary:focus-visible { outline: 3px solid rgba(38, 134, 92, .62); outline-offset: -3px; }
+.erp-form-disclosure > summary h2 { margin: 0; }
+.erp-form-disclosure > summary p { margin: .25rem 0 0; }
+.erp-form-disclosure-icon { display: grid; flex: 0 0 2rem; width: 2rem; height: 2rem; place-items: center; color: var(--forest); background: var(--sage); border: 1px solid #d5e4d7; border-radius: .65rem; font-size: 1.1rem; font-weight: 800; }
+.erp-form-disclosure-icon::before { content: '+'; }
+.erp-form-disclosure[open] .erp-form-disclosure-icon::before { content: '\2212'; }
+
 .bg-forest-green { background-color: var(--forest); }
 .text-forest-green { color: var(--forest); }
 .border-forest-green { border-color: var(--forest); }
@@ -185,7 +195,9 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 
 @media (max-width: 640px) {
     .erp-topbar { min-height: 4.1rem; padding: .75rem 1rem; }
+    .erp-topbar-left { flex: 1 1 auto; }
     .erp-topbar-right { gap: .25rem; }
+    .erp-topbar-right, .erp-user-wrap { flex-shrink: 0; }
     .erp-user-copy, .erp-user-button > svg { display: none; }
     .erp-menu { right: -.3rem; width: min(18rem, calc(100vw - 2rem)); }
     .erp-content { padding: 1rem; }
