@@ -640,4 +640,42 @@ class ABPMSProcurementTest extends TestCase
             ->assertForbidden();
         $this->assertDatabaseHas('purchase_orders', ['id' => $order->id, 'status' => 'draft']);
     }
+
+    public function test_abpms_creation_forms_are_disclosed_and_reopen_for_validation_errors(): void
+    {
+        $data = $this->setupAbpms();
+
+        $this->actingAs($data['manager'])
+            ->get('/modules/abpms')
+            ->assertOk()
+            ->assertSee('class="ab-disclosure"', false)
+            ->assertDontSee('class="ab-disclosure" open', false)
+            ->assertSee('Open a budget period')
+            ->assertSee('New procurement request');
+
+        $response = $this->actingAs($data['manager'])
+            ->from('/modules/abpms')
+            ->post('/modules/abpms/periods', [
+                '_abpms_form' => 'period',
+                'year' => 1999,
+                'name' => 'Validation Budget Period',
+                'starts_on' => '2026-01-01',
+                'ends_on' => '2026-12-31',
+            ]);
+
+        $response->assertRedirect()->assertSessionHasErrors('year');
+    }
+
+    public function test_abpms_does_not_offer_a_duplicate_purchase_order_for_an_active_request_order(): void
+    {
+        $data = $this->setupAbpms();
+        $order = $this->createApprovedOrder($data, 'existing-request-order');
+
+        $this->actingAs($data['manager'])
+            ->get('/modules/abpms')
+            ->assertOk()
+            ->assertSee('Purchase order exists')
+            ->assertSee($order->purchase_order_number)
+            ->assertDontSee('Set up purchase order');
+    }
 }

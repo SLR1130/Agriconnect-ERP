@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
 use App\Models\Role;
+use App\Models\User;
 use App\Models\WorkflowRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -64,7 +64,7 @@ class ErpCoreTest extends TestCase
             ->assertOk()
             ->assertSee('AgriConnect ERP')
             ->assertSee('Live records from')
-            ->assertSee('Isolated demonstration database')
+            ->assertSee('Isolated SQLite')
             ->assertDontSee(':memory:');
     }
 

@@ -32,9 +32,9 @@
         <section class="erp-nav-section">
             <p class="erp-nav-label">Workspace</p>
             <ul class="erp-nav-list">
-                <li><a class="erp-nav-link {{ request()->routeIs('dashboard', 'admin.dashboard', 'mao.dashboard', 'farmer.portal') ? 'is-active' : '' }}" href="{{ route($dashboardRoute) }}"><span class="erp-nav-icon">DS</span><span>Dashboard</span></a></li>
+                <li><a class="erp-nav-link {{ request()->routeIs('dashboard', 'admin.dashboard', 'mao.dashboard', 'farmer.portal') ? 'is-active' : '' }}" href="{{ route($dashboardRoute) }}" title="Dashboard" @if(request()->routeIs('dashboard', 'admin.dashboard', 'mao.dashboard', 'farmer.portal')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">DS</span><span>Dashboard</span></a></li>
                 @if($canOverview && ! $currentUser?->hasRole('farmer'))
-                    <li><a class="erp-nav-link {{ request()->routeIs('overview') ? 'is-active' : '' }}" href="{{ route('overview') }}"><span class="erp-nav-icon">OV</span><span>Overview</span></a></li>
+                    <li><a class="erp-nav-link {{ request()->routeIs('overview') ? 'is-active' : '' }}" href="{{ route('overview') }}" title="Overview" @if(request()->routeIs('overview')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">OV</span><span>Overview</span></a></li>
                 @endif
             </ul>
         </section>
@@ -45,7 +45,7 @@
                 <p class="erp-nav-label">Agricultural modules</p>
                 <ul class="erp-nav-list">
                     @foreach($visibleModules as $module)
-                        <li><a class="erp-nav-link {{ request()->routeIs('modules.'.$module['slug'].'.*') ? 'is-active' : '' }}" href="{{ route('modules.'.$module['slug'].'.dashboard') }}"><span class="erp-nav-icon">{{ $module['code'] }}</span><span>{{ $module['label'] }}</span></a></li>
+                        <li><a class="erp-nav-link {{ request()->routeIs('modules.'.$module['slug'].'.*') ? 'is-active' : '' }}" href="{{ route('modules.'.$module['slug'].'.dashboard') }}" title="{{ $module['label'] }}" @if(request()->routeIs('modules.'.$module['slug'].'.*')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">{{ $module['code'] }}</span><span>{{ $module['label'] }}</span></a></li>
                     @endforeach
                 </ul>
             </section>
@@ -55,9 +55,9 @@
             <section class="erp-nav-section">
                 <p class="erp-nav-label">Farmer services</p>
                 <ul class="erp-nav-list">
-                    <li><a class="erp-nav-link {{ request()->routeIs('farmer.portal') ? 'is-active' : '' }}" href="{{ route('farmer.portal') }}"><span class="erp-nav-icon">ME</span><span>My farmer profile</span></a></li>
-                    <li><a class="erp-nav-link {{ request()->routeIs('farmer.assistance') ? 'is-active' : '' }}" href="{{ route('farmer.assistance') }}"><span class="erp-nav-icon">AS</span><span>Assistance services</span></a></li>
-                    <li><a class="erp-nav-link {{ request()->routeIs('modules.aeams.*') ? 'is-active' : '' }}" href="{{ route('modules.aeams.dashboard') }}"><span class="erp-nav-icon">EA</span><span>Equipment requests</span></a></li>
+                    <li><a class="erp-nav-link {{ request()->routeIs('farmer.portal') ? 'is-active' : '' }}" href="{{ route('farmer.portal') }}" title="My farmer profile" @if(request()->routeIs('farmer.portal')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">ME</span><span>My farmer profile</span></a></li>
+                    <li><a class="erp-nav-link {{ request()->routeIs('farmer.assistance') ? 'is-active' : '' }}" href="{{ route('farmer.assistance') }}" title="Assistance services" @if(request()->routeIs('farmer.assistance')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">AS</span><span>Assistance services</span></a></li>
+                    <li><a class="erp-nav-link {{ request()->routeIs('modules.aeams.*') ? 'is-active' : '' }}" href="{{ route('modules.aeams.dashboard') }}" title="Equipment requests" @if(request()->routeIs('modules.aeams.*')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">EA</span><span>Equipment requests</span></a></li>
                 </ul>
             </section>
         @endif
@@ -67,12 +67,12 @@
                 <p class="erp-nav-label">Administration</p>
                 <ul class="erp-nav-list">
                     @if($isSuperAdmin)
-                        <li><a class="erp-nav-link {{ request()->routeIs('erp.users.*') ? 'is-active' : '' }}" href="{{ route('erp.users.index') }}"><span class="erp-nav-icon">US</span><span>User management</span></a></li>
-                        <li><a class="erp-nav-link {{ request()->routeIs('erp.roles.*') ? 'is-active' : '' }}" href="{{ route('erp.roles.index') }}"><span class="erp-nav-icon">RL</span><span>Roles &amp; permissions</span></a></li>
-                        <li><a class="erp-nav-link {{ request()->routeIs('erp.modules.*') ? 'is-active' : '' }}" href="{{ route('erp.modules.index') }}"><span class="erp-nav-icon">MD</span><span>Module management</span></a></li>
+                        <li><a class="erp-nav-link {{ request()->routeIs('erp.users.*') ? 'is-active' : '' }}" href="{{ route('erp.users.index') }}" title="User management" @if(request()->routeIs('erp.users.*')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">US</span><span>User management</span></a></li>
+                        <li><a class="erp-nav-link {{ request()->routeIs('erp.roles.*') ? 'is-active' : '' }}" href="{{ route('erp.roles.index') }}" title="Roles &amp; permissions" @if(request()->routeIs('erp.roles.*')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">RL</span><span>Roles &amp; permissions</span></a></li>
+                        <li><a class="erp-nav-link {{ request()->routeIs('erp.modules.*') ? 'is-active' : '' }}" href="{{ route('erp.modules.index') }}" title="Module management" @if(request()->routeIs('erp.modules.*')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">MD</span><span>Module management</span></a></li>
                     @endif
-                    @if($canReports)<li><a class="erp-nav-link {{ request()->routeIs('erp.reports.*') ? 'is-active' : '' }}" href="{{ route('erp.reports.index') }}"><span class="erp-nav-icon">RP</span><span>Consolidated reports</span></a></li>@endif
-                    @if($canActivity)<li><a class="erp-nav-link {{ request()->routeIs('erp.activity-logs.*') ? 'is-active' : '' }}" href="{{ route('erp.activity-logs.index') }}"><span class="erp-nav-icon">AL</span><span>Activity logs</span></a></li>@endif
+                    @if($canReports)<li><a class="erp-nav-link {{ request()->routeIs('erp.reports.*') ? 'is-active' : '' }}" href="{{ route('erp.reports.index') }}" title="Consolidated reports" @if(request()->routeIs('erp.reports.*')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">RP</span><span>Consolidated reports</span></a></li>@endif
+                    @if($canActivity)<li><a class="erp-nav-link {{ request()->routeIs('erp.activity-logs.*') ? 'is-active' : '' }}" href="{{ route('erp.activity-logs.index') }}" title="Activity logs" @if(request()->routeIs('erp.activity-logs.*')) aria-current="page" @endif><span class="erp-nav-icon" aria-hidden="true">AL</span><span>Activity logs</span></a></li>@endif
                 </ul>
             </section>
         @endif

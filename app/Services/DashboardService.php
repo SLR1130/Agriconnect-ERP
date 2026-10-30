@@ -152,13 +152,18 @@ class DashboardService
     public function getSystemHealth(): array
     {
         try {
-            DB::connection()->getPdo();
+            $connection = DB::connection();
+            $connection->getPdo();
 
             return [
                 'connected' => true,
-                'database' => DB::connection()->getDatabaseName() === ':memory:'
-                    ? 'Isolated demonstration database'
-                    : DB::connection()->getDatabaseName(),
+                'database' => match ($connection->getDriverName()) {
+                    'mysql', 'mariadb' => 'MySQL',
+                    'sqlite' => $connection->getDatabaseName() === ':memory:' ? 'Isolated SQLite' : 'SQLite',
+                    'pgsql' => 'PostgreSQL',
+                    'sqlsrv' => 'SQL Server',
+                    default => 'Configured database',
+                },
                 'checked_at' => now(),
             ];
         } catch (\Throwable $exception) {

@@ -36,7 +36,7 @@ class ABPMSController extends Controller
         $budgetSummaries = $allocations->mapWithKeys(fn (BudgetAllocation $allocation) => [$allocation->id => $budget->summary($allocation)])->all();
 
         $requestsQuery = ProcurementRequest::query()
-            ->with(['allocation.period', 'requester', 'reviewer', 'items.supplyItem'])
+            ->with(['allocation.period', 'requester', 'reviewer', 'items.supplyItem', 'purchaseOrders' => fn ($query) => $query->whereNotIn('status', ['cancelled'])])
             ->latest();
         $requestSearch = trim((string) $request->input('request_search', ''));
         if ($requestSearch !== '') {

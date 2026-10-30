@@ -51,7 +51,7 @@
             <div class="erp-section-header"><h2 class="erp-section-title">System health</h2><span class="erp-pill">Live check</span></div>
             <div class="space-y-4 text-sm">
                 <div class="flex items-center justify-between gap-4 border-b border-gray-100 pb-4"><span class="text-gray-500">Database connection</span><span class="font-bold {{ $health['connected'] ? 'text-emerald-green' : 'text-red-600' }}">{{ $health['connected'] ? 'Connected' : 'Unavailable' }}</span></div>
-                <div class="flex items-center justify-between gap-4 border-b border-gray-100 pb-4"><span class="text-gray-500">Database context</span><span class="text-right font-bold text-dark-slate">{{ $health['database'] ?: 'Unavailable' }}</span></div>
+                <div class="flex items-center justify-between gap-4 border-b border-gray-100 pb-4"><span class="text-gray-500">Database engine</span><span class="text-right font-bold text-dark-slate">{{ $health['database'] ?: 'Unavailable' }}</span></div>
                 <div class="flex items-center justify-between gap-4"><span class="text-gray-500">Last checked</span><span class="text-right font-bold text-dark-slate">{{ $health['checked_at']->format('M j, Y g:i A') }}</span></div>
             </div>
         </section>

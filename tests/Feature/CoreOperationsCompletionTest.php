@@ -2,16 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\ActivityLog;
 use App\Models\AssistanceApplication;
 use App\Models\AssistanceProgram;
+use App\Models\CropProductionRecord;
 use App\Models\EquipmentAsset;
 use App\Models\EquipmentCategory;
 use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\CropProductionRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -90,8 +89,8 @@ class CoreOperationsCompletionTest extends TestCase
         $this->actingAs($staff)
             ->get('/modules/apms')
             ->assertOk()
-            ->assertSee("name='farmer_id'", false)
-            ->assertSee("name='farm_id'", false)
+            ->assertSee('name="farmer_id"', false)
+            ->assertSee('name="farm_id"', false)
             ->assertDontSee("@include('apms.farm-fields')", false);
     }
 

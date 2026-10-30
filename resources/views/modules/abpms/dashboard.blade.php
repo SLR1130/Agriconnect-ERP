@@ -1,4 +1,4 @@
-<x-layouts.app>
+﻿<x-layouts.app>
     <x-slot name="header">Budget &amp; Procurement Management</x-slot>
     <x-slot name="description">Plan agricultural budgets, control procurement, and receive approved goods into the shared ERP records.</x-slot>
 
@@ -12,6 +12,19 @@
         .ab-table{width:100%;border-collapse:collapse}.ab-table th{padding:.7rem;text-align:left;color:#718177;font-size:.64rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #e1e9e2;white-space:nowrap}.ab-table td{padding:.75rem;color:#405048;font-size:.78rem;border-bottom:1px solid #edf2ee;vertical-align:top}.ab-table tr:last-child td{border-bottom:0}
         .ab-pill{display:inline-flex;border-radius:999px;padding:.25rem .6rem;font-size:.65rem;font-weight:800;text-transform:capitalize;white-space:nowrap}.ab-green{background:#e7f0e8;color:#1c6a46}.ab-yellow{background:#fff5d8;color:#8a691e}.ab-red{background:#fee7e5;color:#a33e36}.ab-blue{background:#e7f0fb;color:#28618e}.ab-gray{background:#eef2f0;color:#58685e}
         .ab-label{display:block;margin-bottom:.35rem;color:#53645a;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+        .ab-disclosure>summary{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;list-style:none;cursor:pointer}
+        .ab-disclosure>summary::-webkit-details-marker{display:none}
+        .ab-disclosure>summary:focus-visible{outline:2px solid #26865c;outline-offset:4px;border-radius:8px}
+        .ab-disclosure-title{margin:0;color:#153d2b;font-size:1.125rem;font-weight:800}
+        .ab-disclosure-copy{margin:.25rem 0 0;color:#718177;font-size:.82rem;line-height:1.5}
+        .ab-disclosure-toggle{display:inline-flex;align-items:center;gap:.4rem;flex:none;color:#1c6a46;font-size:.75rem;font-weight:800}
+        .ab-disclosure-toggle::before{content:'+';display:grid;width:1.35rem;height:1.35rem;place-items:center;border-radius:999px;background:#e7f0e8;font-size:1rem}
+        .ab-disclosure[open] .ab-disclosure-toggle::before{content:'−'}
+        .ab-disclosure-body{margin-top:1rem;padding-top:1rem;border-top:1px solid #e1e9e2}
+        .ab-row-disclosure>summary{list-style:none;cursor:pointer}
+        .ab-row-disclosure>summary::-webkit-details-marker{display:none}
+        .ab-row-disclosure>summary:focus-visible{outline:2px solid #26865c;outline-offset:3px}
+        .ab-row-disclosure-body{margin-top:.5rem;min-width:200px}
         @media(max-width:900px){.ab-two,.ab-forms{grid-template-columns:1fr!important}.ab-table-wrap{overflow-x:auto}.ab-table{min-width:900px}}
     </style>
 
@@ -49,31 +62,27 @@
 
         @if($canManage)
             <div class="ab-forms grid grid-cols-2 gap-5">
-                <section class="ab-card p-5">
-                    <h2 class="text-lg font-bold text-forest-green">Open a budget period</h2>
-                    <p class="mt-1 text-sm text-slate-500">A period is the authoritative time boundary for budget allocations.</p>
-                    <form method="POST" action="{{ route('modules.abpms.periods.store') }}" class="mt-5 grid gap-3 sm:grid-cols-2">
+                <section class="ab-card p-5"><details class="ab-disclosure" @if(old('_abpms_form') === 'period' || $errors->has('year') || $errors->has('name') || $errors->has('starts_on') || $errors->has('ends_on')) open @endif><summary><span><span class="ab-disclosure-title">Open a budget period</span><span class="ab-disclosure-copy block">A period is the authoritative time boundary for budget allocations.</span></span><span class="ab-disclosure-toggle" aria-hidden="true"></span></summary><div class="ab-disclosure-body"><form method="POST" action="{{ route('modules.abpms.periods.store') }}" class="grid gap-3 sm:grid-cols-2">
                         @csrf
+                        <input type="hidden" name="_abpms_form" value="period">
+
                         <div><label class="ab-label" for="period-year">Year</label><input id="period-year" class="ab-input" name="year" type="number" min="2000" max="2200" value="{{ old('year', now()->year) }}" required></div>
                         <div><label class="ab-label" for="period-name">Period name</label><input id="period-name" class="ab-input" name="name" placeholder="FY {{ now()->year }} Agricultural Program" required></div>
                         <div><label class="ab-label" for="period-start">Starts</label><input id="period-start" class="ab-input" name="starts_on" type="date" required></div>
                         <div><label class="ab-label" for="period-end">Ends</label><input id="period-end" class="ab-input" name="ends_on" type="date" required></div>
                         <button class="ab-btn ab-primary sm:col-span-2" type="submit">Create budget period</button>
-                    </form>
-                </section>
-                <section class="ab-card bg-sage p-5">
-                    <h2 class="text-lg font-bold text-forest-green">Create an allocation</h2>
-                    <p class="mt-1 text-sm text-slate-600">Funds are tracked through an auditable ledger. Available balances are calculated from recorded entries.</p>
-                    <form method="POST" action="{{ route('modules.abpms.allocations.store') }}" class="mt-5 grid gap-3 sm:grid-cols-2">
+                    </form></div></details></section>
+                <section class="ab-card bg-sage p-5"><details class="ab-disclosure" @if(old('_abpms_form') === 'allocation' || $errors->has('budget_period_id') || $errors->has('program_code') || $errors->has('funding_category') || $errors->has('authorized_amount') || $errors->has('description')) open @endif><summary><span><span class="ab-disclosure-title">Create an allocation</span><span class="ab-disclosure-copy block">Funds are tracked through an auditable ledger. Available balances are calculated from recorded entries.</span></span><span class="ab-disclosure-toggle" aria-hidden="true"></span></summary><div class="ab-disclosure-body"><form method="POST" action="{{ route('modules.abpms.allocations.store') }}" class="grid gap-3 sm:grid-cols-2">
                         @csrf
+                        <input type="hidden" name="_abpms_form" value="allocation">
+
                         <div><label class="ab-label" for="allocation-period">Budget period</label><select id="allocation-period" class="ab-input" name="budget_period_id" required><option value="">Select period</option>@foreach($periods as $period)<option value="{{ $period->id }}">{{ $period->year }} — {{ $period->name }}</option>@endforeach</select></div>
                         <div><label class="ab-label" for="allocation-program">Program code</label><input id="allocation-program" class="ab-input" name="program_code" placeholder="e.g. FFRMS-2026" required></div>
                         <div><label class="ab-label" for="allocation-category">Funding category</label><input id="allocation-category" class="ab-input" name="funding_category" placeholder="Agricultural supplies" required></div>
                         <div><label class="ab-label" for="allocation-amount">Authorized amount</label><input id="allocation-amount" class="ab-input" name="authorized_amount" type="number" min=".01" step=".01" placeholder="0.00" required></div>
                         <div class="sm:col-span-2"><label class="ab-label" for="allocation-description">Description</label><textarea id="allocation-description" class="ab-input" name="description" rows="2" required></textarea></div>
                         <button class="ab-btn ab-gold sm:col-span-2" type="submit">Authorize allocation</button>
-                    </form>
-                </section>
+                    </form></div></details></section>
             </div>
         @endif
 
@@ -124,23 +133,20 @@
 
         @if($canCreate)
             <div class="ab-forms grid grid-cols-2 gap-5">
-                <section class="ab-card p-5">
-                    <h2 class="text-lg font-bold text-forest-green">Supplier registry</h2>
-                    <p class="mt-1 text-sm text-slate-500">Keep supplier identity and registration details in one shared procurement record.</p>
-                    <form method="POST" action="{{ route('modules.abpms.suppliers.store') }}" class="mt-5 grid gap-3 sm:grid-cols-2">
+                <section class="ab-card p-5"><details class="ab-disclosure" @if(old('_abpms_form') === 'supplier' || $errors->has('contact_person') || $errors->has('registration_reference') || $errors->has('email') || $errors->has('phone') || $errors->has('address') || $errors->has('name')) open @endif><summary><span><span class="ab-disclosure-title">Supplier registry</span><span class="ab-disclosure-copy block">Keep supplier identity and registration details in one shared procurement record.</span></span><span class="ab-disclosure-toggle" aria-hidden="true"></span></summary><div class="ab-disclosure-body"><form method="POST" action="{{ route('modules.abpms.suppliers.store') }}" class="grid gap-3 sm:grid-cols-2">
                         @csrf
+                        <input type="hidden" name="_abpms_form" value="supplier">
+
                         <div class="sm:col-span-2"><label class="ab-label" for="supplier-name">Supplier name</label><input id="supplier-name" class="ab-input" name="name" required></div>
                         <input class="ab-input" name="contact_person" placeholder="Contact person"><input class="ab-input" name="registration_reference" placeholder="Registration reference">
                         <input class="ab-input" name="email" type="email" placeholder="Email"><input class="ab-input" name="phone" placeholder="Phone">
                         <input class="ab-input sm:col-span-2" name="address" placeholder="Business address">
                         <button class="ab-btn ab-primary sm:col-span-2" type="submit">Register supplier</button>
-                    </form>
-                </section>
-                <section class="ab-card p-5">
-                    <h2 class="text-lg font-bold text-forest-green">New procurement request</h2>
-                    <p class="mt-1 text-sm text-slate-500">Requests reserve no funds until an authorized purchase order is approved.</p>
-                    <form method="POST" action="{{ route('modules.abpms.requests.store') }}" class="mt-5 space-y-3" id="procurement-request-form">
+                    </form></div></details></section>
+                <section class="ab-card p-5"><details class="ab-disclosure" @if(old('_abpms_form') === 'request' || $errors->has('budget_allocation_id') || $errors->has('requesting_office') || $errors->has('purpose') || $errors->has('justification') || $errors->has('items.0.item_type') || $errors->has('items.0.supply_item_id') || $errors->has('items.0.description') || $errors->has('items.0.quantity') || $errors->has('items.0.estimated_unit_price')) open @endif><summary><span><span class="ab-disclosure-title">New procurement request</span><span class="ab-disclosure-copy block">Requests reserve no funds until an authorized purchase order is approved.</span></span><span class="ab-disclosure-toggle" aria-hidden="true"></span></summary><div class="ab-disclosure-body"><form method="POST" action="{{ route('modules.abpms.requests.store') }}" class="space-y-3" id="procurement-request-form">
                         @csrf
+                        <input type="hidden" name="_abpms_form" value="request">
+
                         <div class="grid gap-3 sm:grid-cols-2">
                             <select class="ab-input" name="budget_allocation_id" required><option value="">Budget allocation</option>@foreach($allocations as $allocation)<option value="{{ $allocation->id }}">{{ $allocation->reference }} · {{ $allocation->program_code }}</option>@endforeach</select>
                             <input class="ab-input" name="requesting_office" placeholder="Requesting office" required>
@@ -161,8 +167,7 @@
                             </div>
                         </div>
                         <button class="ab-btn ab-primary w-full" type="submit">Submit procurement request</button>
-                    </form>
-                </section>
+                    </form></div></details></section>
             </div>
         @endif
 
@@ -183,8 +188,23 @@
                                     @if($canApprove)<form method="POST" action="{{ route('modules.abpms.requests.review', $procurementRequest) }}">@csrf<input type="hidden" name="status" value="approved"><button class="ab-btn ab-primary" type="submit">Approve</button></form>@endif
                                 </div>
                                 @if($canReject)<form method="POST" action="{{ route('modules.abpms.requests.review', $procurementRequest) }}" class="mt-2 space-y-2">@csrf<input type="hidden" name="status" value="rejected"><textarea class="ab-input" name="review_notes" rows="2" placeholder="Required rejection reason" required></textarea><button class="ab-btn ab-danger" type="submit">Reject request</button></form>@endif
+                            @elseif($procurementRequest->status === 'approved' && $procurementRequest->purchaseOrders->isNotEmpty())
+                                <span class="ab-pill ab-blue">Purchase order exists</span><div class="mt-1 text-xs text-slate-500">{{ $procurementRequest->purchaseOrders->first()->purchase_order_number }}</div>
                             @elseif($canCreate && $procurementRequest->status === 'approved')
-                                <form method="POST" action="{{ route('modules.abpms.purchase-orders.store', $procurementRequest) }}" class="space-y-2">@csrf<select class="ab-input" name="supplier_id" required><option value="">Select supplier</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->name }}</option>@endforeach</select><input class="ab-input" name="expected_delivery_on" type="date"><input class="ab-input" name="idempotency_key" placeholder="Optional retry key"><textarea class="ab-input" name="notes" rows="2" placeholder="Purchase order notes"></textarea><button class="ab-btn ab-gold" type="submit">Create purchase order</button></form>
+                                <details class="ab-row-disclosure" @if(old('_abpms_form') === 'purchase_order' && (string) old('procurement_request_id') === (string) $procurementRequest->id) open @endif>
+    <summary class="ab-btn ab-gold">Set up purchase order</summary>
+    <div class="ab-row-disclosure-body">
+        <form method="POST" action="{{ route('modules.abpms.purchase-orders.store', $procurementRequest) }}" class="space-y-2">
+            @csrf
+            <input type="hidden" name="_abpms_form" value="purchase_order"><input type="hidden" name="procurement_request_id" value="{{ $procurementRequest->id }}">
+            <label class="ab-label">Supplier<select class="ab-input" name="supplier_id" required><option value="">Select supplier</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->name }}</option>@endforeach</select></label>
+            <label class="ab-label">Expected delivery<input class="ab-input" name="expected_delivery_on" type="date"></label>
+            <label class="ab-label">Retry key <span class="font-normal normal-case tracking-normal">(optional)</span><input class="ab-input" name="idempotency_key" placeholder="Enter a unique retry key"></label>
+            <label class="ab-label">Purchase order notes<textarea class="ab-input" name="notes" rows="2"></textarea></label>
+            <button class="ab-btn ab-primary" type="submit">Create purchase order</button>
+        </form>
+    </div>
+</details>
                             @else
                                 <span class="text-xs text-slate-500">No action available for this state.</span>
                             @endif
