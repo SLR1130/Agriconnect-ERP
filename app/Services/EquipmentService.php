@@ -7,8 +7,9 @@ use App\Models\EquipmentAsset;
 use App\Models\EquipmentMaintenance;
 use App\Models\EquipmentRequest;
 use App\Models\EquipmentTransaction;
-use App\Models\User;
 use App\Models\Farmer;
+use App\Models\User;
+use App\Notifications\EquipmentRequestStatusChanged;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -184,6 +185,7 @@ class EquipmentService
 
             $this->record($asset, $request, $status, $actor, null, $notes);
             ActivityLog::log($status, 'Equipment request '.$request->reference.' '.$status.'.', $request->reference, $actor->id, 'aeams');
+            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, $status));
 
             return $request->refresh();
         });
@@ -244,6 +246,7 @@ class EquipmentService
 
             $this->record($asset, $request, 'issued', $actor, $condition, 'Equipment issued to the verified farmer.');
             ActivityLog::log('updated', 'Equipment request '.$request->reference.' issued.', $request->reference, $actor->id, 'aeams');
+            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, 'issued'));
 
             return $request->refresh();
         });
@@ -283,6 +286,7 @@ class EquipmentService
 
             $this->record($asset, $request, 'returned', $actor, $condition, $notes);
             ActivityLog::log('updated', 'Equipment request '.$request->reference.' returned.', $request->reference, $actor->id, 'aeams');
+            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, 'returned'));
 
             return $request->refresh();
         });
@@ -315,6 +319,7 @@ class EquipmentService
             $lockedAsset->update(['availability_status' => 'maintenance']);
 
             $this->record($lockedAsset, null, 'maintenance_started', $actor, $lockedAsset->condition, $maintenance->description);
+
             return $maintenance->load('asset');
         });
     }
@@ -346,6 +351,7 @@ class EquipmentService
             ]);
 
             $this->record($asset, null, 'maintenance_completed', $actor, $asset->condition, 'Maintenance completed.');
+
             return $lockedMaintenance->refresh();
         });
     }

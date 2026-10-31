@@ -191,6 +191,7 @@ class AgriculturalDashboardTest extends TestCase
 
     public function test_report_csv_is_filtered_and_escapes_formula_like_group_labels(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-10-15'));
         $admin = $this->staff('super_admin');
         $this->farmer('pending', '=HYPERLINK("https://example.invalid")');
 

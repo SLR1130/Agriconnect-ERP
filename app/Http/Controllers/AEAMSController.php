@@ -26,9 +26,23 @@ class AEAMSController extends Controller
         $canReturn = $this->canStaff($user, 'return');
         $canMaintenance = $this->canStaff($user, 'maintenance');
         $farmer = $user->farmer;
-        $isFarmer = $user->canErp('farmer.equipment.request') && $farmer?->isVerified();
+        $isFarmer = $user->hasRole('farmer') && $farmer !== null;
 
         abort_unless($isStaff || $isFarmer, 403);
+
+        if ($isFarmer && ! $isStaff) {
+            $search = trim($request->string('search')->toString());
+
+            return view('farmer.equipment', [
+                'farmer' => $farmer,
+                'assets' => EquipmentAsset::query()->with('category')
+                    ->where('availability_status', 'available')
+                    ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+                    ->orderBy('name')->paginate(9, ['*'], 'assets_page')->withQueryString(),
+                'requests' => EquipmentRequest::query()->with('asset')
+                    ->where('farmer_id', $farmer->id)->latest()->paginate(10, ['*'], 'requests_page')->withQueryString(),
+            ]);
+        }
 
         $search = $request->string('search')->toString();
         $status = $request->string('status')->toString();
@@ -106,9 +120,21 @@ class AEAMSController extends Controller
         $user = $request->user();
         $isStaff = $this->canStaff($user, 'view');
         $farmer = $user->farmer;
-        $isFarmer = $user->canErp('farmer.equipment.request') && $farmer?->isVerified();
+        $isFarmer = $user->hasRole('farmer') && $farmer !== null;
 
         abort_unless($isStaff || $isFarmer, 403);
+
+        if ($isFarmer && ! $isStaff) {
+            $ownRequests = EquipmentRequest::query()->with('asset')->where('farmer_id', $farmer->id)
+                ->where('equipment_asset_id', $equipmentAsset->id)->latest()->get();
+            abort_unless($equipmentAsset->availability_status === 'available' || $ownRequests->isNotEmpty(), 404);
+
+            return view('farmer.equipment-detail', [
+                'farmer' => $farmer,
+                'asset' => $equipmentAsset->load('category'),
+                'requests' => $ownRequests,
+            ]);
+        }
 
         $asset = $equipmentAsset->load(['category', 'responsibleUser']);
         $requests = $asset->requests()
@@ -145,6 +171,7 @@ class AEAMSController extends Controller
         ]);
 
         $service->registerAsset($data, $request->user());
+
         return back()->with('status', 'Equipment asset registered.');
     }
 
@@ -162,6 +189,7 @@ class AEAMSController extends Controller
             'responsible_user_id' => ['nullable', 'exists:users,id'],
         ]);
         $service->updateAsset($equipmentAsset, $data, $request->user());
+
         return back()->with('status', 'Equipment asset details updated and audited.');
     }
 
@@ -169,6 +197,7 @@ class AEAMSController extends Controller
     {
         $this->authorizeStaff($request, 'update');
         $service->archiveAsset($equipmentAsset, $request->user());
+
         return back()->with('status', 'Equipment asset archived without deleting its history.');
     }
 
@@ -176,6 +205,7 @@ class AEAMSController extends Controller
     {
         $this->authorizeStaff($request, 'update');
         $service->restoreAsset($equipmentAsset, $request->user());
+
         return back()->with('status', 'Equipment asset restored to available inventory.');
     }
 
@@ -188,7 +218,9 @@ class AEAMSController extends Controller
         return response()->streamDownload(function () use ($assets, $safe) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Asset code', 'Name', 'Category', 'Condition', 'Availability', 'Location', 'Responsible', 'Requests', 'Transactions', 'Maintenance records']);
-            foreach ($assets as $asset) fputcsv($out, [$safe($asset->asset_code), $safe($asset->name), $safe($asset->category?->name), $asset->condition, $asset->availability_status, $safe($asset->assigned_location), $safe($asset->responsibleUser?->name), $asset->requests_count, $asset->transactions_count, $asset->maintenances_count]);
+            foreach ($assets as $asset) {
+                fputcsv($out, [$safe($asset->asset_code), $safe($asset->name), $safe($asset->category?->name), $asset->condition, $asset->availability_status, $safe($asset->assigned_location), $safe($asset->responsibleUser?->name), $asset->requests_count, $asset->transactions_count, $asset->maintenances_count]);
+            }
             fclose($out);
         }, 'aeams-equipment-utilization.csv', ['Content-Type' => 'text/csv']);
     }
@@ -207,6 +239,7 @@ class AEAMSController extends Controller
         ]);
 
         $service->requestForUser($request->user(), $data);
+
         return back()->with('status', 'Equipment request submitted for MAO review.');
     }
 
@@ -220,6 +253,7 @@ class AEAMSController extends Controller
         ]);
 
         $service->review($equipmentRequest, $data['status'], $data['review_notes'] ?? null, $request->user());
+
         return back()->with('status', 'Equipment request review saved.');
     }
 
@@ -229,6 +263,7 @@ class AEAMSController extends Controller
         abort_unless($request->user()->farmer?->isVerified() && (int) $equipmentRequest->requested_by === (int) $request->user()->id, 403);
 
         $service->cancel($equipmentRequest, $request->user());
+
         return back()->with('status', 'Equipment request cancelled.');
     }
 
@@ -241,6 +276,7 @@ class AEAMSController extends Controller
         ]);
 
         $service->issue($equipmentRequest, $data['condition'], $request->user());
+
         return back()->with('status', 'Equipment released to the verified farmer.');
     }
 
@@ -255,6 +291,7 @@ class AEAMSController extends Controller
         ]);
 
         $service->return($equipmentRequest, $data['condition'], (bool) ($data['needs_maintenance'] ?? false), $data['notes'] ?? null, $request->user());
+
         return back()->with('status', 'Equipment return recorded.');
     }
 
@@ -268,6 +305,7 @@ class AEAMSController extends Controller
         ]);
 
         $service->startMaintenance($equipmentAsset, $data, $request->user());
+
         return back()->with('status', 'Equipment moved to maintenance.');
     }
 
@@ -280,6 +318,7 @@ class AEAMSController extends Controller
         ]);
 
         $service->completeMaintenance($equipmentMaintenance, $data['condition'] ?? null, $request->user());
+
         return back()->with('status', 'Maintenance completed and equipment availability updated.');
     }
 

@@ -1,0 +1,14 @@
+<x-layouts.farmer>
+    <x-slot name="title">My assistance application</x-slot>
+    <x-slot name="description">{{ $application->program->name }}</x-slot>
+    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.assistance') }}">← Back to assistance</a>
+    <div class="grid gap-5 lg:grid-cols-[1.3fr_.7fr]">
+        <div class="space-y-5"><section class="farmer-card"><div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-xl font-bold">{{ $application->program->name }}</h2><span class="farmer-pill {{ $application->status === 'rejected' ? 'farmer-pill-bad' : '' }}">{{ ucfirst($application->status) }}</span></div><p class="mt-3 text-sm text-slate-600">Submitted {{ $application->created_at?->format('M d, Y') }}. {{ $application->purpose ?: 'No additional purpose supplied.' }}</p>@if($application->review_notes)<p class="mt-4 rounded-xl bg-sage p-3 text-sm"><strong>MAO feedback:</strong> {{ $application->review_notes }}</p>@endif
+@if($application->approved_quantity)<p class="mt-3 text-sm"><strong>Approved allocation:</strong> {{ $application->approved_quantity }} {{ $application->approvedSupplyItem?->name }}</p>@endif</section>
+            <section class="farmer-card"><h2 class="text-lg font-bold">Distributions received</h2><div class="mt-3 divide-y divide-slate-100">@forelse($application->distributions as $distribution)<div class="py-3 text-sm"><strong class="text-forest-green">{{ $distribution->batch->item->name }}</strong><p>{{ $distribution->quantity }} distributed on {{ $distribution->distributed_at?->format('M d, Y') }}</p><p class="text-xs text-slate-600">Reference {{ $distribution->reference }}</p></div>@empty<p class="py-3 text-sm text-slate-600">No supplies have been distributed for this application yet.</p>@endforelse</div></section>
+        </div>
+        <aside class="farmer-card self-start"><h2 class="text-lg font-bold">Status history</h2><ol class="mt-3 space-y-4 border-l-2 border-sage pl-4">@forelse($application->history->sortByDesc('created_at') as $entry)<li><span class="farmer-pill">{{ ucfirst($entry->to_status) }}</span><p class="mt-1 text-xs text-slate-600">{{ $entry->created_at?->format('M d, Y h:i A') }}</p>@if($entry->notes)<p class="mt-1 text-sm text-slate-700">{{ $entry->notes }}</p>@endif</li>@empty<li class="text-sm text-slate-600">Submitted and awaiting MAO review.</li>@endforelse</ol>
+            @if($application->status === 'returned')<form class="mt-5 space-y-3 border-t border-slate-100 pt-5" method="POST" action="{{ route('farmer.assistance.resubmit', $application) }}">@csrf<div class="farmer-field"><label for="resubmit-purpose">Updated application purpose</label><textarea id="resubmit-purpose" name="purpose" maxlength="2000" rows="4">{{ old('purpose', $application->purpose) }}</textarea></div><button class="farmer-button" type="submit">Resubmit for review</button></form>@endif
+        </aside>
+    </div>
+</x-layouts.farmer>

@@ -279,6 +279,90 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
     .erp-footer { align-items: flex-start; flex-direction: column; padding: 1rem; }
 }
 
+/* Farmer services use the shared palette with a lighter, task-focused shell. */
+.farmer-body { min-width: 320px; margin: 0; color: #243a2d; background: #f6f8f2; }
+.farmer-container { width: min(100% - 2rem, 1180px); margin-inline: auto; }
+.farmer-skip { position: absolute; top: -5rem; left: 1rem; z-index: 100; padding: .65rem 1rem; color: #fff; background: #153d2b; border-radius: .65rem; }
+.farmer-skip:focus { top: .6rem; }
+.farmer-header { position: relative; z-index: 30; background: #fff; border-bottom: 1px solid #dfe9df; box-shadow: 0 3px 16px #153d2b09; }
+.farmer-header-inner { display: flex; align-items: center; justify-content: space-between; min-height: 76px; gap: 1.25rem; }
+.farmer-brand { display: inline-flex; align-items: center; gap: .7rem; color: #153d2b; text-decoration: none; white-space: nowrap; }
+.farmer-brand strong, .farmer-brand small { display: block; line-height: 1.15; }
+.farmer-brand strong { font-size: 1.12rem; font-weight: 850; letter-spacing: -.035em; }
+.farmer-brand small { margin-top: .15rem; color: #61756a; font-size: .66rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.farmer-brand-mark { display: grid; width: 2.65rem; height: 2.65rem; place-items: center; color: #153d2b; background: #d5ad55; border-radius: .9rem; }
+.farmer-brand-mark svg { width: 1.45rem; height: 1.45rem; }
+.farmer-desktop-nav { display: flex; align-items: center; gap: .2rem; }
+.farmer-desktop-nav a { padding: .65rem .8rem; color: #506557; border-radius: .6rem; font-size: .86rem; font-weight: 700; text-decoration: none; }
+.farmer-desktop-nav a:hover, .farmer-desktop-nav a[aria-current=page] { color: #153d2b; background: #e7f0e8; }
+.farmer-header-actions { display: flex; align-items: center; gap: .55rem; }
+.farmer-notice-link { position: relative; display: grid; width: 2.6rem; height: 2.6rem; place-items: center; color: #153d2b; border: 1px solid #e0e8e1; border-radius: .8rem; }
+.farmer-notice-link svg { width: 1.25rem; height: 1.25rem; }
+.farmer-notice-count { position: absolute; top: -.4rem; right: -.4rem; min-width: 1.2rem; padding: .1rem .2rem; color: #fff; background: #b84935; border-radius: 999px; font-size: .64rem; text-align: center; }
+.farmer-account-menu { position: relative; }
+.farmer-account-menu summary { display: flex; align-items: center; gap: .5rem; padding: .3rem .5rem; color: #153d2b; border-radius: .7rem; cursor: pointer; list-style: none; font-size: .78rem; font-weight: 750; }
+.farmer-account-menu summary::-webkit-details-marker { display: none; }
+.farmer-account-menu summary:hover { background: #edf3ee; }
+.farmer-avatar { display: grid; width: 2rem; height: 2rem; place-items: center; color: #153d2b; background: #d5ad55; border-radius: 50%; font-weight: 850; }
+.farmer-account-panel { position: absolute; top: calc(100% + .5rem); right: 0; z-index: 50; width: min(18rem, calc(100vw - 2rem)); padding: .6rem; background: #fff; border: 1px solid #dfe9df; border-radius: .9rem; box-shadow: 0 16px 40px #153d2b24; }
+.farmer-account-caption { padding: .55rem .65rem; color: #637468; font-size: .73rem; overflow-wrap: anywhere; }
+.farmer-account-panel a, .farmer-account-panel button { display: block; width: 100%; padding: .65rem .7rem; color: #243a2d; background: transparent; border: 0; border-radius: .55rem; font-size: .82rem; text-align: left; text-decoration: none; cursor: pointer; }
+.farmer-account-panel a:hover, .farmer-account-panel button:hover { background: #e7f0e8; }
+.farmer-main { min-height: calc(100dvh - 180px); padding-block: 2rem 4rem; }
+.farmer-page-heading { margin-bottom: 1.5rem; }
+.farmer-eyebrow { color: #26865c; font-size: .7rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
+.farmer-page-heading h1 { margin: .3rem 0 .4rem; color: #153d2b; font-size: clamp(1.7rem, 4vw, 2.55rem); font-weight: 850; letter-spacing: -.055em; line-height: 1.15; }
+.farmer-page-heading > p:last-child { color: #617368; font-size: .94rem; line-height: 1.65; }
+.farmer-hero { position: relative; overflow: hidden; padding: clamp(1.5rem, 4vw, 3.5rem); color: #fff; background: linear-gradient(115deg, #123a29 0%, #205c3e 68%, #387a53 100%); border-radius: 1.6rem; }
+.farmer-hero::before, .farmer-hero::after { position: absolute; width: 19rem; height: 19rem; border: 1px solid #ffffff2b; border-radius: 50%; content: ''; pointer-events: none; }
+.farmer-hero::before { top: -11rem; right: -5rem; }.farmer-hero::after { right: 4rem; bottom: -15rem; }
+.farmer-hero h1 { max-width: 18ch; font-size: clamp(1.9rem, 4vw, 3.35rem); font-weight: 850; letter-spacing: -.055em; line-height: 1.1; }
+.farmer-hero p { max-width: 58ch; color: #e0efe5; line-height: 1.7; }
+.farmer-section { margin-top: 2rem; }
+.farmer-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.farmer-section-heading h2 { color: #153d2b; font-size: 1.28rem; font-weight: 820; letter-spacing: -.03em; }
+.farmer-section-heading p { margin-top: .2rem; color: #66766b; font-size: .82rem; line-height: 1.55; }
+.farmer-card { min-width: 0; padding: 1.35rem; background: #fff; border: 1px solid #dde8de; border-radius: 1.1rem; box-shadow: 0 8px 26px #153d2b08; }
+.farmer-card h2, .farmer-card h3 { color: #153d2b; }
+.farmer-card p { overflow-wrap: anywhere; }
+.farmer-pill { display: inline-flex; align-items: center; padding: .28rem .6rem; color: #1c6845; background: #e7f0e8; border-radius: 999px; font-size: .7rem; font-weight: 750; }
+.farmer-pill-warn { color: #79590f; background: #fff2ce; }.farmer-pill-bad { color: #9c3a32; background: #fde8e4; }
+.farmer-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.65rem; gap: .35rem; padding: .65rem 1rem; color: #fff; background: #153d2b; border: 1px solid #153d2b; border-radius: .75rem; font-size: .84rem; font-weight: 750; text-align: center; text-decoration: none; cursor: pointer; }
+.farmer-button:hover { background: #236648; }.farmer-button:disabled { opacity: .55; cursor: not-allowed; }
+.farmer-button-gold { color: #153d2b; background: #d5ad55; border-color: #d5ad55; }.farmer-button-gold:hover { background: #e5c071; }
+.farmer-button-light { color: #153d2b; background: #fff; border-color: #d1dfd3; }.farmer-button-light:hover { background: #edf5ed; }
+.farmer-field label { display: block; margin-bottom: .35rem; color: #314d39; font-size: .79rem; font-weight: 750; }
+.farmer-field input, .farmer-field select, .farmer-field textarea { display: block; width: 100%; min-height: 2.7rem; padding: .65rem .8rem; color: #203829; background: #fff; border: 1px solid #bdcebf; border-radius: .7rem; font-size: .86rem; }
+.farmer-field textarea { min-height: 5rem; }.farmer-field input:focus, .farmer-field select:focus, .farmer-field textarea:focus { border-color: #26865c; outline: 2px solid #26865c55; }
+.farmer-field small { display: block; margin-top: .3rem; color: #647469; font-size: .73rem; }
+.farmer-message { margin-bottom: 1.25rem; padding: .9rem 1rem; border-radius: .8rem; font-size: .84rem; line-height: 1.55; }
+.farmer-message-success { color: #145b39; background: #e7f6eb; border: 1px solid #b8dfc4; }.farmer-message-error { color: #8f332e; background: #fff1ee; border: 1px solid #ecc2bb; }
+.farmer-message ul { margin: .35rem 0 0 1.2rem; list-style: disc; }
+.farmer-empty { padding: 1.5rem; color: #5e7164; background: #f0f5ef; border: 1px dashed #c4d5c6; border-radius: .9rem; font-size: .86rem; line-height: 1.6; }
+.farmer-subnav { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .35rem; scrollbar-width: thin; }
+.farmer-subnav a { flex: 0 0 auto; padding: .6rem .85rem; color: #4b6352; background: #e8efe8; border-radius: .65rem; font-size: .79rem; font-weight: 750; text-decoration: none; white-space: nowrap; }
+.farmer-subnav a[aria-current=page], .farmer-subnav a:hover { color: #fff; background: #153d2b; }
+.farmer-disclosure > summary { color: #153d2b; font-weight: 750; cursor: pointer; }.farmer-disclosure[open] > summary { margin-bottom: 1rem; }
+.farmer-footer { padding: 1.3rem 0; color: #6a7c6d; background: #fff; border-top: 1px solid #e1e9df; font-size: .72rem; }
+.farmer-footer .farmer-container { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .6rem; }
+.farmer-bottom-nav { display: none; }
+@media (max-width: 900px) {
+    .farmer-desktop-nav { display: none; }
+    .farmer-main { padding-bottom: 7.5rem; }
+    .farmer-footer { padding-bottom: 5.5rem; }
+    .farmer-bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 25; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: .35rem .35rem calc(.35rem + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #d9e4da; box-shadow: 0 -7px 24px #153d2b12; }
+    .farmer-bottom-nav a { display: flex; align-items: center; justify-content: center; flex-direction: column; min-width: 0; gap: .05rem; padding: .25rem .1rem; color: #657769; border-radius: .55rem; font-size: .64rem; font-weight: 750; text-align: center; text-decoration: none; }
+    .farmer-bottom-nav a span { font-size: 1.25rem; line-height: 1; }
+    .farmer-bottom-nav a[aria-current=page] { color: #153d2b; background: #e7f0e8; }
+}
+@media (max-width: 640px) {
+    .farmer-container { width: min(100% - 1.25rem, 1180px); }
+    .farmer-header-inner { min-height: 64px; gap: .5rem; }.farmer-brand-mark { width: 2.25rem; height: 2.25rem; }.farmer-brand strong { font-size: 1rem; }.farmer-brand small { font-size: .58rem; }
+    .farmer-account-name { display: none; }.farmer-header-actions { gap: .3rem; }.farmer-notice-link { width: 2.2rem; height: 2.2rem; }
+    .farmer-main { padding-top: 1.3rem; }.farmer-section { margin-top: 1.4rem; }.farmer-hero { border-radius: 1.2rem; }
+    .farmer-section-heading { align-items: start; }.farmer-section-heading h2 { font-size: 1.13rem; }
+}
+
 /* APMS focused operational workspace */
 .apms-workspace { display: grid; gap: 1rem; }
 .apms-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }

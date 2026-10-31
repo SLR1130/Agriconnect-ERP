@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AssistanceApplication;
+use App\Models\AssistanceDistribution;
+use App\Models\AssistanceProgram;
+use App\Models\EquipmentRequest;
 use App\Models\Farm;
 use App\Models\Farmer;
 use App\Services\FarmerRegistrationService;
@@ -9,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class FarmerPortalController extends Controller
@@ -42,7 +47,32 @@ class FarmerPortalController extends Controller
 
         $farmer = $request->user()->farmer()->with(['farms', 'registrationHistory.processor'])->firstOrFail();
 
-        return view('farmer.portal', compact('farmer'));
+        return view('farmer.portal', [
+            'farmer' => $farmer,
+            'programs' => AssistanceProgram::query()->with('supplyItem')->where('status', 'open')
+                ->where(fn ($query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', today()))
+                ->where(fn ($query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', today()))
+                ->orderBy('closes_on')->take(3)->get(),
+            'applications' => AssistanceApplication::query()->with('program')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),
+            'equipmentRequests' => EquipmentRequest::query()->with('asset')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),
+            'distributions' => AssistanceDistribution::query()->with(['application.program', 'batch.item'])
+                ->whereHas('application', fn ($query) => $query->where('farmer_id', $farmer->id))->latest('distributed_at')->take(3)->get(),
+            'unreadCount' => $request->user()->unreadNotifications()->count(),
+        ]);
+    }
+
+    public function farms(Request $request): View
+    {
+        $farmer = $this->ownedFarmer($request)->load(['farms', 'registrationHistory.processor']);
+
+        return view('farmer.farms', compact('farmer'));
+    }
+
+    public function profile(Request $request): View
+    {
+        $farmer = $this->ownedFarmer($request);
+
+        return view('farmer.profile', compact('farmer'));
     }
 
     public function updateProfile(Request $request): RedirectResponse
@@ -53,6 +83,9 @@ class FarmerPortalController extends Controller
             'address' => ['nullable', 'string', 'max:255'],
             'barangay' => ['required', 'string', 'max:100'],
         ]);
+        if ($farmer->isVerified() && $data['barangay'] !== $farmer->barangay) {
+            throw ValidationException::withMessages(['barangay' => 'Ask the MAO to review changes to a verified barangay. Your current verified record is unchanged.']);
+        }
         $farmer->update($data);
 
         return back()->with('status', 'Profile updated.');

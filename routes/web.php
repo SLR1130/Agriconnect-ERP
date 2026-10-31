@@ -9,7 +9,9 @@ use App\Http\Controllers\Auth\AccountSetupController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ERP\AdministrationController;
 use App\Http\Controllers\ERP\DashboardController;
+use App\Http\Controllers\FarmerExperienceController;
 use App\Http\Controllers\FarmerPortalController;
+use App\Http\Controllers\FarmerProductionController;
 use App\Http\Controllers\FFRMSController;
 use App\Http\Controllers\SetupStatusController;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +45,19 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     Route::prefix('farmer')->middleware('can:farmer-portal')->group(function () {
         Route::get('/', [FarmerPortalController::class, 'dashboard'])->name('farmer.portal');
+        Route::get('/services', [FarmerExperienceController::class, 'services'])->name('farmer.services');
+        Route::get('/programs/{program}', [FarmerExperienceController::class, 'program'])->name('farmer.programs.show');
+        Route::get('/applications/{application}', [FarmerExperienceController::class, 'application'])->name('farmer.applications.show');
+        Route::get('/equipment-requests/{equipmentRequest}', [FarmerExperienceController::class, 'equipmentRequest'])->name('farmer.equipment-requests.show');
+        Route::get('/farms', [FarmerPortalController::class, 'farms'])->name('farmer.farms');
+        Route::get('/profile', [FarmerPortalController::class, 'profile'])->name('farmer.profile');
+        Route::get('/activities', [FarmerExperienceController::class, 'activities'])->name('farmer.activities');
+        Route::get('/notifications', [FarmerExperienceController::class, 'notifications'])->name('farmer.notifications');
+        Route::post('/notifications/{notification}/read', [FarmerExperienceController::class, 'markNotificationRead'])->name('farmer.notifications.read');
+        Route::get('/production', [FarmerProductionController::class, 'index'])->name('farmer.production');
+        Route::post('/production/incidents', [FarmerProductionController::class, 'reportIncident'])->name('farmer.production.incidents.store');
+        Route::get('/equipment', [AEAMSController::class, 'index'])->name('farmer.equipment');
+        Route::get('/equipment/{equipmentAsset}', [AEAMSController::class, 'show'])->name('farmer.equipment.show');
         Route::patch('/profile', [FarmerPortalController::class, 'updateProfile'])->name('farmer.profile.update');
         Route::post('/farms', [FarmerPortalController::class, 'storeFarm'])->name('farmer.farms.store');
         Route::patch('/farms/{farm}', [FarmerPortalController::class, 'updateFarm'])->name('farmer.farms.update');
