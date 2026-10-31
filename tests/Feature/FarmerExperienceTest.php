@@ -118,6 +118,7 @@ class FarmerExperienceTest extends TestCase
             'schedule_start' => now()->addDays(2)->format('Y-m-d H:i:s'), 'schedule_end' => now()->addDays(3)->format('Y-m-d H:i:s'),
         ])->assertRedirect();
         $equipmentRequest = EquipmentRequest::firstOrFail();
+        $this->actingAs($data['user'])->get('/farmer/activities')->assertOk()->assertSee('Irrigation pump')->assertSee('Equipment request');
         $this->actingAs($other['user'])->get('/farmer/equipment-requests/'.$equipmentRequest->id)->assertNotFound();
         $this->actingAs($staff)->post('/modules/aeams/requests/'.$equipmentRequest->id.'/review', ['status' => 'approved'])->assertRedirect();
         $this->assertDatabaseHas('equipment_requests', ['id' => $equipmentRequest->id, 'status' => 'approved']);
