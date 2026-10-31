@@ -388,4 +388,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (trigger) openEditor(trigger, true);
         }
     }
+
+    document.querySelectorAll('form').forEach((form) => {
+        const stage = form.querySelector('[data-crop-stage]');
+        const planted = form.querySelector('[data-crop-planted]');
+        const harvested = form.querySelector('#crop-harvested');
+        if (!stage || !planted || !harvested) return;
+
+        const syncCropDates = () => {
+            const planned = stage.value === 'planned';
+            planted.min = planned ? planted.dataset.today : '';
+            planted.max = planned ? '' : planted.dataset.today;
+            harvested.required = stage.value === 'harvested';
+            harvested.disabled = stage.value !== 'harvested';
+            harvested.min = planted.value || '';
+        };
+
+        stage.addEventListener('change', syncCropDates);
+        planted.addEventListener('change', syncCropDates);
+        syncCropDates();
+    });
 });

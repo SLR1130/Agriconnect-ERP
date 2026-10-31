@@ -96,8 +96,9 @@ class FarmerProductionController extends Controller
         $rules = match ($category) {
             'crop' => [
                 'season_id' => ['nullable', 'exists:agricultural_seasons,id'], 'crop_type' => ['required', 'string', 'max:120'],
-                'variety' => ['nullable', 'string', 'max:120'], 'planted_on' => ['required', 'date', 'before_or_equal:today'],
-                'harvested_on' => ['nullable', 'date', 'after_or_equal:planted_on', 'before_or_equal:today'],
+                'variety' => ['nullable', 'string', 'max:120'],
+                'planted_on' => ['required', 'date', Rule::when($request->input('status') === 'planned', ['after_or_equal:today'], ['before_or_equal:today'])],
+                'harvested_on' => ['nullable', 'required_if:status,harvested', 'date', 'after_or_equal:planted_on', 'before_or_equal:today'],
                 'area_planted' => ['required', 'numeric', 'min:0.01', 'max:99999999'], 'area_unit' => ['required', Rule::in(['hectare', 'square_meter'])],
                 'yield_quantity' => ['nullable', 'numeric', 'min:0', 'max:999999999999'], 'yield_unit' => ['required', 'string', 'max:30'],
                 'status' => ['required', Rule::in(['planned', 'growing', 'harvested'])], 'notes' => ['nullable', 'string', 'max:2000'],

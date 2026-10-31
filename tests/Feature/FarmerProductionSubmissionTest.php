@@ -89,6 +89,45 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->assertDatabaseCount('livestock_records', 0);
     }
 
+    public function test_crop_stage_controls_planting_and_harvest_date_requirements(): void
+    {
+        $owner = $this->farmer();
+        $planned = [
+            'farm_id' => $owner['farm']->id,
+            'crop_type' => 'Rice',
+            'planted_on' => today()->addDays(10)->toDateString(),
+            'area_planted' => '1.25',
+            'area_unit' => 'hectare',
+            'yield_unit' => 'kilogram',
+            'status' => 'planned',
+            'idempotency_key' => (string) Str::uuid(),
+        ];
+
+        $this->actingAs($owner['user'])->get('/farmer/production?section=crops')
+            ->assertOk()->assertSee('data-crop-stage', false)->assertSee('future planting date');
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/crop', $planned)->assertRedirect();
+        $submission = ProductionSubmission::firstOrFail();
+        $this->assertSame('planned', $submission->payload['status']);
+        $this->assertSame(today()->addDays(10)->toDateString(), $submission->payload['planted_on']);
+
+        $pastPlanned = array_replace($planned, [
+            'planted_on' => today()->subDay()->toDateString(),
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/crop', $pastPlanned)
+            ->assertSessionHasErrors('planted_on');
+
+        $harvestedWithoutDate = array_replace($planned, [
+            'status' => 'harvested',
+            'planted_on' => today()->subDays(30)->toDateString(),
+            'harvested_on' => null,
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/crop', $harvestedWithoutDate)
+            ->assertSessionHasErrors('harvested_on');
+        $this->assertDatabaseCount('production_submissions', 1);
+    }
+
     public function test_return_resubmit_reject_and_invalid_review_transitions(): void
     {
         $owner = $this->farmer();

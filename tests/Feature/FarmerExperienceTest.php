@@ -56,6 +56,64 @@ class FarmerExperienceTest extends TestCase
         $this->assertDatabaseCount('assistance_applications', 0);
     }
 
+    public function test_service_discovery_filters_programs_by_application_dates_and_shows_profile_eligibility(): void
+    {
+        $data = $this->farmer('pending');
+        $available = AssistanceProgram::create(['name' => 'Current Seed Support', 'status' => 'open', 'category' => 'Seeds']);
+        $upcoming = AssistanceProgram::create([
+            'name' => 'Upcoming Farm Grant', 'status' => 'open', 'category' => 'Grants',
+            'opens_on' => today()->addDays(5), 'closes_on' => today()->addDays(15),
+        ]);
+        $ended = AssistanceProgram::create([
+            'name' => 'Past Harvest Support', 'status' => 'open', 'category' => 'Harvest',
+            'opens_on' => today()->subDays(20), 'closes_on' => today()->subDay(),
+        ]);
+        $closesToday = AssistanceProgram::create([
+            'name' => 'Closing Today Support', 'status' => 'open', 'category' => 'Boundary',
+            'opens_on' => today(), 'closes_on' => today(),
+        ]);
+        $closed = AssistanceProgram::create(['name' => 'Closed Support', 'status' => 'closed', 'category' => 'Boundary']);
+
+        $this->actingAs($data['user'])->get('/farmer/services')
+            ->assertOk()->assertSee('Current Seed Support')->assertSee('Closing Today Support')->assertSee('Farmer registration must be verified')
+            ->assertDontSee('Upcoming Farm Grant')->assertDontSee('Past Harvest Support')->assertDontSee('Closed Support');
+        $this->actingAs($data['user'])->get('/farmer/services?availability=upcoming')
+            ->assertOk()->assertSee('Upcoming Farm Grant')->assertDontSee('Current Seed Support')->assertDontSee('Past Harvest Support');
+        $this->actingAs($data['user'])->get('/farmer/services?availability=ended')
+            ->assertOk()->assertSee('Past Harvest Support')->assertDontSee('Current Seed Support')->assertDontSee('Upcoming Farm Grant');
+        $this->actingAs($data['user'])->get('/farmer/services?availability=all&category=Grants')
+            ->assertOk()->assertSee('Upcoming Farm Grant')->assertDontSee('Current Seed Support')->assertDontSee('Past Harvest Support');
+        $this->actingAs($data['user'])->get('/farmer/services?availability=ended')
+            ->assertOk()->assertSee('Past Harvest Support')->assertDontSee('Closing Today Support');
+        $this->actingAs($data['user'])->get('/farmer/programs/'.$closed->id)->assertNotFound();
+        $this->assertDatabaseCount('assistance_programs', 5);
+    }
+
+    public function test_farmer_activity_tracker_searches_filters_and_paginates_owned_records(): void
+    {
+        $data = $this->farmer();
+        for ($number = 1; $number <= 22; $number++) {
+            $program = AssistanceProgram::create(['name' => sprintf('Portal tracking item %02d', $number), 'status' => 'open']);
+            $application = AssistanceApplication::create([
+                'program_id' => $program->id,
+                'farmer_id' => $data['farmer']->id,
+                'status' => $number % 2 === 0 ? 'approved' : 'submitted',
+            ]);
+            $timestamp = now()->addSeconds($number);
+            $application->forceFill(['created_at' => $timestamp, 'updated_at' => $timestamp])->save();
+        }
+
+        $firstPage = $this->actingAs($data['user'])->get('/farmer/activities?type=Assistance%20application&search=tracking+item');
+        $firstPage->assertOk()->assertSee('22 matching records')->assertSee('Portal tracking item 22')->assertDontSee('Portal tracking item 01')->assertSee('page=2');
+
+        $secondPage = $this->actingAs($data['user'])->get('/farmer/activities?type=Assistance%20application&search=tracking+item&page=2');
+        $secondPage->assertOk()->assertSee('Portal tracking item 01')->assertDontSee('Portal tracking item 22');
+
+        $this->actingAs($data['user'])->get('/farmer/activities?status=approved&type=Assistance%20application')
+            ->assertOk()->assertSee('Portal tracking item 22')->assertDontSee('Portal tracking item 21');
+        $this->assertDatabaseCount('assistance_applications', 22);
+    }
+
     public function test_verified_farmer_applies_once_and_other_applications_stay_private(): void
     {
         $data = $this->farmer();
@@ -113,10 +171,11 @@ class FarmerExperienceTest extends TestCase
 
         $this->actingAs($data['user'])->get('/farmer/equipment')->assertOk()->assertSee('Irrigation pump')->assertDontSee('PO-PRIVATE-001')->assertDontSee('9999');
         $this->actingAs($data['user'])->get('/modules/aeams/equipment/'.$asset->id)->assertOk()->assertDontSee('PO-PRIVATE-001');
-        $this->actingAs($data['user'])->post('/modules/aeams/requests', [
+        $this->actingAs($data['user'])->from('/farmer/equipment')->post('/modules/aeams/requests', [
             'equipment_asset_id' => $asset->id, 'intended_use' => 'Field irrigation',
             'schedule_start' => now()->addDays(2)->format('Y-m-d H:i:s'), 'schedule_end' => now()->addDays(3)->format('Y-m-d H:i:s'),
-        ])->assertRedirect();
+        ])->assertRedirect('/farmer/equipment')->assertSessionHas('status', 'Equipment request submitted for MAO review.');
+        $this->actingAs($data['user'])->get('/farmer/equipment')->assertOk()->assertSee('Field irrigation');
         $equipmentRequest = EquipmentRequest::firstOrFail();
         $this->actingAs($data['user'])->get('/farmer/activities')->assertOk()->assertSee('Irrigation pump')->assertSee('Equipment request');
         $this->actingAs($other['user'])->get('/farmer/equipment-requests/'.$equipmentRequest->id)->assertNotFound();
