@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AgriculturalAnnouncement;
 use App\Models\AssistanceApplication;
 use App\Models\AssistanceDistribution;
 use App\Models\AssistanceProgram;
@@ -11,9 +12,11 @@ use App\Models\Farmer;
 use App\Models\FisheryRecord;
 use App\Models\LivestockRecord;
 use App\Models\PestDiseaseIncident;
+use App\Models\ProductionSubmission;
 use App\Services\ProgramEligibilityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class FarmerExperienceController extends Controller
@@ -29,11 +32,15 @@ class FarmerExperienceController extends Controller
             'farmer' => $farmer,
             'search' => $search,
             'category' => $category,
+            'announcementsAvailable' => Schema::hasTable('agricultural_announcements'),
             'categories' => (clone $published)->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'),
             'programs' => $published->with('supplyItem')
                 ->when($search !== '', fn ($query) => $query->where(fn ($results) => $results->where('name', 'like', '%'.$search.'%')->orWhere('description', 'like', '%'.$search.'%')))
                 ->when($category !== '', fn ($query) => $query->where('category', $category))
                 ->orderBy('closes_on')->orderBy('name')->paginate(9)->withQueryString(),
+            'announcements' => Schema::hasTable('agricultural_announcements')
+                ? AgriculturalAnnouncement::query()->visibleToFarmers()->latest('published_at')->take(3)->get()
+                : collect(),
         ]);
     }
 
@@ -146,6 +153,16 @@ class FarmerExperienceController extends Controller
         }
         foreach (PestDiseaseIncident::query()->where('farmer_id', $farmer->id)->latest()->take(30)->get() as $incident) {
             $activities->push(['title' => $incident->incident_type, 'type' => 'Pest or disease report', 'status' => $incident->status, 'group' => in_array($incident->status, ['resolved', 'closed'], true) ? 'completed' : 'pending', 'date' => $incident->created_at, 'url' => route('farmer.production', ['section' => 'incidents'])]);
+        }
+        foreach (Schema::hasTable('production_submissions') ? ProductionSubmission::query()->with('farm')->where('farmer_id', $farmer->id)->latest()->take(50)->get() : collect() as $submission) {
+            $activities->push([
+                'title' => ucfirst($submission->category).' information · '.$submission->farm->name,
+                'type' => 'Agricultural submission', 'status' => $submission->status,
+                'group' => match ($submission->status) {
+                    'approved' => 'approved', 'rejected' => 'rejected', default => 'pending'
+                },
+                'date' => $submission->updated_at, 'url' => route('farmer.production.submissions.show', $submission),
+            ]);
         }
 
         return view('farmer.activities', [

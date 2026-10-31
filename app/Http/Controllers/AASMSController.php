@@ -69,9 +69,9 @@ class AASMSController extends Controller
     public function storeProgram(ProgramRequest $request): RedirectResponse
     {
         $this->staff($request, 'create');
-        AssistanceProgram::create($this->programData($request) + ['status' => 'open']);
+        AssistanceProgram::create($this->programData($request) + ['status' => 'closed']);
 
-        return back()->with('status', 'Assistance program created.');
+        return back()->with('status', 'Assistance program saved privately. Open it when it is ready for farmers.');
     }
 
     public function updateProgram(ProgramRequest $request, AssistanceProgram $program): RedirectResponse

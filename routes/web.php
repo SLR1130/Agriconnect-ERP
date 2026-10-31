@@ -4,6 +4,7 @@ use App\Http\Controllers\AASMSController;
 use App\Http\Controllers\ABPMSController;
 use App\Http\Controllers\AEAMSController;
 use App\Http\Controllers\AISMSController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\APMSController;
 use App\Http\Controllers\Auth\AccountSetupController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\FarmerExperienceController;
 use App\Http\Controllers\FarmerPortalController;
 use App\Http\Controllers\FarmerProductionController;
 use App\Http\Controllers\FFRMSController;
+use App\Http\Controllers\ProductionReviewController;
 use App\Http\Controllers\SetupStatusController;
 use Illuminate\Support\Facades\Route;
 
@@ -46,6 +48,8 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::prefix('farmer')->middleware('can:farmer-portal')->group(function () {
         Route::get('/', [FarmerPortalController::class, 'dashboard'])->name('farmer.portal');
         Route::get('/services', [FarmerExperienceController::class, 'services'])->name('farmer.services');
+        Route::get('/announcements', [AnnouncementController::class, 'farmerIndex'])->name('farmer.announcements');
+        Route::get('/announcements/{announcement}', [AnnouncementController::class, 'farmerShow'])->name('farmer.announcements.show');
         Route::get('/programs/{program}', [FarmerExperienceController::class, 'program'])->name('farmer.programs.show');
         Route::get('/applications/{application}', [FarmerExperienceController::class, 'application'])->name('farmer.applications.show');
         Route::get('/equipment-requests/{equipmentRequest}', [FarmerExperienceController::class, 'equipmentRequest'])->name('farmer.equipment-requests.show');
@@ -55,6 +59,9 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/notifications', [FarmerExperienceController::class, 'notifications'])->name('farmer.notifications');
         Route::post('/notifications/{notification}/read', [FarmerExperienceController::class, 'markNotificationRead'])->name('farmer.notifications.read');
         Route::get('/production', [FarmerProductionController::class, 'index'])->name('farmer.production');
+        Route::post('/production/submissions/{category}', [FarmerProductionController::class, 'storeSubmission'])->name('farmer.production.submissions.store');
+        Route::get('/production/submissions/{submission}', [FarmerProductionController::class, 'showSubmission'])->name('farmer.production.submissions.show');
+        Route::post('/production/submissions/{submission}/resubmit', [FarmerProductionController::class, 'resubmitSubmission'])->name('farmer.production.submissions.resubmit');
         Route::post('/production/incidents', [FarmerProductionController::class, 'reportIncident'])->name('farmer.production.incidents.store');
         Route::get('/equipment', [AEAMSController::class, 'index'])->name('farmer.equipment');
         Route::get('/equipment/{equipmentAsset}', [AEAMSController::class, 'show'])->name('farmer.equipment.show');
@@ -74,6 +81,9 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/ffrms/associations/{association}/members', [FFRMSController::class, 'addMember'])->name('modules.ffrms.associations.members.store');
 
         Route::get('/apms', [APMSController::class, 'index'])->name('modules.apms.dashboard');
+        Route::get('/apms/submissions', [ProductionReviewController::class, 'index'])->name('modules.apms.submissions');
+        Route::get('/apms/submissions/{submission}', [ProductionReviewController::class, 'show'])->name('modules.apms.submissions.show');
+        Route::post('/apms/submissions/{submission}/review', [ProductionReviewController::class, 'review'])->name('modules.apms.submissions.review');
         Route::post('/apms/seasons', [APMSController::class, 'season'])->name('modules.apms.seasons.store');
         Route::patch('/apms/seasons/{season}', [APMSController::class, 'updateSeason'])->name('modules.apms.seasons.update');
         Route::post('/apms/crops', [APMSController::class, 'crop'])->name('modules.apms.crops.store');
@@ -96,6 +106,11 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/aisms/export', [AISMSController::class, 'export'])->name('modules.aisms.export');
 
         Route::get('/aasms', [AASMSController::class, 'index'])->name('modules.aasms.dashboard');
+        Route::get('/aasms/announcements', [AnnouncementController::class, 'staffIndex'])->name('modules.aasms.announcements');
+        Route::post('/aasms/announcements', [AnnouncementController::class, 'store'])->name('modules.aasms.announcements.store');
+        Route::patch('/aasms/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('modules.aasms.announcements.update');
+        Route::post('/aasms/announcements/{announcement}/publish', [AnnouncementController::class, 'publish'])->name('modules.aasms.announcements.publish');
+        Route::post('/aasms/announcements/{announcement}/archive', [AnnouncementController::class, 'archive'])->name('modules.aasms.announcements.archive');
         Route::post('/aasms/programs', [AASMSController::class, 'storeProgram'])->name('modules.aasms.programs.store');
         Route::patch('/aasms/programs/{program}', [AASMSController::class, 'updateProgram'])->name('modules.aasms.programs.update');
         Route::post('/aasms/programs/{program}/toggle', [AASMSController::class, 'toggleProgram'])->name('modules.aasms.programs.toggle');

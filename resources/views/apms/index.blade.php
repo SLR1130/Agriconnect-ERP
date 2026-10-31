@@ -1,6 +1,7 @@
 ﻿<x-layouts.app>
     <x-slot name="header">Agricultural Production &amp; Monitoring</x-slot>
     <x-slot name="description">Manage agricultural production, field assessments and monitoring records.</x-slot>
+    @if(\Illuminate\Support\Facades\Schema::hasTable('production_submissions'))<a class="mb-4 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('modules.apms.submissions') }}">Review farmer-submitted production →</a>@endif
 
     @php
         $tabs = [

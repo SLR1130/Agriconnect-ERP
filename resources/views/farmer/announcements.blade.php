@@ -1,0 +1,5 @@
+<x-layouts.farmer>
+    <x-slot name="title">Official MAO notices</x-slot>
+    <x-slot name="description">Published agricultural announcements and service advisories from the Municipal Agriculture Office.</x-slot>
+    <div class="grid gap-4 md:grid-cols-2">@forelse($announcements as $announcement)<article class="farmer-card"><span class="farmer-pill">Official notice</span><h2 class="mt-3 text-lg font-bold">{{ $announcement->title }}</h2><p class="mt-2 line-clamp-3 text-sm leading-6 text-slate-700">{{ $announcement->body }}</p><p class="mt-3 text-xs text-slate-600">Published {{ $announcement->published_at->format('M d, Y') }}@if($announcement->expires_at) · Available until {{ $announcement->expires_at->format('M d, Y') }}@endif</p><a class="farmer-button farmer-button-light mt-4" href="{{ route('farmer.announcements.show', $announcement) }}">Read notice</a></article>@empty<div class="farmer-empty md:col-span-2">No MAO announcements are currently published. You can still browse agricultural programs and service requirements.</div>@endforelse</div><div class="mt-5">{{ $announcements->links() }}</div>
+</x-layouts.farmer>

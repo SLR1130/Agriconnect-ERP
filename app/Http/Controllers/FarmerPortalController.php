@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AgriculturalAnnouncement;
 use App\Models\AssistanceApplication;
 use App\Models\AssistanceDistribution;
 use App\Models\AssistanceProgram;
@@ -12,6 +13,7 @@ use App\Services\FarmerRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -58,6 +60,10 @@ class FarmerPortalController extends Controller
             'distributions' => AssistanceDistribution::query()->with(['application.program', 'batch.item'])
                 ->whereHas('application', fn ($query) => $query->where('farmer_id', $farmer->id))->latest('distributed_at')->take(3)->get(),
             'unreadCount' => $request->user()->unreadNotifications()->count(),
+            'announcementsAvailable' => Schema::hasTable('agricultural_announcements'),
+            'announcements' => Schema::hasTable('agricultural_announcements')
+                ? AgriculturalAnnouncement::query()->visibleToFarmers()->latest('published_at')->take(3)->get()
+                : collect(),
         ]);
     }
 

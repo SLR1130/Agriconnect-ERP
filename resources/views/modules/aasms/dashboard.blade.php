@@ -2,6 +2,7 @@
     <x-slot name="title">AASMS Assistance</x-slot>
     <x-slot name="header">Assistance &amp; Subsidy Management</x-slot>
     <x-slot name="description">Coordinate farmer assistance programs, application review, and authorized supply distribution.</x-slot>
+    @if(\Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements') && auth()->user()->canModuleAction('aasms', 'view'))<a class="mb-4 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('modules.aasms.announcements') }}">Manage official MAO notices →</a>@endif
 
     <style>
         .aas-card{background:#fff;border:1px solid #dfe9e1;border-radius:16px;box-shadow:0 5px 18px #153d2b0a}
@@ -54,7 +55,7 @@
             @if($canCreate)
                 <section class="aas-card p-5">
                     <details class="aas-disclosure" @if(old('_aasms_workspace') === 'programs' && old('_aasms_form') === 'create-program') open @endif>
-                        <summary>Create assistance program and eligibility rules</summary>
+                        <summary>Create private assistance program and eligibility rules</summary>
                         <form method="POST" action="{{ route('modules.aasms.programs.store') }}" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             @csrf<input type="hidden" name="_aasms_workspace" value="programs"><input type="hidden" name="_aasms_form" value="create-program">
                             <div><label class="aas-inline-label" for="aasms-create-name">Program name</label><input id="aasms-create-name" class="aas-input" name="name" value="{{ old('_aasms_form') === 'create-program' ? old('name') : '' }}" required></div>
@@ -69,7 +70,7 @@
                             <div><label class="aas-inline-label" for="aasms-create-categories">Farm categories</label><input id="aasms-create-categories" class="aas-input" name="farm_categories" value="{{ old('_aasms_form') === 'create-program' ? old('farm_categories') : '' }}" placeholder="Comma separated"></div>
                             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="requires_farm" value="1" @checked(old('_aasms_form') === 'create-program' && old('requires_farm'))> Require a registered farm</label>
                             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="previous_beneficiary_restricted" value="1" @checked(old('_aasms_form') === 'create-program' && old('previous_beneficiary_restricted'))> Restrict previous beneficiaries</label>
-                            <button class="aas-btn aas-primary sm:col-span-2 xl:col-span-3" type="submit">Create program</button>
+                            <button class="aas-btn aas-primary sm:col-span-2 xl:col-span-3" type="submit">Save private program</button>
                         </form>
                     </details>
                 </section>
@@ -87,7 +88,7 @@
                             <td><span class="aas-status {{ $program->status === 'open' ? 'aas-open' : 'aas-closed' }}">{{ ucfirst($program->status) }}</span></td>
                             <td><div class="min-w-[12rem] space-y-2">
                                 @if($canUpdate)
-                                    <form method="POST" action="{{ route('modules.aasms.programs.toggle', $program) }}" data-confirm-submit="{{ $program->status === 'open' ? 'Close' : 'Open' }} this assistance program?">@csrf<input type="hidden" name="_aasms_workspace" value="programs"><button class="aas-btn aas-sage w-full" type="submit">{{ $program->status === 'open' ? 'Close program' : 'Open program' }}</button></form>
+                                    <form method="POST" action="{{ route('modules.aasms.programs.toggle', $program) }}" data-confirm-submit="{{ $program->status === 'open' ? 'Close' : 'Publish' }} this assistance program?">@csrf<input type="hidden" name="_aasms_workspace" value="programs"><button class="aas-btn aas-sage w-full" type="submit">{{ $program->status === 'open' ? 'Close program' : 'Publish for farmers' }}</button></form>
                                     <details class="aas-disclosure" @if($programEditorOpen && old('_aasms_form') === 'edit-program') open @endif><summary>Edit program and eligibility</summary>
                                         <form method="POST" action="{{ route('modules.aasms.programs.update', $program) }}" class="mt-3 grid gap-2">@csrf @method('PATCH')<input type="hidden" name="_aasms_workspace" value="programs"><input type="hidden" name="_aasms_form" value="edit-program"><input type="hidden" name="_aasms_program_id" value="{{ $program->id }}">
                                             <label class="aas-inline-label">Program name<input class="aas-input mt-1" name="name" value="{{ $programEditorOpen ? old('name', $program->name) : $program->name }}" required></label>

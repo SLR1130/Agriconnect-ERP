@@ -36,6 +36,7 @@
                         <a href="{{ route('farmer.assistance') }}">Assistance applications</a>
                         <a href="{{ route('farmer.equipment') }}">Equipment services</a>
                         <a href="{{ route('farmer.notifications') }}">Notifications</a>
+                        @if(\Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements'))<a href="{{ route('farmer.announcements') }}">Official MAO notices</a>@endif
                         <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit">Sign out</button></form>
                     </div>
                 </details>
