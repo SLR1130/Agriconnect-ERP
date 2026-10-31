@@ -29,7 +29,7 @@ return new class extends Migration
         });
         Schema::create('production_submission_histories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('production_submission_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('production_submission_id')->constrained()->restrictOnDelete();
             $table->string('from_status', 20)->nullable();
             $table->string('to_status', 20);
             $table->foreignId('changed_by')->nullable()->constrained('users')->nullOnDelete();

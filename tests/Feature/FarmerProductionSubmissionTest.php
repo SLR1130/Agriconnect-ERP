@@ -7,6 +7,7 @@ use App\Models\Farmer;
 use App\Models\ProductionSubmission;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -123,5 +124,32 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->actingAs($owner['user'])->get('/farmer/services')->assertOk()->assertDontSee('All notices');
         $this->actingAs($owner['user'])->get('/farmer/production')->assertOk()->assertDontSee('Send crop information');
         $this->actingAs($owner['user'])->get('/farmer/activities')->assertOk();
+    }
+
+    public function test_submission_cannot_be_deleted_while_review_history_exists(): void
+    {
+        $owner = $this->farmer();
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/livestock', [
+            'farm_id' => $owner['farm']->id,
+            'animal_type' => 'Goat',
+            'quantity' => 2,
+            'recorded_on' => '2026-10-30',
+            'idempotency_key' => (string) Str::uuid(),
+        ])->assertRedirect();
+
+        $submission = ProductionSubmission::firstOrFail();
+
+        try {
+            $submission->delete();
+            $this->fail('A submission with status history must be protected from deletion.');
+        } catch (QueryException) {
+            // The database restriction must preserve both the submission and its audit history.
+        }
+
+        $this->assertDatabaseHas('production_submissions', ['id' => $submission->id]);
+        $this->assertDatabaseHas('production_submission_histories', [
+            'production_submission_id' => $submission->id,
+            'to_status' => 'pending',
+        ]);
     }
 }
