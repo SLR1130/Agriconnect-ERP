@@ -409,3 +409,112 @@ document.addEventListener('DOMContentLoaded', () => {
         syncCropDates();
     });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-farm-wizard]').forEach((wizard) => {
+        const form = wizard.querySelector('[data-farm-wizard-form]');
+        const panels = [...wizard.querySelectorAll('[data-farm-step-panel]')];
+        const indicators = [...wizard.querySelectorAll('[data-farm-step-indicator]')];
+        const next = wizard.querySelector('[data-farm-next]');
+        const back = wizard.querySelector('[data-farm-back]');
+        const submit = wizard.querySelector('[data-farm-submit]');
+        const status = wizard.querySelector('[data-farm-step-status]');
+        const submitStatus = wizard.querySelector('[data-farm-submit-status]');
+        if (!form || panels.length !== 4 || !next || !back || !submit) return;
+
+        form.noValidate = true;
+        let step = Math.min(4, Math.max(1, Number(wizard.dataset.initialStep) || 1));
+        let submitting = false;
+        const value = (name) => form.elements.namedItem(name)?.value?.trim() ?? '';
+        const text = (name) => value(name) || 'Not entered';
+        const setReview = () => {
+            wizard.querySelector('[data-review-name]').textContent = text('name');
+            wizard.querySelector('[data-review-barangay]').textContent = text('barangay');
+            const area = value('area');
+            const unit = form.elements.namedItem('area_unit')?.selectedOptions?.[0]?.textContent?.trim() ?? '';
+            wizard.querySelector('[data-review-area]').textContent = area ? `${area} ${unit.toLowerCase()}` : 'Not entered';
+            wizard.querySelector('[data-review-ownership]').textContent = form.elements.namedItem('ownership_type')?.selectedOptions?.[0]?.textContent?.trim() || 'Not entered';
+            wizard.querySelector('[data-review-activities]').textContent = text('agricultural_activities');
+            wizard.querySelector('[data-review-categories]').textContent = text('categories');
+        };
+        const render = (focus = false) => {
+            panels.forEach((panel) => { panel.hidden = Number(panel.dataset.farmStepPanel) !== step; });
+            indicators.forEach((item) => {
+                const number = Number(item.dataset.farmStepIndicator);
+                item.classList.toggle('is-current', number === step);
+                item.classList.toggle('is-complete', number < step);
+                if (number === step) item.setAttribute('aria-current', 'step');
+                else item.removeAttribute('aria-current');
+            });
+            status.textContent = `Step ${step} of 4`;
+            back.hidden = step === 1;
+            next.hidden = step === 4;
+            submit.hidden = step !== 4;
+            if (step === 4) setReview();
+            if (focus) wizard.querySelector(`[data-farm-step-panel="${step}"] [data-farm-step-heading]`)?.focus();
+        };
+        const validatePanel = (panel) => {
+            const panelFields = [...panel.querySelectorAll('input:not([type=hidden]), select, textarea')];
+            const invalid = panelFields.find((field) => !field.checkValidity());
+            if (!invalid) return true;
+            invalid.reportValidity();
+            return false;
+        };
+        const moveNext = () => {
+            const panel = panels.find((item) => Number(item.dataset.farmStepPanel) === step);
+            if (!validatePanel(panel)) return;
+            step = Math.min(4, step + 1);
+            render(true);
+        };
+
+        next.addEventListener('click', moveNext);
+        back.addEventListener('click', () => { step = Math.max(1, step - 1); render(true); });
+        form.addEventListener('input', (event) => {
+            if (event.target.matches('input, select, textarea')) setReview();
+        });
+        form.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' || event.target.matches('textarea') || step === 4) return;
+            event.preventDefault();
+            moveNext();
+        });
+        form.addEventListener('submit', (event) => {
+            if (submitting) { event.preventDefault(); return; }
+            const invalidPanel = panels.find((panel) => [...panel.querySelectorAll('input:not([type=hidden]), select, textarea')].some((field) => !field.checkValidity()));
+            if (invalidPanel) {
+                event.preventDefault();
+                step = Number(invalidPanel.dataset.farmStepPanel);
+                render();
+                const invalid = [...invalidPanel.querySelectorAll('input:not([type=hidden]), select, textarea')].find((field) => !field.checkValidity());
+                invalid?.reportValidity();
+                return;
+            }
+            submitting = true;
+            submit.disabled = true;
+            submitStatus.textContent = 'Saving your farm record…';
+        });
+        render();
+    });
+
+    document.querySelectorAll('[data-farm-wizard-open]').forEach((trigger) => {
+        trigger.addEventListener('click', (event) => {
+            const details = document.getElementById('farm-registration');
+            if (!details) return;
+            event.preventDefault();
+            details.open = true;
+            details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            details.querySelector('summary')?.focus({ preventScroll: true });
+        });
+    });
+
+    document.querySelectorAll('[data-ui-dialog-open]').forEach((trigger) => {
+        trigger.addEventListener('click', () => document.getElementById(trigger.dataset.uiDialogOpen)?.showModal());
+    });
+    document.querySelectorAll('dialog[data-ui-dialog], dialog.ui-dialog').forEach((dialog) => {
+        dialog.querySelectorAll('[data-ui-dialog-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
+        dialog.querySelector('[data-ui-dialog-confirm]')?.addEventListener('click', () => {
+            dialog.dispatchEvent(new CustomEvent('ui:confirm', { bubbles: true, detail: { dialog } }));
+            dialog.close();
+        });
+        dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+    });
+});

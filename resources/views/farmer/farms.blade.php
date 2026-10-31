@@ -1,13 +1,82 @@
 <x-layouts.farmer>
-    <x-slot name="title">My farms and registration</x-slot>
-    <x-slot name="description">See your verification progress and keep each farm record useful for agricultural services.</x-slot>
-    <section class="farmer-card"><div class="flex flex-wrap items-start justify-between gap-3"><div><p class="farmer-eyebrow">Farmer ID {{ $farmer->farmer_code }}</p><h2 class="mt-2 text-xl font-bold">Registration {{ ucfirst($farmer->registration_status) }}</h2><p class="mt-1 text-sm text-slate-600">{{ $farmer->user->name }} · {{ $farmer->barangay }}</p></div><span class="farmer-pill {{ $farmer->registration_status === 'rejected' ? 'farmer-pill-bad' : (!$farmer->isVerified() ? 'farmer-pill-warn' : '') }}">{{ ucfirst($farmer->registration_status) }}</span></div>@if($farmer->review_notes)<div class="farmer-message farmer-message-success mt-4"><strong>MAO feedback:</strong> {{ $farmer->review_notes }}</div>@endif
-@if(!$farmer->isVerified())<p class="mt-3 text-sm text-slate-600">Assistance applications and equipment requests become available after MAO verification. You can manage your farms and read program requirements now.</p>@endif</section>
+    <x-slot name="title">My farms</x-slot>
+    <x-slot name="description">Keep your farm information current so the Municipal Agriculture Office can connect you with the right services.</x-slot>
 
-    <section class="farmer-section"><div class="farmer-section-heading"><div><h2>Registered farms</h2><p>Only farms linked to your farmer ID appear here.</p></div><span class="farmer-pill">{{ $farmer->farms->count() }} {{ $farmer->farms->count() === 1 ? 'farm' : 'farms' }}</span></div><div class="grid gap-3 md:grid-cols-2">@forelse($farmer->farms as $farm)<article id="farm-{{ $farm->id }}" class="farmer-card"><div class="flex flex-wrap items-start justify-between gap-2"><div><h3 class="text-lg font-bold">{{ $farm->name }}</h3><p class="mt-1 text-sm text-slate-600">{{ $farm->barangay }} · {{ $farm->area ?: 'Area not recorded' }} {{ $farm->area_unit }}</p></div><span class="farmer-pill">{{ ucfirst($farm->ownership_type) }}</span></div><p class="mt-3 text-sm text-slate-600">{{ $farm->location_details ?: 'No location details added.' }}</p>
-            <details class="farmer-disclosure mt-4 border-t border-slate-100 pt-4" @if(old('_farm_id') == $farm->id) open @endif><summary>Edit farm information</summary><form method="POST" action="{{ route('farmer.farms.update', $farm) }}" class="grid gap-3 sm:grid-cols-2">@csrf @method('PATCH')<input type="hidden" name="_farm_id" value="{{ $farm->id }}"><div class="farmer-field sm:col-span-2"><label for="farm-name-{{ $farm->id }}">Farm name</label><input id="farm-name-{{ $farm->id }}" name="name" maxlength="255" value="{{ old('_farm_id') == $farm->id ? old('name') : $farm->name }}" required></div><div class="farmer-field"><label for="farm-barangay-{{ $farm->id }}">Barangay</label><input id="farm-barangay-{{ $farm->id }}" name="barangay" maxlength="100" value="{{ $farm->barangay }}" required></div><div class="farmer-field"><label for="farm-area-{{ $farm->id }}">Area</label><input id="farm-area-{{ $farm->id }}" name="area" type="number" min="0.01" step="0.01" value="{{ $farm->area }}"></div><div class="farmer-field sm:col-span-2"><label for="farm-location-{{ $farm->id }}">Location details</label><input id="farm-location-{{ $farm->id }}" name="location_details" maxlength="255" value="{{ $farm->location_details }}"></div><div class="farmer-field"><label for="farm-unit-{{ $farm->id }}">Area unit</label><select id="farm-unit-{{ $farm->id }}" name="area_unit"><option value="hectare" @selected($farm->area_unit === 'hectare')>Hectare</option><option value="square_meter" @selected($farm->area_unit === 'square_meter')>Square meter</option></select></div><div class="farmer-field"><label for="farm-ownership-{{ $farm->id }}">Ownership or tenancy</label><select id="farm-ownership-{{ $farm->id }}" name="ownership_type">@foreach(['owner'=>'Owner','tenant'=>'Tenant','leaseholder'=>'Leaseholder','other'=>'Other'] as $value=>$label)<option value="{{ $value }}" @selected($farm->ownership_type === $value)>{{ $label }}</option>@endforeach</select></div><div class="farmer-field sm:col-span-2"><label for="farm-activities-{{ $farm->id }}">Agricultural activities</label><input id="farm-activities-{{ $farm->id }}" name="agricultural_activities" value="{{ implode(', ', $farm->agricultural_activities ?? []) }}" maxlength="1000"><small>Separate activities with commas.</small></div><div class="farmer-field sm:col-span-2"><label for="farm-categories-{{ $farm->id }}">Crops or livestock categories</label><input id="farm-categories-{{ $farm->id }}" name="categories" value="{{ implode(', ', $farm->categories ?? []) }}" maxlength="1000"></div><button class="farmer-button sm:col-span-2" type="submit">Save farm record</button></form></details></article>@empty<div class="farmer-empty md:col-span-2">No farm records yet. Add your first farm using the form below.</div>@endforelse</div></section>
+    <x-ui.card class="farmer-registration-card" aria-labelledby="registration-status-title">
+        <div class="farmer-registration-summary">
+            <div class="farmer-registration-mark"><x-ui.icon name="office" size="lg"/></div>
+            <div class="farmer-registration-copy">
+                <p class="ui-eyebrow">Farmer registration · {{ $farmer->farmer_code }}</p>
+                <h2 id="registration-status-title">Your registration</h2>
+                <p>{{ $farmer->user->name }} <span aria-hidden="true">·</span> {{ $farmer->barangay }}</p>
+            </div>
+            <x-ui.status-badge :status="$farmer->registration_status" />
+        </div>
+        @if($farmer->review_notes)
+            <div class="farmer-message {{ $farmer->registration_status === 'rejected' || $farmer->registration_status === 'returned' ? 'farmer-message-warning' : 'farmer-message-success' }} mt-4" role="status"><strong>MAO feedback:</strong> {{ $farmer->review_notes }}</div>
+        @endif
+        @if(!$farmer->isVerified())
+            <p class="farmer-registration-guidance"><x-ui.icon name="success" size="sm"/><span class="ui-guidance-copy">Farm records can be added while your registration is under review. Assistance applications and equipment requests require MAO verification.</span></p>
+        @else
+            <p class="farmer-registration-guidance"><x-ui.icon name="success" size="sm"/><span class="ui-guidance-copy">Your farmer registration is verified. You can use the services for which you meet the program requirements.</span></p>
+        @endif
+    </x-ui.card>
 
-    <section class="farmer-section farmer-card"><details class="farmer-disclosure" @if($errors->any() && !old('_farm_id')) open @endif><summary>Register another farm</summary><form method="POST" action="{{ route('farmer.farms.store') }}" class="grid gap-3 sm:grid-cols-2">@csrf<div class="farmer-field sm:col-span-2"><label for="new-farm-name">Farm name</label><input id="new-farm-name" name="name" value="{{ old('name') }}" maxlength="255" required></div><div class="farmer-field"><label for="new-farm-barangay">Barangay</label><input id="new-farm-barangay" name="barangay" value="{{ old('barangay', $farmer->barangay) }}" maxlength="100" required></div><div class="farmer-field"><label for="new-farm-area">Area</label><input id="new-farm-area" name="area" type="number" min="0.01" step="0.01" value="{{ old('area') }}"></div><div class="farmer-field sm:col-span-2"><label for="new-farm-location">Location details</label><input id="new-farm-location" name="location_details" value="{{ old('location_details') }}" maxlength="255"></div><div class="farmer-field"><label for="new-farm-unit">Area unit</label><select id="new-farm-unit" name="area_unit"><option value="hectare">Hectare</option><option value="square_meter">Square meter</option></select></div><div class="farmer-field"><label for="new-farm-ownership">Ownership or tenancy</label><select id="new-farm-ownership" name="ownership_type">@foreach(['owner'=>'Owner','tenant'=>'Tenant','leaseholder'=>'Leaseholder','other'=>'Other'] as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></div><div class="farmer-field sm:col-span-2"><label for="new-farm-activities">Agricultural activities</label><input id="new-farm-activities" name="agricultural_activities" value="{{ old('agricultural_activities') }}" maxlength="1000"></div><div class="farmer-field sm:col-span-2"><label for="new-farm-categories">Crops or livestock categories</label><input id="new-farm-categories" name="categories" value="{{ old('categories') }}" maxlength="1000"></div><button class="farmer-button sm:col-span-2" type="submit">Add farm</button></form></details></section>
+    @php
+        $initialStep = $errors->hasAny(['name', 'barangay', 'location_details']) ? 1 : ($errors->hasAny(['area', 'area_unit', 'ownership_type']) ? 2 : 3);
+        $createHasErrors = $errors->any() && !old('_farm_id');
+    @endphp
 
-    <section class="farmer-section farmer-card"><h2 class="text-lg font-bold">Verification history</h2><div class="mt-3 divide-y divide-slate-100">@forelse($farmer->registrationHistory->sortByDesc('created_at') as $history)<div class="flex flex-wrap items-start justify-between gap-3 py-3"><div><span class="farmer-pill">{{ ucfirst($history->to_status) }}</span><p class="mt-1 text-sm text-slate-600">{{ $history->reason ?: 'No additional MAO note.' }}</p></div><time class="text-xs text-slate-500">{{ $history->created_at?->format('M d, Y h:i A') }}</time></div>@empty<p class="py-3 text-sm text-slate-600">No verification updates yet.</p>@endforelse</div></section>
+    <details id="farm-registration" class="farmer-section ui-card ui-farm-disclosure" @if($createHasErrors) open @endif>
+        <summary class="ui-farm-summary">
+            <span class="ui-farm-summary-mark"><x-ui.icon name="add"/></span>
+            <span class="ui-farm-summary-copy"><strong>{{ $farmer->farms->isEmpty() ? 'Add your first farm' : 'Add another farm' }}</strong><small>About two minutes · your information is saved to your farmer account</small></span>
+            <span class="ui-farm-summary-action">{{ $farmer->farms->isEmpty() ? 'Get started' : 'Add farm' }} <x-ui.icon name="chevron" size="sm"/></span>
+        </summary>
+        <div id="farm-registration-form" class="ui-farm-wizard" data-farm-wizard data-initial-step="{{ $createHasErrors ? $initialStep : 1 }}">
+            <div class="ui-wizard-header"><div><p class="ui-eyebrow">Farm details</p><h2>Register a farm</h2><p>Your farm details stay linked to your farmer record.</p></div><p class="ui-wizard-step-status" data-farm-step-status aria-live="polite">Step 1 of 4</p></div>
+            @if($createHasErrors)<div class="farmer-message farmer-message-error" role="alert"><strong>Some details need attention.</strong> Review the highlighted fields before continuing.</div>@endif
+            <ol class="ui-wizard-progress" aria-label="Farm registration steps">
+                <li data-farm-step-indicator="1"><span>1</span><small>Basics</small></li><li data-farm-step-indicator="2"><span>2</span><small>Location</small></li><li data-farm-step-indicator="3"><span>3</span><small>Activities</small></li><li data-farm-step-indicator="4"><span>4</span><small>Review</small></li>
+            </ol>
+            <form method="POST" action="{{ route('farmer.farms.store') }}" class="ui-farm-form" data-farm-wizard-form>
+                @csrf
+                @include('farmer.partials.farm-fields', ['wizard' => true, 'prefix' => 'new-farm'])
+                <section class="ui-wizard-review" data-farm-step-panel="4" aria-labelledby="new-farm-review-title">
+                    <h3 class="wizard-step-title" id="new-farm-review-title" tabindex="-1" data-farm-step-heading>Review your farm details</h3><p class="wizard-step-copy">Check the information before sending it to your farm records.</p>
+                    <dl class="ui-review-list"><div><dt>Farm</dt><dd data-review-name>Not entered</dd></div><div><dt>Barangay</dt><dd data-review-barangay>Not entered</dd></div><div><dt>Area</dt><dd data-review-area>Not entered</dd></div><div><dt>Land arrangement</dt><dd data-review-ownership>Not entered</dd></div><div><dt>Activities</dt><dd data-review-activities>Not entered</dd></div><div><dt>Crops or livestock</dt><dd data-review-categories>Not entered</dd></div></dl>
+                    <p class="ui-review-note">After saving, you can review or edit this farm from My farms.</p>
+                </section>
+                <div class="ui-wizard-controls"><button type="button" class="farmer-button farmer-button-light" data-farm-back hidden><x-ui.icon name="back" size="sm"/> Back</button><span class="ui-wizard-control-spacer"></span><button type="button" class="farmer-button" data-farm-next>Continue <x-ui.icon name="next" size="sm"/></button><button type="submit" class="farmer-button farmer-button-gold" data-farm-submit hidden><x-ui.icon name="success" size="sm"/> Save farm</button></div>
+                <p class="ui-submit-status" data-farm-submit-status role="status" aria-live="polite"></p>
+            </form>
+        </div>
+    </details>
+
+    <section class="farmer-section" aria-labelledby="registered-farms-title">
+        <x-ui.section-heading id="registered-farms-title" title="Your registered farms" description="Only farms linked to your account are shown here.">
+            <x-slot:actions><x-ui.status-badge status="neutral" :label="$farmer->farms->count().' '.str('farm')->plural($farmer->farms->count())"/></x-slot:actions>
+        </x-ui.section-heading>
+        @if($farmer->farms->isEmpty())
+            <x-ui.empty-state icon="farms" title="No farms added yet" description="Add your first farm above to keep your land and agricultural activities together in one place."><a class="farmer-button farmer-button-light" href="#farm-registration" data-farm-wizard-open><x-ui.icon name="add" size="sm"/> Add your first farm</a></x-ui.empty-state>
+        @else
+            <div class="grid gap-3 md:grid-cols-2">
+                @foreach($farmer->farms as $farm)
+                    <article id="farm-{{ $farm->id }}" class="farmer-card ui-farm-card">
+                        <div class="ui-farm-card-heading"><span class="ui-farm-card-icon"><x-ui.icon name="farms"/></span><div class="min-w-0"><h3>{{ $farm->name }}</h3><p>{{ $farm->barangay }}@if($farm->area) <span aria-hidden="true">·</span> {{ number_format((float)$farm->area, 2) }} {{ $farm->area_unit === 'square_meter' ? 'sq m' : 'ha' }}@endif</p></div><x-ui.status-badge :status="$farm->ownership_type" /></div>
+                        @if($farm->location_details)<p class="ui-farm-location"><x-ui.icon name="location" size="sm"/><span>{{ $farm->location_details }}</span></p>@endif
+                        <div class="ui-farm-tags"><div><span>Activities</span><strong>{{ count($farm->agricultural_activities ?? []) ? implode(', ', $farm->agricultural_activities) : 'Not added' }}</strong></div><div><span>Crops or livestock</span><strong>{{ count($farm->categories ?? []) ? implode(', ', $farm->categories) : 'Not added' }}</strong></div></div>
+                        <details class="ui-farm-edit" @if((string) old('_farm_id') === (string) $farm->id) open @endif><summary>Edit farm information <x-ui.icon name="chevron" size="sm"/></summary><form method="POST" action="{{ route('farmer.farms.update', $farm) }}" class="grid gap-3 sm:grid-cols-2">@csrf @method('PATCH')@include('farmer.partials.farm-fields', ['farm' => $farm, 'prefix' => 'farm-'.$farm->id])<button class="farmer-button sm:col-span-2" type="submit">Save changes</button></form></details>
+                    </article>
+                @endforeach
+            </div>
+        @endif
+    </section>
+
+    <section class="farmer-section" aria-labelledby="verification-history-title">
+        <x-ui.card>
+            <x-ui.section-heading id="verification-history-title" title="Verification history" description="Updates recorded by the Municipal Agriculture Office."/>
+            <div class="ui-history-list">@forelse($farmer->registrationHistory->sortByDesc('created_at') as $history)<article class="ui-history-row"><span class="ui-history-mark"><x-ui.icon name="success" size="sm"/></span><div><x-ui.status-badge :status="$history->to_status"/><p>{{ $history->reason ?: 'No additional MAO note.' }}</p>@if($history->processor)<small>Reviewed by {{ $history->processor->name }}</small>@endif</div><time datetime="{{ $history->created_at?->toAtomString() }}">{{ $history->created_at?->format('M d, Y · h:i A') }}</time></article>@empty<x-ui.empty-state icon="activity" title="No verification updates yet" description="When the MAO reviews your registration, the update will appear here."/>@endforelse</div>
+        </x-ui.card>
+    </section>
 </x-layouts.farmer>

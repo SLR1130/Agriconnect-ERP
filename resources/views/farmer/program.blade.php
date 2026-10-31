@@ -1,7 +1,7 @@
 <x-layouts.farmer>
     <x-slot name="title">{{ $program->name }}</x-slot>
     <x-slot name="description">{{ $program->category ?: 'Agricultural assistance' }} · Municipal Agriculture Office</x-slot>
-    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.services') }}">← Back to services</a>
+    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.services') }}"><x-ui.icon name="back" size="sm"/> Back to services</a>
     <div class="grid gap-5 lg:grid-cols-[1.4fr_.8fr]">
         <div class="farmer-card">
             <span class="farmer-pill {{ $program->isAvailable() ? '' : 'farmer-pill-warn' }}">{{ $program->isAvailable() ? 'Accepting applications' : 'Applications unavailable' }}</span>

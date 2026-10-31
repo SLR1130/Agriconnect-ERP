@@ -32,6 +32,65 @@ class FarmerPortalTest extends TestCase
         $this->assertDatabaseHas('farmer_registration_histories', ['farmer_id' => $user->farmer->id, 'to_status' => 'pending']);
     }
 
+    public function test_farmer_farms_page_renders_the_accessible_four_step_registration_and_owner_edit_forms(): void
+    {
+        $role = Role::create(['name' => 'Farmer', 'slug' => 'farmer', 'permissions' => [], 'is_active' => true]);
+        $user = User::factory()->create();
+        $user->roles()->attach($role);
+        $farmer = Farmer::create(['user_id' => $user->id, 'farmer_code' => 'FMR-WIZARD', 'barangay' => 'Poblacion', 'registration_status' => 'verified']);
+        Farm::create(['farmer_id' => $farmer->id, 'name' => 'Demo Farm', 'barangay' => 'Poblacion', 'area' => 1.25, 'area_unit' => 'hectare', 'ownership_type' => 'owner', 'agricultural_activities' => ['rice'], 'categories' => ['palay']]);
+
+        $this->actingAs($user)->get('/farmer/farms')->assertOk()
+            ->assertSee('Your registered farms')
+            ->assertSee('data-farm-wizard', false)
+            ->assertSee('data-farm-step-panel="1"', false)
+            ->assertSee('data-farm-step-panel="4"', false)
+            ->assertSee('name="area_unit"', false)
+            ->assertSee('name="ownership_type"', false)
+            ->assertSee('name="agricultural_activities"', false)
+            ->assertSee('name="categories"', false)
+            ->assertSee('Save changes')
+            ->assertSee('<svg', false)
+            ->assertSee('data-slot="icon"', false)
+            ->assertSee('class="ui-guidance-copy"', false)
+            ->assertSee('action="'.route('farmer.farms.store').'"', false)
+            ->assertSee('action="'.route('farmer.farms.update', Farm::first()).'"', false);
+    }
+
+    public function test_farmer_can_submit_the_farm_registration_form_and_list_fields_are_persisted(): void
+    {
+        $role = Role::create(['name' => 'Farmer', 'slug' => 'farmer', 'permissions' => [], 'is_active' => true]);
+        $user = User::factory()->create();
+        $user->roles()->attach($role);
+        $farmer = Farmer::create(['user_id' => $user->id, 'farmer_code' => 'FMR-CREATE', 'barangay' => 'Poblacion', 'registration_status' => 'pending']);
+
+        $this->actingAs($user)->from('/farmer/farms')->post('/farmer/farms', [
+            'name' => 'Riverside Farm', 'barangay' => 'Poblacion', 'location_details' => 'Near the bridge',
+            'area' => '1.25', 'area_unit' => 'hectare', 'ownership_type' => 'tenant',
+            'agricultural_activities' => 'rice, vegetables', 'categories' => 'palay, tomato',
+        ])->assertRedirect('/farmer/farms')->assertSessionHas('status', 'Farm record added.');
+
+        $farm = Farm::query()->where('farmer_id', $farmer->id)->where('name', 'Riverside Farm')->firstOrFail();
+        $this->assertSame(['rice', 'vegetables'], $farm->agricultural_activities);
+        $this->assertSame(['palay', 'tomato'], $farm->categories);
+        $this->assertSame('tenant', $farm->ownership_type);
+    }
+
+    public function test_invalid_farm_input_returns_field_errors_without_creating_a_record(): void
+    {
+        $role = Role::create(['name' => 'Farmer', 'slug' => 'farmer', 'permissions' => [], 'is_active' => true]);
+        $user = User::factory()->create();
+        $user->roles()->attach($role);
+        $farmer = Farmer::create(['user_id' => $user->id, 'farmer_code' => 'FMR-INVALID', 'barangay' => 'Poblacion', 'registration_status' => 'pending']);
+
+        $this->actingAs($user)->from('/farmer/farms')->post('/farmer/farms', [
+            'name' => 'Invalid area farm', 'barangay' => 'Poblacion', 'area' => '0',
+            'area_unit' => 'hectare', 'ownership_type' => 'owner',
+        ])->assertRedirect('/farmer/farms')->assertSessionHasErrors('area')->assertSessionHas('_old_input.name', 'Invalid area farm');
+
+        $this->assertDatabaseMissing('farms', ['farmer_id' => $farmer->id, 'name' => 'Invalid area farm']);
+    }
+
     public function test_farmer_cannot_update_another_farmers_farm(): void
     {
         $role = Role::create(['name' => 'Farmer', 'slug' => 'farmer', 'permissions' => [], 'is_active' => true]);

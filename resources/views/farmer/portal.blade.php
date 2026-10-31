@@ -20,14 +20,14 @@
         <div class="farmer-section-heading"><div><h2 id="farmer-services-title">What can we help you with?</h2><p>Choose a service to see requirements and your next step.</p></div></div>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             @foreach([
-                ['Assistance & subsidies', 'Discover open support programs and apply when eligible.', route('farmer.assistance'), '✦'],
-                ['Equipment services', 'See available equipment and request a schedule.', route('farmer.equipment'), '⚙'],
-                ['My farms', 'View your registration and update farm records.', route('farmer.farms'), '♧'],
-                ['Crop & livestock records', 'Send information for MAO review and view official records.', route('farmer.production'), '◌'],
-                ['Fisheries', 'Send fishery information and review official records.', route('farmer.production', ['section' => 'fisheries']), '≈'],
-                ['Farm monitoring', 'Read MAO visits and report pests or disease.', route('farmer.production', ['section' => 'monitoring']), '◎'],
+                ['Assistance & subsidies', 'Discover open support programs and apply when eligible.', route('farmer.assistance'), 'assistance'],
+                ['Equipment services', 'See available equipment and request a schedule.', route('farmer.equipment'), 'equipment'],
+                ['My farms', 'View your registration and update farm records.', route('farmer.farms'), 'farms'],
+                ['Crop & livestock records', 'Send information for MAO review and view official records.', route('farmer.production'), 'crop'],
+                ['Fisheries', 'Send fishery information and review official records.', route('farmer.production', ['section' => 'fisheries']), 'fish'],
+                ['Farm monitoring', 'Read MAO visits and report pests or disease.', route('farmer.production', ['section' => 'monitoring']), 'monitoring'],
             ] as [$name, $copy, $url, $icon])
-                <a href="{{ $url }}" class="farmer-card group block no-underline transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg"><span class="mb-4 inline-grid h-10 w-10 place-items-center rounded-xl bg-sage text-xl text-forest-green" aria-hidden="true">{{ $icon }}</span><h3 class="text-base font-bold">{{ $name }}</h3><p class="mt-1 text-sm leading-6 text-slate-600">{{ $copy }}</p><span class="mt-4 inline-block text-sm font-bold text-emerald-700">Open service →</span></a>
+                <a href="{{ $url }}" class="farmer-card group block no-underline transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg"><span class="mb-4 inline-grid h-10 w-10 place-items-center rounded-xl bg-sage text-forest-green" aria-hidden="true"><x-ui.icon :name="$icon" size="md"/></span><h3 class="text-base font-bold">{{ $name }}</h3><p class="mt-1 text-sm leading-6 text-slate-600">{{ $copy }}</p><span class="mt-4 inline-block text-sm font-bold text-emerald-700">Open service <x-ui.icon name="next" size="sm"/></span></a>
             @endforeach
         </div>
     </section>

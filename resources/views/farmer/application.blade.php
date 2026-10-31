@@ -1,7 +1,7 @@
 <x-layouts.farmer>
     <x-slot name="title">My assistance application</x-slot>
     <x-slot name="description">{{ $application->program->name }}</x-slot>
-    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.assistance') }}">← Back to assistance</a>
+    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.assistance') }}"><x-ui.icon name="back" size="sm"/> Back to assistance</a>
     <div class="grid gap-5 lg:grid-cols-[1.3fr_.7fr]">
         <div class="space-y-5"><section class="farmer-card"><div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-xl font-bold">{{ $application->program->name }}</h2><span class="farmer-pill {{ $application->status === 'rejected' ? 'farmer-pill-bad' : ($application->status === 'returned' ? 'farmer-pill-warn' : '') }}">{{ ucfirst($application->status) }}</span></div><p class="mt-3 text-sm text-slate-600">Submitted {{ $application->created_at?->format('M d, Y') }}. {{ $application->purpose ?: 'No additional purpose supplied.' }}</p>
                 <p class="farmer-message mt-4" role="status">@switch($application->status)

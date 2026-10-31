@@ -1,7 +1,7 @@
 <x-layouts.farmer>
     <x-slot name="title">Equipment request</x-slot>
     <x-slot name="description">{{ $equipmentRequest->reference }} · {{ $equipmentRequest->asset->name }}</x-slot>
-    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.equipment') }}">← Back to equipment services</a>
+    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.equipment') }}"><x-ui.icon name="back" size="sm"/> Back to equipment services</a>
     <div class="grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><section class="farmer-card"><div class="flex flex-wrap justify-between gap-2"><h2 class="text-xl font-bold">{{ $equipmentRequest->asset->name }}</h2><span class="farmer-pill {{ $equipmentRequest->status === 'rejected' ? 'farmer-pill-bad' : '' }}">{{ ucfirst($equipmentRequest->status) }}</span></div><p class="farmer-message mt-4" role="status">@switch($equipmentRequest->status)
         @case('pending') Your request is waiting for MAO review. The requested schedule is not confirmed until approved. @break
         @case('approved') The MAO approved this schedule. Watch your notifications for the equipment issue update. @break

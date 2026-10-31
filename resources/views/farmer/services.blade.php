@@ -3,14 +3,14 @@
     <x-slot name="description">Find agricultural support and see what is available for your farm.</x-slot>
     <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Agricultural services">
         @foreach([
-            ['Assistance and subsidies', 'Browse programs and track applications.', route('farmer.assistance')],
-            ['Equipment requests', 'Browse available equipment and request dates.', route('farmer.equipment')],
-            ['Farm registration', 'Manage your farmer and farm information.', route('farmer.farms')],
-            ['Crop and livestock records', 'Send information for MAO review and view official records.', route('farmer.production')],
-            ['Fisheries services', 'Send fishery information and review your official records.', route('farmer.production', ['section' => 'fisheries'])],
-            ['Farm monitoring and reports', 'See MAO visits and send a pest or disease report.', route('farmer.production', ['section' => 'monitoring'])],
-        ] as [$name, $copy, $url])
-            <a class="farmer-card block no-underline hover:border-emerald-300" href="{{ $url }}"><h2 class="font-bold">{{ $name }}</h2><p class="mt-2 text-sm leading-6 text-slate-600">{{ $copy }}</p><span class="mt-3 inline-block text-sm font-bold text-emerald-700">Explore →</span></a>
+            ['Assistance and subsidies', 'Browse programs and track applications.', route('farmer.assistance'), 'assistance'],
+            ['Equipment requests', 'Browse available equipment and request dates.', route('farmer.equipment'), 'equipment'],
+            ['Farm registration', 'Manage your farmer and farm information.', route('farmer.farms'), 'farms'],
+            ['Crop and livestock records', 'Send information for MAO review and view official records.', route('farmer.production'), 'crop'],
+            ['Fisheries services', 'Send fishery information and review your official records.', route('farmer.production', ['section' => 'fisheries']), 'fish'],
+            ['Farm monitoring and reports', 'See MAO visits and send a pest or disease report.', route('farmer.production', ['section' => 'monitoring']), 'monitoring'],
+        ] as [$name, $copy, $url, $icon])
+            <a class="farmer-card block no-underline hover:border-emerald-300" href="{{ $url }}"><span class="ui-service-icon" aria-hidden="true"><x-ui.icon :name="$icon" size="md"/></span><h2 class="font-bold">{{ $name }}</h2><p class="mt-2 text-sm leading-6 text-slate-600">{{ $copy }}</p><span class="ui-service-open">Explore <x-ui.icon name="next" size="sm"/></span></a>
         @endforeach
     </section>
 
