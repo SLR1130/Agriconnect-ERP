@@ -47,7 +47,7 @@ class FarmerExperienceTest extends TestCase
         $open = AssistanceProgram::create(['name' => 'Rice Seed Support', 'status' => 'open', 'category' => 'Seeds']);
         $closed = AssistanceProgram::create(['name' => 'Internal Draft', 'status' => 'closed']);
 
-        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertDontSee('name="phone"', false);
+        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertSee('Recent requests')->assertSee('1 registered farm')->assertDontSee('name="phone"', false);
         $this->actingAs($data['user'])->get('/farmer/services?search=Rice')->assertOk()->assertSee('Rice Seed Support')->assertDontSee('Internal Draft');
         $this->actingAs($data['user'])->get('/farmer/assistance')->assertOk()->assertSee('Rice Seed Support');
         $this->actingAs($data['user'])->get('/farmer/programs/'.$open->id)->assertOk()->assertSee('Farmer registration must be verified');

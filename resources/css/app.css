@@ -361,6 +361,8 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
     .farmer-account-name { display: none; }.farmer-header-actions { gap: .3rem; }.farmer-notice-link { width: 2.2rem; height: 2.2rem; }
     .farmer-main { padding-top: 1.3rem; }.farmer-section { margin-top: 1.4rem; }.farmer-hero { border-radius: 1.2rem; }
     .farmer-section-heading { align-items: start; }.farmer-section-heading h2 { font-size: 1.13rem; }
+    .farmer-subnav { flex-wrap: wrap; overflow-x: visible; padding-bottom: 0; }
+    .farmer-subnav a { min-height: 2.75rem; white-space: normal; text-align: center; }
 }
 
 /* APMS focused operational workspace */
