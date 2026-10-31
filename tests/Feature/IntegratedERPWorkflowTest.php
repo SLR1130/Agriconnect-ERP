@@ -206,7 +206,7 @@ class IntegratedERPWorkflowTest extends TestCase
         $this->assertSame('2.00', (string) $batch->fresh()->quantity_available);
     }
 
-    public function test_verified_farmer_assistance_page_renders_application_form_for_each_open_program(): void
+    public function test_verified_farmer_assistance_catalog_links_to_program_details_with_authorized_application_form(): void
     {
         $data = $this->staffAndFarmer();
         $farmer = $this->verifiedFarmer($data['farmerUser'], $data['staff']);
@@ -219,17 +219,25 @@ class IntegratedERPWorkflowTest extends TestCase
         $this->actingAs($data['farmerUser'])
             ->get('/farmer/assistance')
             ->assertOk()
-            ->assertSee('Available assistance programs')
-            ->assertSee('Submit application')
-            ->assertSee(route('farmer.assistance.apply', $program), false)
-            ->assertSee('Visible Integration Assistance');
+            ->assertSee('Published assistance programs')
+            ->assertSee('View details and requirements')
+            ->assertSee(route('farmer.programs.show', $program), false)
+            ->assertSee('Visible Integration Assistance')
+            ->assertDontSee('Submit application');
 
         $this->actingAs($data['farmerUser'])
-            ->from('/farmer/assistance')
+            ->get(route('farmer.programs.show', $program))
+            ->assertOk()
+            ->assertSee('Eligibility and requirements')
+            ->assertSee('Submit application')
+            ->assertSee(route('farmer.assistance.apply', $program), false);
+
+        $this->actingAs($data['farmerUser'])
+            ->from(route('farmer.programs.show', $program))
             ->post('/assistance/programs/'.$program->id.'/apply', [
                 'purpose' => 'Application submitted through the farmer assistance interface.',
             ])
-            ->assertRedirect('/farmer/assistance')
+            ->assertRedirect(route('farmer.programs.show', $program))
             ->assertSessionHas('status', 'Assistance application submitted.');
 
         $this->assertDatabaseHas('assistance_applications', [

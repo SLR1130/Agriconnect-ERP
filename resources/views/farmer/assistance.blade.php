@@ -1,13 +1,48 @@
 <x-layouts.farmer>
-    <x-slot name="title">Assistance and subsidies</x-slot>
-    <x-slot name="description">Discover agricultural support and follow each application from review to distribution.</x-slot>
-    @if(!$farmer->isVerified())<div class="farmer-message farmer-message-success" role="status">Your registration is {{ $farmer->registration_status }}. You can read program requirements now. Applications open after MAO verification. <a class="font-bold underline" href="{{ route('farmer.farms') }}">See verification progress</a>.</div>@endif
+    <x-slot name="title">Assistance</x-slot>
+    <x-slot name="description">Discover MAO programs and keep each application, review, and distribution together.</x-slot>
 
-    <section class="farmer-section !mt-0"><div class="farmer-section-heading"><div><h2>My applications</h2><p>MAO decisions, notes and completed distributions stay linked to your account.</p></div><a class="text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.activities') }}">All activity</a></div>
-        <div class="grid gap-3 md:grid-cols-2">@forelse($applications as $application)
-            <article class="farmer-card" id="application-{{ $application->id }}"><div class="flex flex-wrap items-start justify-between gap-2"><h3 class="font-bold">{{ $application->program->name }}</h3><span class="farmer-pill {{ $application->status === 'rejected' ? 'farmer-pill-bad' : '' }}">{{ ucfirst($application->status) }}</span></div><p class="mt-2 text-sm text-slate-600">Submitted {{ $application->created_at?->format('M d, Y') }}@if($application->review_notes) · MAO note: {{ $application->review_notes }}@endif</p>@foreach($application->distributions as $distribution)<p class="mt-2 text-xs text-slate-600">Received {{ $distribution->batch->item->name }} · {{ $distribution->quantity }} · {{ $distribution->reference }}</p>@endforeach<a class="farmer-button farmer-button-light mt-4" href="{{ route('farmer.applications.show', $application) }}">View status and history</a></article>
-        @empty<div class="farmer-empty md:col-span-2">You have not submitted an assistance application. Browse a published program below to review its requirements.</div>@endforelse</div>
+    @if(!$farmer->isVerified())
+        <div class="farmer-message farmer-message-warning" role="status">
+            Your farmer registration is {{ $farmer->registration_status }}. You may review published program details; application forms appear after verification when you meet the program rules.
+            <a class="font-bold underline" href="{{ route('farmer.farms') }}">View verification progress</a>
+        </div>
+    @endif
+
+    @include('farmer.partials.assistance-catalog', [
+        'catalogHeading' => 'Published assistance programs',
+        'catalogDescription' => 'Search the same published program catalog shown under Explore services. Availability and eligibility are evaluated consistently.',
+    ])
+
+    <section class="farmer-section !mt-0" id="applications" aria-labelledby="my-assistance-title">
+        <div class="farmer-section-heading">
+            <div><h2 id="my-assistance-title">My applications</h2><p>Review the latest MAO status, notes, and any completed distribution.</p></div>
+            <a class="farmer-text-link" href="{{ route('farmer.activities', ['type' => 'Assistance application']) }}">Application activity <x-ui.icon name="next" size="sm" /></a>
+        </div>
+        <div class="farmer-application-list">
+            @forelse($applications as $application)
+                <article class="farmer-card farmer-application-card" id="application-{{ $application->id }}">
+                    <div class="farmer-application-main">
+                        <span class="farmer-service-kicker">{{ $application->program->category ?: 'Agricultural assistance' }}</span>
+                        <h3>{{ $application->program->name }}</h3>
+                        <p>Submitted {{ $application->created_at?->format('M d, Y') }}@if($application->distributions->isNotEmpty()) · {{ $application->distributions->count() }} {{ \Illuminate\Support\Str::plural('distribution', $application->distributions->count()) }} recorded @endif</p>
+                        @if($application->review_notes)<p class="farmer-review-note"><strong>MAO feedback:</strong> {{ $application->review_notes }}</p>@endif
+                        @foreach($application->distributions as $distribution)
+                            <p class="farmer-distribution-line"><x-ui.icon name="success" size="sm" />{{ $distribution->batch->item->name }} · {{ $distribution->quantity }} · Ref {{ $distribution->reference }}</p>
+                        @endforeach
+                    </div>
+                    <div class="farmer-application-actions">
+                        <span class="farmer-pill {{ $application->status === 'rejected' ? 'farmer-pill-bad' : (in_array($application->status, ['returned', 'pending'], true) ? 'farmer-pill-warn' : '') }}">{{ ucfirst($application->status) }}</span>
+                        <a class="farmer-button farmer-button-light" href="{{ route('farmer.applications.show', $application) }}">View status and history <x-ui.icon name="next" size="sm" /></a>
+                    </div>
+                </article>
+            @empty
+                <div class="farmer-empty">
+                    <strong>No assistance applications yet.</strong>
+                    <p>Use the program search below to check requirements and see whether you can apply.</p>
+                </div>
+            @endforelse
+        </div>
     </section>
 
-    <section class="farmer-section"><div class="farmer-section-heading"><div><h2>Available assistance programs</h2><p>Availability is based on the MAO program status and application dates.</p></div><a class="text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.services') }}">Search programs</a></div><div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">@forelse($programs as $program)<div class="flex flex-col">@include('farmer.partials.program-card', ['program' => $program])@if(($eligibilities[$program->id]['passed'] ?? false) && !$applications->contains('program_id', $program->id))<form method="POST" action="{{ route('farmer.assistance.apply', $program) }}" class="farmer-card mt-2 space-y-3">@csrf<div class="farmer-field"><label for="assistance-purpose-{{ $program->id }}">How will this support your farm? (optional)</label><textarea id="assistance-purpose-{{ $program->id }}" name="purpose" maxlength="2000" rows="2">{{ old('purpose') }}</textarea></div><button class="farmer-button w-full" type="submit">Submit application</button></form>@endif</div>@empty<div class="farmer-empty md:col-span-2 xl:col-span-3">No programs are currently published for farmers.</div>@endforelse</div></section>
 </x-layouts.farmer>

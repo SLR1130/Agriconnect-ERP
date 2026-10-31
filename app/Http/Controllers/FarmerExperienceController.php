@@ -7,6 +7,7 @@ use App\Models\AssistanceApplication;
 use App\Models\EquipmentRequest;
 use App\Models\AssistanceProgram;
 use App\Models\Farmer;
+use App\Services\AssistanceProgramCatalogService;
 use App\Services\ProgramEligibilityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,39 +19,18 @@ use Illuminate\View\View;
 
 class FarmerExperienceController extends Controller
 {
-    public function services(Request $request, ProgramEligibilityService $eligibility): View
+    public function services(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility): View
     {
         $farmer = $this->farmer($request)->load('farms');
-        $search = trim($request->string('search')->toString());
-        $category = trim($request->string('category')->toString());
-        $availability = $request->string('availability')->toString() ?: 'available';
-        abort_unless(in_array($availability, ['available', 'upcoming', 'ended', 'all'], true), 404);
-        $published = AssistanceProgram::query()->where('status', 'open');
-        $programQuery = (clone $published)
-            ->when($availability === 'available', fn ($query) => $query
-                ->where(fn ($dates) => $dates->whereNull('opens_on')->orWhereDate('opens_on', '<=', today()))
-                ->where(fn ($dates) => $dates->whereNull('closes_on')->orWhereDate('closes_on', '>=', today())))
-            ->when($availability === 'upcoming', fn ($query) => $query->whereDate('opens_on', '>', today()))
-            ->when($availability === 'ended', fn ($query) => $query->whereNotNull('closes_on')->whereDate('closes_on', '<', today()))
-            ->when($search !== '', fn ($query) => $query->where(fn ($results) => $results->where('name', 'like', '%'.$search.'%')->orWhere('description', 'like', '%'.$search.'%')))
-            ->when($category !== '', fn ($query) => $query->where('category', $category));
-        $programs = $programQuery->with('supplyItem')->orderBy('closes_on')->orderBy('name')->paginate(9)->withQueryString();
+        $catalogData = $catalog->forFarmer($request, $farmer, $eligibility);
 
         return view('farmer.services', [
             'farmer' => $farmer,
-            'search' => $search,
-            'category' => $category,
-            'availability' => $availability,
             'announcementsAvailable' => Schema::hasTable('agricultural_announcements'),
-            'categories' => (clone $published)->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'),
-            'programs' => $programs,
-            'eligibilities' => $programs->getCollection()->mapWithKeys(fn ($program) => [
-                $program->id => $eligibility->check($program, $farmer),
-            ]),
             'announcements' => Schema::hasTable('agricultural_announcements')
                 ? AgriculturalAnnouncement::query()->visibleToFarmers()->latest('published_at')->take(3)->get()
                 : collect(),
-        ]);
+        ] + $catalogData);
     }
 
     public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility): View

@@ -9,6 +9,7 @@ use App\Models\AssistanceProgram;
 use App\Models\SupplyBatch;
 use App\Models\SupplyItem;
 use App\Services\AssistanceService;
+use App\Services\AssistanceProgramCatalogService;
 use App\Services\InventoryService;
 use App\Services\ProgramEligibilityService;
 use Illuminate\Http\RedirectResponse;
@@ -167,18 +168,16 @@ class AASMSController extends Controller
         }, 'aasms-distributions.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function farmerPrograms(Request $request, ProgramEligibilityService $eligibility): View
+    public function farmerPrograms(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility): View
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
         $farmer = $request->user()->farmer()->with('farms')->firstOrFail();
-        $programs = AssistanceProgram::with('supplyItem')->where('status', 'open')->latest()->get();
+        $catalogData = $catalog->forFarmer($request, $farmer, $eligibility);
 
         return view('farmer.assistance', [
             'farmer' => $farmer,
-            'programs' => $programs,
-            'eligibilities' => $programs->mapWithKeys(fn ($program) => [$program->id => $eligibility->check($program, $farmer)]),
             'applications' => AssistanceApplication::with(['program.supplyItem', 'approvedSupplyItem', 'distributions.batch.item', 'history'])->where('farmer_id', $farmer->id)->latest()->get(),
             'notifications' => $request->user()->notifications()->latest()->take(10)->get(),
-        ]);
+        ] + $catalogData);
     }
 }

@@ -10,6 +10,19 @@ class AssistanceProgram extends Model
     protected $casts = ['opens_on'=>'date','closes_on'=>'date','eligibility_rules'=>'array','allocation_limit'=>'decimal:2'];
     public function applications(){ return $this->hasMany(AssistanceApplication::class, 'program_id'); }
     public function supplyItem(){ return $this->belongsTo(SupplyItem::class, 'supply_item_id'); }
+    public function availabilityState(): string
+    {
+        if ($this->status !== 'open') {
+            return 'unpublished';
+        }
+
+        if ($this->isAvailable()) {
+            return 'available';
+        }
+
+        return $this->opens_on && $this->opens_on->greaterThan(today()) ? 'upcoming' : 'ended';
+    }
+
     public function isAvailable(): bool
     {
         $today = today();

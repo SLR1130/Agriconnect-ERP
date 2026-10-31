@@ -695,3 +695,121 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
     .ui-dialog { width: 100vw; max-width: none; max-height: 100dvh; height: auto; margin: auto 0 0; border-radius: 1rem 1rem 0 0; }
     .ui-dialog-panel { padding: 1rem; }
 }
+
+/* Design System 2.0 Stage 3: farmer service discovery and assistance */
+.farmer-service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
+.farmer-service-card { display: flex; min-width: 0; flex-direction: column; padding: 1.05rem; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.farmer-service-card:hover { border-color: #a9c9b0; box-shadow: 0 12px 30px #153d2b12; transform: translateY(-1px); }
+.farmer-service-card-top { display: flex; align-items: center; gap: .65rem; margin-bottom: .7rem; }
+.farmer-service-card-top .ui-service-icon { flex: 0 0 2.6rem; margin: 0; }
+.farmer-service-kicker { color: #347253; font-size: .65rem; font-weight: 820; letter-spacing: .075em; text-transform: uppercase; }
+.farmer-service-card h3, .farmer-program-card h3, .farmer-application-card h3 { margin: 0; color: var(--brand-forest); font-size: 1rem; font-weight: 820; line-height: 1.35; overflow-wrap: anywhere; }
+.farmer-service-copy { flex: 1; margin: .4rem 0 .8rem; color: #5d6d63; font-size: .78rem; line-height: 1.55; }
+.farmer-service-availability { display: flex; align-items: flex-start; gap: .4rem; margin: 0 0 .8rem; color: #52645a; font-size: .71rem; line-height: 1.45; }
+.farmer-service-availability svg { color: var(--brand-emerald); }
+.farmer-service-action, .farmer-program-action { display: inline-flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; min-height: 2.65rem; margin-top: auto; text-align: left; }
+.farmer-text-link { display: inline-flex; align-items: center; gap: .3rem; color: var(--brand-emerald); font-size: .78rem; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.farmer-notice-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; }
+.farmer-notice-card { display: flex; min-width: 0; flex-direction: column; gap: .35rem; padding: .9rem; color: inherit; background: #fbfcfa; border: 1px solid var(--border-subtle); border-radius: .85rem; text-decoration: none; }
+.farmer-notice-card:hover { border-color: #a9c9b0; }
+.farmer-notice-card strong { color: var(--brand-forest); font-size: .86rem; line-height: 1.4; }
+.farmer-notice-card p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--text-muted); font-size: .75rem; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.farmer-catalog-filters { display: grid; grid-template-columns: minmax(14rem, 1.4fr) repeat(2, minmax(10rem, 1fr)) auto; align-items: end; gap: .75rem; padding: .9rem; }
+.farmer-catalog-search { min-width: 0; }
+.farmer-search-input { position: relative; }
+.farmer-search-input > svg { position: absolute; top: 50%; left: .75rem; color: #617468; transform: translateY(-50%); }
+.farmer-search-input input { padding-left: 2.25rem; }
+.farmer-catalog-filter-actions { display: flex; flex-wrap: wrap; gap: .45rem; }
+.farmer-catalog-filter-actions .farmer-button { min-height: 2.7rem; padding: .6rem .8rem; white-space: nowrap; }
+.farmer-catalog-result-count { margin: .15rem 0 .7rem; color: var(--text-muted); font-size: .73rem; }
+.farmer-program-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: .8rem; }
+.farmer-program-card { display: flex; min-width: 0; flex-direction: column; padding: 1rem; }
+.farmer-program-card-heading, .farmer-program-detail-badges { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.farmer-program-category { display: inline-flex; max-width: 60%; color: #466052; font-size: .67rem; font-weight: 760; line-height: 1.35; overflow-wrap: anywhere; }
+.farmer-program-card h3 { margin-top: .65rem; font-size: .98rem; }
+.farmer-program-description { display: -webkit-box; min-height: 3.45rem; overflow: hidden; margin: .35rem 0 .6rem; color: #5d6d63; font-size: .76rem; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.farmer-program-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: 0; padding: .65rem 0; border-top: 1px solid #edf1ed; border-bottom: 1px solid #edf1ed; }
+.farmer-program-dates > div { min-width: 0; }
+.farmer-program-dates dt { color: var(--text-muted); font-size: .64rem; font-weight: 730; }
+.farmer-program-dates dd { margin: .12rem 0 0; color: #405048; font-size: .72rem; font-weight: 720; overflow-wrap: anywhere; }
+.farmer-program-eligibility { display: flex; align-items: flex-start; gap: .38rem; min-height: 3rem; margin: .6rem 0 .75rem; padding: .55rem .6rem; border-radius: .65rem; font-size: .69rem; line-height: 1.45; }
+.farmer-program-eligibility svg { flex: 0 0 auto; margin-top: .05rem; }
+.farmer-program-eligibility.is-eligible { color: #275f40; background: #edf5ee; }
+.farmer-program-eligibility.is-guidance { color: #6d521a; background: #fff7e3; }
+.farmer-program-empty { display: grid; grid-column: 1 / -1; justify-items: center; gap: .3rem; padding: 1.5rem; text-align: center; }
+.farmer-program-empty .ui-service-icon { margin: 0 0 .3rem; }
+.farmer-program-empty strong { color: var(--brand-forest); font-size: .9rem; }
+.farmer-program-empty p { max-width: 34rem; margin: 0; color: var(--text-muted); font-size: .78rem; line-height: 1.5; }
+.farmer-pagination { margin-top: .8rem; overflow-x: auto; }
+.farmer-back-link { display: inline-flex; align-items: center; gap: .3rem; margin: 0 0 .85rem; color: var(--brand-emerald); font-size: .78rem; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.farmer-program-detail-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(17rem, .75fr); align-items: start; gap: 1rem; }
+.farmer-program-detail-main { display: grid; gap: .75rem; min-width: 0; }
+.farmer-program-detail-main > .farmer-card h2 { margin: .9rem 0 0; color: var(--brand-forest); font-size: 1.08rem; font-weight: 820; }
+.farmer-program-long-description { margin: .45rem 0 0; color: #4e6055; font-size: .84rem; line-height: 1.65; overflow-wrap: anywhere; white-space: pre-line; }
+.farmer-program-detail-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin: 1rem 0 0; }
+.farmer-program-detail-facts > div { min-width: 0; padding: .7rem; background: var(--surface-page); border: 1px solid #e8eee8; border-radius: .7rem; }
+.farmer-program-detail-facts dt { color: var(--text-muted); font-size: .66rem; font-weight: 760; }
+.farmer-program-detail-facts dd { margin: .18rem 0 0; color: var(--brand-forest); font-size: .78rem; font-weight: 730; overflow-wrap: anywhere; }
+.farmer-date-guidance { margin: .45rem 0 0; color: var(--text-muted); font-size: .68rem; }
+.farmer-requirements-panel { margin-top: 1rem; padding: .9rem; background: #f5f8f4; border: 1px solid #e4ece3; border-radius: .8rem; }
+.farmer-requirements-panel h2 { margin: 0 !important; font-size: .94rem !important; }
+.farmer-requirements-panel > p { margin: .25rem 0 .45rem; color: var(--text-muted); font-size: .72rem; line-height: 1.5; }
+.farmer-requirements-panel ul { display: grid; gap: .35rem; margin: 0; padding-left: 1.1rem; color: #425449; font-size: .75rem; line-height: 1.5; }
+.farmer-journey-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .35rem; }
+.farmer-journey-strip span { display: flex; align-items: center; gap: .4rem; min-width: 0; padding: .55rem; color: #56675d; background: #fff; border: 1px solid var(--border-subtle); border-radius: .7rem; font-size: .66rem; font-weight: 730; line-height: 1.35; }
+.farmer-journey-strip span.is-current { color: var(--brand-forest); background: var(--surface-sage); }
+.farmer-journey-strip b { display: grid; flex: 0 0 1.35rem; width: 1.35rem; height: 1.35rem; place-items: center; color: white; background: var(--brand-emerald); border-radius: 50%; font-size: .65rem; }
+.farmer-program-next-step { position: sticky; top: 1rem; }
+.farmer-program-next-step h2 { margin: .35rem 0 .4rem; color: var(--brand-forest); font-size: 1.08rem; font-weight: 820; }
+.farmer-program-next-step > p { margin: 0 0 .85rem; color: #5c6c62; font-size: .78rem; line-height: 1.55; }
+.farmer-program-next-step > .farmer-button { width: 100%; justify-content: space-between; margin-top: .65rem; }
+.farmer-program-state-note { padding: .7rem; color: #6d521a !important; background: #fff7e3; border-radius: .7rem; }
+.farmer-program-apply-form { display: grid; gap: .7rem; }
+.farmer-program-apply-form .farmer-button { width: 100%; justify-content: space-between; }
+.farmer-application-list { display: grid; gap: .7rem; }
+.farmer-application-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem; }
+.farmer-application-main { min-width: 0; }
+.farmer-application-main h3 { margin-top: .2rem; }
+.farmer-application-main > p { margin: .25rem 0 0; color: var(--text-muted); font-size: .72rem; line-height: 1.5; overflow-wrap: anywhere; }
+.farmer-application-main .farmer-review-note { margin-top: .55rem; padding: .55rem .65rem; color: #645019; background: #fff7e3; border-radius: .6rem; }
+.farmer-distribution-line { display: flex; align-items: center; gap: .35rem; color: #2c6646 !important; }
+.farmer-application-actions { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: .55rem; }
+.farmer-application-actions .farmer-button { min-height: 2.45rem; padding: .55rem .7rem; font-size: .73rem; white-space: nowrap; }
+.farmer-application-program-summary { margin-top: 1rem; padding-top: .85rem; border-top: 1px solid #e8eee8; }
+.farmer-application-program-summary h3 { margin: 0; color: var(--brand-forest); font-size: .9rem; font-weight: 820; }
+.farmer-application-program-summary > p { margin: .28rem 0; color: var(--text-muted); font-size: .73rem; line-height: 1.5; }
+.farmer-application-program-summary dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin: .6rem 0; }
+.farmer-application-program-summary dl > div { min-width: 0; padding: .5rem; background: var(--surface-page); border-radius: .55rem; }
+.farmer-application-program-summary dt { color: var(--text-muted); font-size: .62rem; font-weight: 730; }
+.farmer-application-program-summary dd { margin: .12rem 0 0; color: var(--brand-forest); font-size: .7rem; font-weight: 720; overflow-wrap: anywhere; }
+.farmer-application-program-summary .farmer-application-eligibility { color: #275f40; font-size: .71rem; }
+.farmer-application-program-summary .farmer-application-eligibility-note { padding: .5rem; color: #6d521a; background: #fff7e3; border-radius: .55rem; }
+.farmer-application-program-summary ul { display: grid; gap: .25rem; margin: .5rem 0 0; padding-left: 1rem; color: #52645a; font-size: .69rem; line-height: 1.45; }
+@media (max-width: 1023px) {
+    .farmer-service-grid, .farmer-program-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .farmer-catalog-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .farmer-catalog-search { grid-column: 1 / -1; }
+    .farmer-notice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+    .farmer-service-grid, .farmer-program-grid, .farmer-notice-grid { grid-template-columns: minmax(0, 1fr); }
+    .farmer-service-card { padding: .9rem; }
+    .farmer-catalog-filters { grid-template-columns: minmax(0, 1fr); padding: .75rem; }
+    .farmer-catalog-filters > *, .farmer-catalog-filters .farmer-field { min-width: 0; }
+    .farmer-catalog-filters input, .farmer-catalog-filters select { min-width: 0; max-width: 100%; }
+    .farmer-catalog-search { grid-column: auto; }
+    .farmer-catalog-filter-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .farmer-catalog-filter-actions .farmer-button { width: 100%; min-width: 0; justify-content: center; white-space: normal; overflow-wrap: anywhere; }
+    .farmer-section-heading { flex-wrap: wrap; }
+    .farmer-section-heading > div { min-width: 0; flex: 1 1 100%; }
+    .farmer-section-heading > .farmer-text-link { max-width: 100%; }
+    .farmer-program-card { padding: .9rem; }
+    .farmer-program-detail-layout { grid-template-columns: minmax(0, 1fr); }
+    .farmer-program-next-step { position: static; }
+    .farmer-program-detail-facts { gap: .4rem; }
+    .farmer-program-detail-facts > div { padding: .55rem; }
+    .farmer-journey-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .farmer-application-card { flex-direction: column; }
+    .farmer-application-actions { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; }
+    .farmer-application-actions .farmer-button { white-space: normal; }
+}

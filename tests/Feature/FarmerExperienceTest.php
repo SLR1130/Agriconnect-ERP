@@ -89,6 +89,61 @@ class FarmerExperienceTest extends TestCase
         $this->assertDatabaseCount('assistance_programs', 5);
     }
 
+    public function test_explore_services_and_assistance_share_the_same_search_category_and_date_filtered_catalog(): void
+    {
+        $data = $this->farmer();
+        $available = AssistanceProgram::create(['name' => 'Shared Rice Seed Program', 'status' => 'open', 'category' => 'Seeds']);
+        AssistanceProgram::create([
+            'name' => 'Shared Upcoming Grant', 'status' => 'open', 'category' => 'Grants',
+            'opens_on' => today()->addDays(3), 'closes_on' => today()->addDays(13),
+        ]);
+        AssistanceProgram::create([
+            'name' => 'Shared Ended Seed Program', 'status' => 'open', 'category' => 'Seeds',
+            'opens_on' => today()->subDays(15), 'closes_on' => today()->subDay(),
+        ]);
+        AssistanceProgram::create(['name' => 'Shared Private Draft', 'status' => 'draft', 'category' => 'Seeds']);
+
+        foreach (['/farmer/services', '/farmer/assistance'] as $path) {
+            $this->actingAs($data['user'])->get($path.'?availability=available')
+                ->assertOk()->assertSee('Shared Rice Seed Program')->assertDontSee('Shared Upcoming Grant')
+                ->assertDontSee('Shared Ended Seed Program')->assertDontSee('Shared Private Draft');
+
+            $this->actingAs($data['user'])->get($path.'?availability=upcoming')
+                ->assertOk()->assertSee('Shared Upcoming Grant')->assertDontSee('Shared Rice Seed Program');
+
+            $this->actingAs($data['user'])->get($path.'?availability=ended')
+                ->assertOk()->assertSee('Shared Ended Seed Program')->assertDontSee('Shared Upcoming Grant');
+
+            $this->actingAs($data['user'])->get($path.'?availability=all&category=Seeds&search=Rice')
+                ->assertOk()->assertSee('Shared Rice Seed Program')->assertDontSee('Shared Ended Seed Program')
+                ->assertDontSee('Shared Upcoming Grant')->assertDontSee('Shared Private Draft')
+                ->assertSee('value="Rice"', false)
+                ->assertSee('name="category"', false)
+                ->assertSee('value="all" selected', false);
+        }
+
+        $this->assertSame($available->id, AssistanceProgram::query()->where('name', 'Shared Rice Seed Program')->value('id'));
+    }
+
+    public function test_upcoming_and_ended_program_details_explain_unavailable_applications_without_wrong_registration_action(): void
+    {
+        $data = $this->farmer();
+        $upcoming = AssistanceProgram::create([
+            'name' => 'Upcoming Application Window', 'status' => 'open', 'opens_on' => today()->addDay(), 'closes_on' => today()->addDays(8),
+        ]);
+        $ended = AssistanceProgram::create([
+            'name' => 'Ended Application Window', 'status' => 'open', 'opens_on' => today()->subDays(10), 'closes_on' => today()->subDay(),
+        ]);
+
+        $this->actingAs($data['user'])->get('/farmer/programs/'.$upcoming->id)
+            ->assertOk()->assertSee('Opens soon')->assertSee('Applications have not opened yet.')
+            ->assertDontSee('name="purpose"', false)->assertDontSee('Check my registration');
+
+        $this->actingAs($data['user'])->get('/farmer/programs/'.$ended->id)
+            ->assertOk()->assertSee('Application period ended')->assertSee('The application period ended')
+            ->assertDontSee('name="purpose"', false)->assertDontSee('Check my registration');
+    }
+
     public function test_farmer_activity_tracker_searches_filters_and_paginates_owned_records(): void
     {
         $data = $this->farmer();
@@ -127,6 +182,9 @@ class FarmerExperienceTest extends TestCase
         $this->assertDatabaseHas('assistance_applications', ['id' => $application->id, 'farmer_id' => $data['farmer']->id, 'purpose' => 'Planting', 'status' => 'submitted']);
         $this->assertDatabaseHas('assistance_status_histories', ['application_id' => $application->id, 'from_status' => null, 'to_status' => 'submitted', 'changed_by' => $data['user']->id]);
         $this->actingAs($data['user'])->get('/farmer/applications/'.$application->id)->assertOk()->assertSee('Seed Grant');
+        $this->actingAs($data['user'])->get('/farmer/applications/'.$application->id)
+            ->assertOk()->assertSee('Program details')->assertSee('Eligibility at submission:')
+            ->assertSee('Checks passed')->assertSee('Status history')->assertSee('Distributions received');
         $this->actingAs($data['user'])->post('/assistance/programs/'.$program->id.'/apply', [])->assertRedirect()->assertSessionHasErrors('program');
         $this->actingAs($other['user'])->get('/farmer/applications/'.$application->id)->assertNotFound();
         $this->assertDatabaseCount('assistance_applications', 1);

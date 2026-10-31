@@ -3,7 +3,7 @@
     $icons = [
         'home' => 'home', 'services' => 'squares-2x2', 'farms' => 'map', 'activity' => 'clipboard-document-list',
         'notifications' => 'bell', 'profile' => 'user-circle', 'assistance' => 'sparkles', 'equipment' => 'wrench-screwdriver',
-        'crop' => 'beaker', 'fish' => 'beaker', 'monitoring' => 'bug-ant', 'location' => 'map-pin', 'add' => 'plus',
+        'crop' => 'beaker', 'fish' => 'circle-stack', 'monitoring' => 'bug-ant', 'location' => 'map-pin', 'add' => 'plus',
         'next' => 'arrow-right', 'back' => 'arrow-left', 'chevron' => 'chevron-down', 'success' => 'check-circle',
         'close' => 'x-mark', 'office' => 'building-office-2', 'search' => 'magnifying-glass',
     ];
