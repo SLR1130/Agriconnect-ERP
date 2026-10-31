@@ -202,7 +202,10 @@ class FarmerExperienceTest extends TestCase
         $data['user']->notify(new EquipmentRequestStatusChanged('EQ-1', 'approved'));
         $notice = $data['user']->notifications()->firstOrFail();
 
-        $this->actingAs($data['user'])->get('/farmer/notifications')->assertOk()->assertSee('EQ-1');
+        $this->actingAs($data['user'])->get('/farmer/notifications')->assertOk()
+            ->assertSee('EQ-1')
+            ->assertSee('View my activities')
+            ->assertSee(route('farmer.activities'), false);
         $this->actingAs($other['user'])->post('/farmer/notifications/'.$notice->id.'/read')->assertNotFound();
         $this->assertNull($notice->fresh()->read_at);
         $this->actingAs($data['user'])->post('/farmer/notifications/'.$notice->id.'/read')->assertRedirect();

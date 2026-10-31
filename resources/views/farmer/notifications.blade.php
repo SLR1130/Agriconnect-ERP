@@ -15,19 +15,19 @@
                 };
                 $destination = match ($type) {
                     'farmer_registration_status' => route('farmer.farms'),
-                    'production_submission_review' => $destinationId ? route('farmer.production.submissions.show', $destinationId) : null,
-                    'assistance_application_status', 'assistance_distribution_completed' => $destinationId ? route('farmer.applications.show', $destinationId) : null,
-                    'equipment_request_status' => $destinationId ? route('farmer.equipment-requests.show', $destinationId) : null,
-                    'agricultural_announcement' => $destinationId ? route('farmer.announcements.show', $destinationId) : null,
-                    default => null,
+                    'production_submission_review' => $destinationId ? route('farmer.production.submissions.show', $destinationId) : route('farmer.activities'),
+                    'assistance_application_status', 'assistance_distribution_completed' => $destinationId ? route('farmer.applications.show', $destinationId) : route('farmer.activities'),
+                    'equipment_request_status' => $destinationId ? route('farmer.equipment-requests.show', $destinationId) : route('farmer.activities'),
+                    'agricultural_announcement' => $destinationId ? route('farmer.announcements.show', $destinationId) : route('farmer.activities'),
+                    default => route('farmer.activities'),
                 };
                 $destinationLabel = match ($type) {
                     'farmer_registration_status' => 'View registration progress',
-                    'production_submission_review' => 'View production submission',
-                    'assistance_application_status', 'assistance_distribution_completed' => 'View assistance application',
-                    'equipment_request_status' => 'View equipment request',
-                    'agricultural_announcement' => 'Read official notice',
-                    default => null,
+                    'production_submission_review' => $destinationId ? 'View production submission' : 'View my activities',
+                    'assistance_application_status', 'assistance_distribution_completed' => $destinationId ? 'View assistance application' : 'View my activities',
+                    'equipment_request_status' => $destinationId ? 'View equipment request' : 'View my activities',
+                    'agricultural_announcement' => $destinationId ? 'Read official notice' : 'View my activities',
+                    default => 'View my activities',
                 };
             @endphp
 
