@@ -39,6 +39,9 @@ class AgriculturalAnnouncementTest extends TestCase
         $this->actingAs($outsider)->post('/modules/aasms/announcements/'.$notice->id.'/publish')->assertForbidden();
         $this->actingAs($staff)->post('/modules/aasms/announcements/'.$notice->id.'/publish')->assertRedirect();
         $this->actingAs($farmer)->get('/farmer/announcements')->assertOk()->assertSee('Seed service notice');
+        $this->actingAs($farmer)->get('/farmer/notifications')->assertOk()
+            ->assertSee('Read official notice')
+            ->assertSee(route('farmer.announcements.show', $notice), false);
         $this->assertDatabaseCount('notifications', 1);
         $this->actingAs($staff)->post('/modules/aasms/announcements/'.$notice->id.'/publish')->assertSessionHasErrors('announcement');
         $this->assertDatabaseCount('notifications', 1);

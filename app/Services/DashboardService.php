@@ -3,7 +3,11 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\AssistanceApplication;
+use App\Models\EquipmentRequest;
+use App\Models\Farmer;
 use App\Models\Module;
+use App\Models\ProductionSubmission;
 use App\Models\User;
 use App\Models\WorkflowRequest;
 use Illuminate\Support\Carbon;
@@ -11,6 +15,88 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
+    /**
+     * @return list<array{module: string, title: string, count: int, href: string, items: list<array{title: string, detail: string, date: Carbon, href: string}>}>
+     */
+    public function getPendingActionCenter(User $user): array
+    {
+        $groups = [];
+
+        if ($user->canModuleAction('ffrms', 'view')
+            && ($user->canModuleAction('ffrms', 'review') || $user->canErp('farmer.verify'))) {
+            $query = Farmer::query()->where('registration_status', 'pending');
+            $groups[] = [
+                'module' => 'FFRMS',
+                'title' => 'Farmer registrations',
+                'count' => (clone $query)->count(),
+                'href' => route('modules.ffrms.dashboard', ['status' => 'pending']),
+                'items' => (clone $query)->with('user')->latest()->limit(3)->get()
+                    ->map(fn (Farmer $farmer): array => [
+                        'title' => $farmer->user->name,
+                        'detail' => $farmer->farmer_code.' · '.$farmer->barangay,
+                        'date' => $farmer->created_at,
+                        'href' => route('modules.ffrms.dashboard', ['status' => 'pending', 'search' => $farmer->farmer_code]),
+                    ])->all(),
+            ];
+        }
+
+        if ($user->canModuleAction('apms', 'view') && $user->canModuleAction('apms', 'update')) {
+            $query = ProductionSubmission::query()->where('status', 'pending');
+            $groups[] = [
+                'module' => 'APMS',
+                'title' => 'Production submissions',
+                'count' => (clone $query)->count(),
+                'href' => route('modules.apms.submissions', ['status' => 'pending']),
+                'items' => (clone $query)->with(['farmer.user', 'farm'])->latest()->limit(3)->get()
+                    ->map(fn (ProductionSubmission $submission): array => [
+                        'title' => ucfirst($submission->category).' · '.$submission->farmer->user->name,
+                        'detail' => $submission->farm->name,
+                        'date' => $submission->created_at,
+                        'href' => route('modules.apms.submissions.show', $submission),
+                    ])->all(),
+            ];
+        }
+
+        if ($user->canModuleAction('aasms', 'view')
+            && ($user->canModuleAction('aasms', 'approve')
+                || $user->canModuleAction('aasms', 'reject')
+                || $user->canModuleAction('aasms', 'review'))) {
+            $query = AssistanceApplication::query()->where('status', 'submitted');
+            $groups[] = [
+                'module' => 'AASMS',
+                'title' => 'Assistance applications',
+                'count' => (clone $query)->count(),
+                'href' => route('modules.aasms.dashboard', ['workspace' => 'applications', 'status' => 'submitted']),
+                'items' => (clone $query)->with(['farmer.user', 'program'])->latest()->limit(3)->get()
+                    ->map(fn (AssistanceApplication $application): array => [
+                        'title' => $application->program->name,
+                        'detail' => $application->farmer->user->name,
+                        'date' => $application->created_at,
+                        'href' => route('modules.aasms.dashboard', ['workspace' => 'applications', 'status' => 'submitted']),
+                    ])->all(),
+            ];
+        }
+
+        if ($user->canModuleAction('aeams', 'view') && $user->canModuleAction('aeams', 'review')) {
+            $query = EquipmentRequest::query()->where('status', 'pending');
+            $groups[] = [
+                'module' => 'AEAMS',
+                'title' => 'Equipment requests',
+                'count' => (clone $query)->count(),
+                'href' => route('modules.aeams.dashboard', ['workspace' => 'requests', 'request_status' => 'pending']),
+                'items' => (clone $query)->with(['farmer.user', 'asset'])->latest()->limit(3)->get()
+                    ->map(fn (EquipmentRequest $request): array => [
+                        'title' => $request->asset->name,
+                        'detail' => $request->farmer->user->name.' · '.$request->schedule_start->format('M j, Y h:i A'),
+                        'date' => $request->created_at,
+                        'href' => route('modules.aeams.dashboard', ['workspace' => 'requests', 'request_status' => 'pending']),
+                    ])->all(),
+            ];
+        }
+
+        return $groups;
+    }
+
     /** @return array<string, array{value: int, description: string}> */
     public function getSystemStats(): array
     {

@@ -89,6 +89,46 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->assertDatabaseCount('livestock_records', 0);
     }
 
+    public function test_farmer_home_surfaces_pending_and_returned_production_actions_only_for_the_owner(): void
+    {
+        $owner = $this->farmer();
+        $other = $this->farmer();
+        $pending = ProductionSubmission::create([
+            'farmer_id' => $owner['farmer']->id,
+            'farm_id' => $owner['farm']->id,
+            'category' => 'crop',
+            'payload' => ['crop_type' => 'Owner pending rice'],
+            'status' => 'pending',
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+        ProductionSubmission::create([
+            'farmer_id' => $owner['farmer']->id,
+            'farm_id' => $owner['farm']->id,
+            'category' => 'livestock',
+            'payload' => ['animal_type' => 'Owner returned goats'],
+            'status' => 'returned',
+            'review_notes' => 'Confirm the updated count.',
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+        ProductionSubmission::create([
+            'farmer_id' => $other['farmer']->id,
+            'farm_id' => $other['farm']->id,
+            'category' => 'crop',
+            'payload' => ['crop_type' => 'Private other farmer rice'],
+            'status' => 'pending',
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+
+        $this->actingAs($owner['user'])->get('/farmer')->assertOk()
+            ->assertSee('My ongoing services')
+            ->assertSee('Owner pending rice')
+            ->assertSee('Owner returned goats')
+            ->assertSee('MAO requested a correction')
+            ->assertSee('Confirm the updated count.')
+            ->assertSee(route('farmer.production.submissions.show', $pending), false)
+            ->assertDontSee('Private other farmer rice');
+    }
+
     public function test_crop_stage_controls_planting_and_harvest_date_requirements(): void
     {
         $owner = $this->farmer();
@@ -147,6 +187,10 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->actingAs($owner['user'])->post('/farmer/production/submissions/'.$submission->id.'/resubmit', array_replace($payload, ['production_quantity' => 7]))->assertRedirect();
         $this->actingAs($staff)->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'rejected', 'review_notes' => 'Unverifiable information.'])->assertRedirect();
         $this->actingAs($staff)->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'approved'])->assertSessionHasErrors('decision');
+        $this->actingAs($owner['user'])->get('/farmer/notifications')->assertOk()
+            ->assertSee('View production submission')
+            ->assertSee(route('farmer.production.submissions.show', $submission), false);
+        $this->assertDatabaseCount('notifications', 2);
         $this->assertDatabaseCount('fishery_records', 0);
         $this->assertDatabaseHas('production_submissions', ['id' => $submission->id, 'status' => 'rejected']);
         $this->assertSame(4, $submission->history()->count());

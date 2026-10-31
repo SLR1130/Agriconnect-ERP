@@ -68,6 +68,7 @@ class DashboardController extends Controller
             'health' => $user->isSuperAdministrator() ? $this->dashboardService->getSystemHealth() : null,
             'activities' => $this->dashboardService->getRecentActivities($user),
             'deadlines' => $this->dashboardService->getUpcomingDeadlines($user),
+            'pendingActions' => $this->dashboardService->getPendingActionCenter($user),
             'canViewReports' => $reportCount > 0,
             'reportCount' => $reportCount,
             'dashboardRoute' => $request->route()?->getName() ?: 'dashboard',

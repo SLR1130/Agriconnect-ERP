@@ -9,6 +9,7 @@ use App\Models\AssistanceProgram;
 use App\Models\EquipmentRequest;
 use App\Models\Farm;
 use App\Models\Farmer;
+use App\Models\ProductionSubmission;
 use App\Services\FarmerRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,6 +49,7 @@ class FarmerPortalController extends Controller
         abort_unless($request->user()->hasRole('farmer'), 403);
 
         $farmer = $request->user()->farmer()->with(['farms', 'registrationHistory.processor'])->firstOrFail();
+        $productionSubmissionsAvailable = Schema::hasTable('production_submissions');
 
         return view('farmer.portal', [
             'farmer' => $farmer,
@@ -57,6 +59,10 @@ class FarmerPortalController extends Controller
                 ->orderBy('closes_on')->take(3)->get(),
             'applications' => AssistanceApplication::query()->with('program')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),
             'equipmentRequests' => EquipmentRequest::query()->with('asset')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),
+            'productionSubmissions' => $productionSubmissionsAvailable
+                ? ProductionSubmission::query()->with('farm')->where('farmer_id', $farmer->id)
+                    ->whereIn('status', ['pending', 'returned'])->latest()->take(3)->get()
+                : collect(),
             'distributions' => AssistanceDistribution::query()->with(['application.program', 'batch.item'])
                 ->whereHas('application', fn ($query) => $query->where('farmer_id', $farmer->id))->latest('distributed_at')->take(3)->get(),
             'unreadCount' => $request->user()->unreadNotifications()->count(),

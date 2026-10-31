@@ -185,7 +185,7 @@ class EquipmentService
 
             $this->record($asset, $request, $status, $actor, null, $notes);
             ActivityLog::log($status, 'Equipment request '.$request->reference.' '.$status.'.', $request->reference, $actor->id, 'aeams');
-            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, $status));
+            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, $status, $request->id));
 
             return $request->refresh();
         });
@@ -246,7 +246,7 @@ class EquipmentService
 
             $this->record($asset, $request, 'issued', $actor, $condition, 'Equipment issued to the verified farmer.');
             ActivityLog::log('updated', 'Equipment request '.$request->reference.' issued.', $request->reference, $actor->id, 'aeams');
-            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, 'issued'));
+            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, 'issued', $request->id));
 
             return $request->refresh();
         });
@@ -286,7 +286,7 @@ class EquipmentService
 
             $this->record($asset, $request, 'returned', $actor, $condition, $notes);
             ActivityLog::log('updated', 'Equipment request '.$request->reference.' returned.', $request->reference, $actor->id, 'aeams');
-            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, 'returned'));
+            $request->farmer->user->notify(new EquipmentRequestStatusChanged($request->reference, 'returned', $request->id));
 
             return $request->refresh();
         });

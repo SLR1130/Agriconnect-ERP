@@ -24,6 +24,7 @@ use App\Models\PestDiseaseIncident;
 use App\Models\ProcurementRequest;
 use App\Models\ProcurementRequestItem;
 use App\Models\ProcurementSupplier;
+use App\Models\ProductionSubmission;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Role;
@@ -187,6 +188,48 @@ class AgriculturalDashboardTest extends TestCase
             ->assertDontSee($farmer->user->email);
         $this->actingAs($farmer->user)->get('/admin/dashboard')->assertForbidden();
         $this->actingAs($farmer->user)->get('/erp/reports')->assertForbidden();
+    }
+
+    public function test_action_center_shows_real_pending_queues_only_to_roles_with_review_authority(): void
+    {
+        $admin = $this->staff('super_admin');
+        $farmer = $this->farmer('pending', 'Poblacion');
+        $farm = Farm::create(['farmer_id' => $farmer->id, 'name' => 'Action Center Farm', 'barangay' => 'Poblacion', 'area_unit' => 'hectare', 'ownership_type' => 'owner']);
+        $production = ProductionSubmission::create([
+            'farmer_id' => $farmer->id,
+            'farm_id' => $farm->id,
+            'category' => 'crop',
+            'payload' => ['crop_type' => 'Rice'],
+            'status' => 'pending',
+            'idempotency_key' => 'action-center-production',
+        ]);
+        $program = AssistanceProgram::create(['name' => 'Action Center Seed Program', 'status' => 'open']);
+        AssistanceApplication::create(['program_id' => $program->id, 'farmer_id' => $farmer->id, 'status' => 'submitted']);
+        $category = EquipmentCategory::create(['name' => 'Action Center Machinery', 'is_active' => true]);
+        $asset = EquipmentAsset::create(['asset_code' => 'ACTION-PUMP', 'name' => 'Action Center Pump', 'category_id' => $category->id, 'condition' => 'good', 'availability_status' => 'available']);
+        EquipmentRequest::create([
+            'reference' => 'ACTION-EQ-1',
+            'farmer_id' => $farmer->id,
+            'requested_by' => $farmer->user_id,
+            'equipment_asset_id' => $asset->id,
+            'intended_use' => 'Prepare the rice field',
+            'schedule_start' => now()->addDays(2),
+            'schedule_end' => now()->addDays(3),
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($admin)->get('/admin/dashboard')->assertOk()
+            ->assertSee('Action center')
+            ->assertSee('Farmer registrations')
+            ->assertSee('Production submissions')
+            ->assertSee('Action Center Seed Program')
+            ->assertSee('Action Center Pump')
+            ->assertSee(route('modules.apms.submissions.show', $production), false)
+            ->assertSee(route('modules.aasms.dashboard', ['workspace' => 'applications', 'status' => 'submitted']))
+            ->assertSee(route('modules.aeams.dashboard', ['workspace' => 'requests', 'request_status' => 'pending']));
+
+        $auditor = $this->staff('authorized_viewer', ['dashboard.view']);
+        $this->actingAs($auditor)->get('/mao/dashboard')->assertOk()->assertDontSee('Action center');
     }
 
     public function test_report_csv_is_filtered_and_escapes_formula_like_group_labels(): void

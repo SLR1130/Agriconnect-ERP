@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\AssistanceApplication;
 use App\Models\AssistanceDistribution;
 use App\Models\AssistanceProgram;
-use App\Models\CropProductionRecord;
 use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\InventoryLocation;
@@ -87,6 +86,16 @@ class IntegratedERPWorkflowTest extends TestCase
                 'reason' => 'Identity and registration documents reviewed.',
             ])
             ->assertRedirect();
+        $this->actingAs($data['staff'])
+            ->post('/modules/ffrms/registrations/'.$registeredFarmer->id.'/review', [
+                'status' => 'verified',
+                'reason' => 'Repeated verification request.',
+            ])
+            ->assertRedirect();
+        $this->assertDatabaseCount('notifications', 1);
+        $this->actingAs($registeredUser)->get('/farmer/notifications')->assertOk()
+            ->assertSee('View registration progress')
+            ->assertSee(route('farmer.farms'), false);
 
         $this->actingAs($registeredUser)
             ->post('/farmer/farms', [

@@ -100,6 +100,28 @@
         </nav>
 
         <section class="erp-workspace-panel" id="dashboard-panel-overview" role="tabpanel" aria-labelledby="dashboard-tab-overview" tabindex="0" data-erp-workspace-panel="overview">
+            @if(count($pendingActions))
+                <section class="mb-5 erp-surface p-5 md:p-6" aria-labelledby="pending-action-center-title">
+                    <div class="erp-section-header"><div><p class="erp-page-eyebrow">Farmer-to-MAO service flow</p><h2 id="pending-action-center-title" class="erp-section-title">Action center</h2><p class="mt-1 text-sm text-gray-500">Pending records that your role is authorized to review.</p></div><span class="erp-pill">Live queue</span></div>
+                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach($pendingActions as $queue)
+                            <article class="min-w-0 rounded-xl border border-[#e4ebe5] bg-white p-4">
+                                <div class="flex items-start justify-between gap-2"><div><p class="text-[.68rem] font-black uppercase tracking-wide text-emerald-700">{{ $queue['module'] }}</p><h3 class="mt-1 text-sm font-extrabold text-[#243324]">{{ $queue['title'] }}</h3></div><span class="erp-pill {{ $queue['count'] > 0 ? 'erp-pill-warning' : 'erp-pill-success' }}">{{ $queue['count'] }}</span></div>
+                                @if(count($queue['items']))
+                                    <ul class="mt-3 divide-y divide-gray-100">
+                                        @foreach($queue['items'] as $item)
+                                            <li class="py-2 first:pt-0"><a class="block text-sm font-semibold text-[#153d2b] underline decoration-transparent hover:decoration-current" href="{{ $item['href'] }}">{{ $item['title'] }}</a><p class="mt-0.5 text-xs leading-5 text-gray-500">{{ $item['detail'] }} · Added {{ $item['date']->format('M j, Y') }}</p></li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="mt-3 text-sm text-gray-500">No records are waiting in this queue.</p>
+                                @endif
+                                <a class="mt-3 inline-flex min-h-10 items-center text-sm font-bold text-emerald-700 underline" href="{{ $queue['href'] }}">Open {{ strtolower($queue['module']) }} queue <span class="ml-1" aria-hidden="true">→</span></a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
             <div class="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
                 <div class="erp-surface p-5 md:p-6">
                     <div class="erp-section-header"><div><p class="erp-page-eyebrow">Authorized shortcuts</p><h2 class="erp-section-title text-lg">Your workspaces</h2></div><span class="erp-pill">{{ count($modules) }} available</span></div>

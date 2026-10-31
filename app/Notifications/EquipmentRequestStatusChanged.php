@@ -12,6 +12,7 @@ class EquipmentRequestStatusChanged extends Notification
     public function __construct(
         public readonly string $reference,
         public readonly string $status,
+        public readonly ?int $equipmentRequestId = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -24,6 +25,7 @@ class EquipmentRequestStatusChanged extends Notification
         return [
             'type' => 'equipment_request_status',
             'reference' => $this->reference,
+            'equipment_request_id' => $this->equipmentRequestId,
             'status' => $this->status,
             'message' => 'Your equipment request '.$this->reference.' is now '.$this->status.'.',
         ];

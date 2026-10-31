@@ -47,7 +47,7 @@ class FarmerExperienceTest extends TestCase
         $open = AssistanceProgram::create(['name' => 'Rice Seed Support', 'status' => 'open', 'category' => 'Seeds']);
         $closed = AssistanceProgram::create(['name' => 'Internal Draft', 'status' => 'closed']);
 
-        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertSee('Recent requests')->assertSee('1 registered farm')->assertDontSee('name="phone"', false);
+        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertSee('My ongoing services')->assertSee('1 registered farm')->assertDontSee('name="phone"', false);
         $this->actingAs($data['user'])->get('/farmer/services?search=Rice')->assertOk()->assertSee('Rice Seed Support')->assertDontSee('Internal Draft');
         $this->actingAs($data['user'])->get('/farmer/assistance')->assertOk()->assertSee('Rice Seed Support');
         $this->actingAs($data['user'])->get('/farmer/programs/'.$open->id)->assertOk()->assertSee('Farmer registration must be verified');
@@ -165,7 +165,7 @@ class FarmerExperienceTest extends TestCase
         $other = $this->farmer();
         $category = EquipmentCategory::create(['name' => 'Farm machinery', 'is_active' => true]);
         $asset = EquipmentAsset::create(['asset_code' => 'PUMP-1', 'name' => 'Irrigation pump', 'category_id' => $category->id, 'description' => 'Purchased on PO-PRIVATE-001', 'acquisition_cost' => 9999, 'condition' => 'good', 'availability_status' => 'available']);
-        $staffRole = Role::create(['name' => 'AEAMS Staff', 'slug' => 'aeams_staff', 'permissions' => ['modules.aeams.review'], 'is_active' => true]);
+        $staffRole = Role::create(['name' => 'AEAMS Staff', 'slug' => 'aeams_staff', 'permissions' => ['modules.aeams.review', 'modules.aeams.issue', 'modules.aeams.return'], 'is_active' => true]);
         $staff = User::factory()->create();
         $staff->roles()->attach($staffRole);
 
@@ -180,9 +180,19 @@ class FarmerExperienceTest extends TestCase
         $this->actingAs($data['user'])->get('/farmer/activities')->assertOk()->assertSee('Irrigation pump')->assertSee('Equipment request');
         $this->actingAs($other['user'])->get('/farmer/equipment-requests/'.$equipmentRequest->id)->assertNotFound();
         $this->actingAs($staff)->post('/modules/aeams/requests/'.$equipmentRequest->id.'/review', ['status' => 'approved'])->assertRedirect();
-        $this->assertDatabaseHas('equipment_requests', ['id' => $equipmentRequest->id, 'status' => 'approved']);
-        $this->assertDatabaseCount('notifications', 1);
+        $this->actingAs($staff)->post('/modules/aeams/requests/'.$equipmentRequest->id.'/issue', ['condition' => 'good'])->assertRedirect();
+        $this->actingAs($staff)->post('/modules/aeams/requests/'.$equipmentRequest->id.'/issue', ['condition' => 'good'])->assertSessionHasErrors('status');
+        $this->actingAs($staff)->post('/modules/aeams/requests/'.$equipmentRequest->id.'/return', ['condition' => 'good'])->assertRedirect();
+        $this->actingAs($staff)->post('/modules/aeams/requests/'.$equipmentRequest->id.'/return', ['condition' => 'good'])->assertSessionHasErrors('status');
+        $this->assertDatabaseHas('equipment_requests', ['id' => $equipmentRequest->id, 'status' => 'returned']);
+        $this->assertDatabaseCount('notifications', 3);
         $this->assertSame($data['user']->id, (int) $data['user']->notifications()->firstOrFail()->notifiable_id);
+        $notification = $data['user']->notifications()->firstOrFail();
+        $this->assertSame($equipmentRequest->id, data_get($notification->data, 'equipment_request_id'));
+        $this->actingAs($data['user'])->get('/farmer/notifications')->assertOk()
+            ->assertSee('View equipment request')
+            ->assertSee(route('farmer.equipment-requests.show', $equipmentRequest), false);
+        $this->actingAs($data['user'])->get('/farmer/equipment-requests/'.$equipmentRequest->id)->assertOk()->assertSee('Request history');
     }
 
     public function test_notification_read_action_is_owner_scoped(): void

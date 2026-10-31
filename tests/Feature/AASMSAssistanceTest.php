@@ -75,6 +75,36 @@ class AASMSAssistanceTest extends TestCase
         $this->assertDatabaseHas('assistance_status_histories', ['application_id' => $x['app']->id, 'from_status' => 'submitted', 'to_status' => 'approved']);
     }
 
+    public function test_assistance_review_retry_does_not_duplicate_history_or_notifications_and_notification_links_to_owned_application(): void
+    {
+        $x = $this->setupData();
+        $x['app']->update(['status' => 'submitted']);
+        $staleApplication = AssistanceApplication::findOrFail($x['app']->id);
+
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/review', ['status' => 'approved'])->assertRedirect();
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/review', ['status' => 'approved'])->assertSessionHasErrors('status');
+
+        $this->assertDatabaseHas('assistance_applications', ['id' => $x['app']->id, 'status' => 'approved']);
+        $this->assertDatabaseCount('assistance_status_histories', 1);
+        $this->assertDatabaseCount('notifications', 1);
+        $notification = $x['fu']->notifications()->firstOrFail();
+        $this->assertSame('assistance_application_status', data_get($notification->data, 'type'));
+        $this->assertSame($x['app']->id, (int) data_get($notification->data, 'application_id'));
+        $this->actingAs($x['fu'])->get('/farmer/notifications')->assertOk()
+            ->assertSee('View assistance application')
+            ->assertSee(route('farmer.applications.show', $x['app']), false);
+
+        try {
+            app(AssistanceService::class)->status($staleApplication, 'approved', $x['staff']->id);
+            $this->fail('A stale application instance must not repeat an already committed transition.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Invalid application transition.', $exception->errors()['status'][0]);
+        }
+
+        $this->assertDatabaseCount('assistance_status_histories', 1);
+        $this->assertDatabaseCount('notifications', 1);
+    }
+
     public function test_mao_can_reject_or_return_only_with_a_reason(): void
     {
         $x = $this->setupData();
@@ -101,9 +131,11 @@ class AASMSAssistanceTest extends TestCase
         $payload = ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 20, 'idempotency_key' => 'distribution-retry'];
         $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', $payload)->assertRedirect();
         $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', $payload)->assertRedirect();
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', array_replace($payload, ['quantity' => 21]))->assertSessionHasErrors('idempotency_key');
         $this->assertSame('80.00', (string) SupplyBatch::find($x['batch']->supply_batch_id)->fresh()->quantity_available);
         $this->assertDatabaseCount('assistance_distributions', 1);
         $this->assertDatabaseCount('inventory_movements', 3);
+        $this->assertDatabaseHas('assistance_distributions', ['application_id' => $x['app']->id, 'quantity' => 20]);
     }
 
     public function test_distribution_form_is_scoped_to_approved_application(): void
@@ -141,6 +173,10 @@ class AASMSAssistanceTest extends TestCase
         $this->assertDatabaseCount('assistance_status_histories', 1);
         $this->assertDatabaseCount('assistance_distributions', 1);
         $this->assertSame('3.00', (string) SupplyBatch::first()->fresh()->quantity_available);
+        $this->assertDatabaseCount('notifications', 1);
+        $notification = $x['fu']->notifications()->firstOrFail();
+        $this->assertSame('assistance_distribution_completed', data_get($notification->data, 'type'));
+        $this->assertSame($x['app']->id, (int) data_get($notification->data, 'application_id'));
     }
 
     public function test_farmer_assistance_page_is_owner_scoped(): void
@@ -159,6 +195,6 @@ class AASMSAssistanceTest extends TestCase
         $secondFarmer = Farmer::create(['user_id' => $secondUser->id, 'farmer_code' => 'F-2', 'registration_status' => 'verified']);
         AssistanceApplication::create(['program_id' => $x['program']->id, 'farmer_id' => $secondFarmer->id, 'status' => 'submitted']);
         $response = $this->actingAs($x['staff'])->get('/modules/aasms?status=approved')->assertOk();
-        $response->assertSee('data-aasms-stat="pending-applications"', false)->assertSee('data-aasms-stat="approved-applications"', false)->assertSee('data-aasms-stat="pending-applications" class="mt-2 text-3xl font-bold text-agricultural-gold">1</p',false)->assertSee('data-aasms-stat="approved-applications" class="mt-2 text-3xl font-bold text-emerald-green">1</p',false)->assertDontSee(route('modules.aasms.review',$x['app']),false);
+        $response->assertSee('data-aasms-stat="pending-applications"', false)->assertSee('data-aasms-stat="approved-applications"', false)->assertSee('data-aasms-stat="pending-applications" class="mt-2 text-3xl font-bold text-agricultural-gold">1</p', false)->assertSee('data-aasms-stat="approved-applications" class="mt-2 text-3xl font-bold text-emerald-green">1</p', false)->assertDontSee(route('modules.aasms.review', $x['app']), false);
     }
 }
