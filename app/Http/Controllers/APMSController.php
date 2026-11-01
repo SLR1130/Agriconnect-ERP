@@ -134,6 +134,8 @@ class APMSController extends Controller
                 'fisheries' => FisheryRecord::count(),
                 'monitoring' => FarmMonitoringRecord::count(),
                 'incidents' => PestDiseaseIncident::whereIn('status', ['reported', 'investigating'])->count(),
+                'incident_records' => PestDiseaseIncident::count(),
+                'seasons' => AgriculturalSeason::count(),
             ],
             'canCreate' => $request->user()->canModuleAction('apms', 'create'),
             'canUpdate' => $request->user()->canModuleAction('apms', 'update'),

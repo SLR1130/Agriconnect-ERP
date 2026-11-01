@@ -2,6 +2,7 @@
 @php
     $icons = [
         'home' => 'home', 'dashboard' => 'squares-2x2', 'services' => 'squares-2x2', 'farms' => 'map', 'activity' => 'clipboard-document-list',
+        'livestock' => 'heart', 'warning' => 'exclamation-triangle',
         'notifications' => 'bell', 'profile' => 'user-circle', 'assistance' => 'sparkles', 'equipment' => 'wrench-screwdriver',
         'crop' => 'beaker', 'fish' => 'circle-stack', 'monitoring' => 'bug-ant', 'location' => 'map-pin', 'add' => 'plus',
         'next' => 'arrow-right', 'back' => 'arrow-left', 'chevron' => 'chevron-down', 'success' => 'check-circle',

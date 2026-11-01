@@ -1,5 +1,5 @@
 ﻿<x-layouts.app>
-    <x-slot name="header">Agricultural Production &amp; Monitoring</x-slot>
+    <x-slot name="header">Agricultural Production & Monitoring</x-slot>
     <x-slot name="description">Manage agricultural production, field assessments and monitoring records.</x-slot>
     @if($pendingSubmissionCount !== null)
         <a class="apms-review-callout" href="{{ route('modules.apms.submissions') }}">
@@ -39,13 +39,13 @@
 
         <section class="apms-stat-grid" aria-label="Production summary">
             @foreach([
-                ['label' => 'Crop records', 'value' => $stats['crops'], 'mark' => 'CR'],
-                ['label' => 'Livestock records', 'value' => $stats['livestock'], 'mark' => 'LS'],
-                ['label' => 'Fisheries records', 'value' => $stats['fisheries'], 'mark' => 'FS'],
-                ['label' => 'Open incidents', 'value' => $stats['incidents'], 'mark' => '!', 'alert' => true],
+                ['label' => 'Crop records', 'value' => $stats['crops'], 'icon' => 'crop'],
+                ['label' => 'Livestock records', 'value' => $stats['livestock'], 'icon' => 'livestock'],
+                ['label' => 'Fisheries records', 'value' => $stats['fisheries'], 'icon' => 'fish'],
+                ['label' => 'Open incidents', 'value' => $stats['incidents'], 'icon' => 'warning', 'alert' => true],
             ] as $stat)
                 <article class="apms-stat">
-                    <span class="apms-stat-mark {{ ($stat['alert'] ?? false) ? 'apms-stat-mark--alert' : '' }}" aria-hidden="true">{{ $stat['mark'] }}</span>
+                    <span class="apms-stat-mark {{ ($stat['alert'] ?? false) ? 'apms-stat-mark--alert' : '' }}" aria-hidden="true"><x-ui.icon :name="$stat['icon']" size="sm" /></span>
                     <div><p>{{ $stat['label'] }}</p><strong>{{ number_format($stat['value']) }}</strong></div>
                 </article>
             @endforeach
@@ -124,7 +124,7 @@
                             <input type="hidden" name="tab" value="production"><input type="hidden" name="record_type" value="{{ $key }}">
                             <div class="apms-search-field"><label class="sr-only" for="record-search-{{ $key }}">Search {{ strtolower($label) }}</label><input id="record-search-{{ $key }}" class="erp-input" type="search" name="record_search" value="{{ $recordSearch }}" placeholder="Search {{ strtolower($label) }}, farms or farmers"></div>
                             @if($key === 'crops')
-                                <label class="sr-only" for="crop-status-filter">Crop status</label><select id="crop-status-filter" class="erp-input" name="crop_status"><option value="">All statuses</option>@foreach(['planned','growing','harvested','cancelled'] as $status)<option value="{{ $status }}" @selected(request('crop_status') === $status)>{{ ucfirst($status) }}</option>@endforeach</select>
+                                <label class="sr-only" for="crop-status-filter">Crop production stage</label><select id="crop-status-filter" class="erp-input" name="crop_status"><option value="">All production stages</option>@foreach(['planned','growing','harvested','cancelled'] as $status)<option value="{{ $status }}" @selected(request('crop_status') === $status)>{{ ucfirst($status) }}</option>@endforeach</select>
                             @elseif($key === 'livestock')
                                 <label class="sr-only" for="livestock-status-filter">Livestock status</label><select id="livestock-status-filter" class="erp-input" name="livestock_status"><option value="">All statuses</option>@foreach(['active','sold','deceased'] as $status)<option value="{{ $status }}" @selected(request('livestock_status') === $status)>{{ ucfirst($status) }}</option>@endforeach</select>
                             @endif
@@ -134,12 +134,20 @@
                     </div>
 
                     @if($key === 'crops')
-                        <div class="apms-table-wrap" role="region" aria-label="Crop production records" tabindex="0"><table class="apms-table apms-table--crops"><thead><tr><th scope="col">Crop</th><th scope="col">Farmer &amp; farm</th><th scope="col">Season</th><th scope="col">Area / yield</th><th scope="col">Status</th>@if($canUpdate)<th scope="col"><span class="sr-only">Actions</span></th>@endif</tr></thead><tbody>
+                        <div class="apms-table-wrap" role="region" aria-label="Crop production records" tabindex="0"><table class="apms-table apms-table--crops"><thead><tr><th scope="col">Crop</th><th scope="col">Farmer &amp; farm</th><th scope="col">Season</th><th scope="col">Area / yield</th><th scope="col">Production stage</th>@if($canUpdate)<th scope="col"><span class="sr-only">Actions</span></th>@endif</tr></thead><tbody>
                             @forelse($crops as $crop)
                                 <tr><td><strong>{{ $crop->crop_type }}</strong><span class="apms-table-meta">{{ $crop->variety ?: 'Variety not specified' }}</span></td><td>{{ $crop->farm?->farmer?->user?->name ?: 'Farmer' }}<span class="apms-table-meta">{{ $crop->farm?->name ?: 'Farm not recorded' }}</span></td><td>{{ $crop->season?->name ?: 'Unassigned' }}<span class="apms-table-meta">{{ $crop->planted_on?->format('M j, Y') ?: 'Planting date not recorded' }}</span></td><td>{{ $crop->area_planted ? number_format((float) $crop->area_planted, 2).' '.str_replace('_', ' ', $crop->area_unit) : '—' }}<span class="apms-table-meta">{{ $crop->yield_quantity !== null ? number_format((float) $crop->yield_quantity, 2).' '.$crop->yield_unit : 'Yield not recorded' }}</span></td><td><span class="erp-pill {{ $crop->status === 'harvested' ? 'erp-pill-success' : ($crop->status === 'cancelled' ? 'erp-pill-neutral' : 'erp-pill-warning') }}">{{ ucfirst($crop->status) }}</span></td>
                                     @if($canUpdate)<td class="apms-actions-cell"><button type="button" class="apms-row-action" data-apms-open-editor="crop" data-apms-mode="edit" data-apms-title="Edit crop record" data-apms-record-id="{{ $crop->id }}" data-apms-action="{{ route('modules.apms.crops.update', ['record' => $crop->id, 'tab' => 'production', 'record_type' => 'crops']) }}" data-apms-record="{{ json_encode(['farmer_id' => $crop->farmer_id, 'farm_id' => $crop->farm_id, 'season_id' => $crop->season_id, 'crop_type' => $crop->crop_type, 'variety' => $crop->variety, 'planted_on' => $crop->planted_on?->format('Y-m-d'), 'harvested_on' => $crop->harvested_on?->format('Y-m-d'), 'area_planted' => $crop->area_planted, 'area_unit' => $crop->area_unit, 'yield_quantity' => $crop->yield_quantity, 'yield_unit' => $crop->yield_unit, 'status' => $crop->status, 'notes' => $crop->notes]) }}" aria-haspopup="dialog">Edit</button></td>@endif
                                 </tr>
-                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty"><strong>No crop records match this view.</strong><span>Try changing the search or status filter, or add a crop production record.</span></div></td></tr>@endforelse
+                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty">
+                                @if($stats['crops'] === 0)
+                                    <strong>No crop records available.</strong><span>Add a crop production record when verified field data is ready.</span>
+                                @elseif($crops->total() === 0)
+                                    <strong>No crop records match the selected filters.</strong><span>Adjust the search or production stage filter to see other records.</span>
+                                @else
+                                    <strong>No crop records on this page.</strong><span>Use the pagination controls to return to an available page.</span>
+                                @endif
+                            </div></td></tr>@endforelse
                         </tbody></table></div><div class="apms-pagination">{{ $crops->links() }}</div>
                     @elseif($key === 'livestock')
                         <div class="apms-table-wrap" role="region" aria-label="Livestock records" tabindex="0"><table class="apms-table apms-table--livestock"><thead><tr><th scope="col">Animal</th><th scope="col">Farmer &amp; farm</th><th scope="col">Quantity</th><th scope="col">Recorded</th><th scope="col">Status</th>@if($canUpdate)<th scope="col"><span class="sr-only">Actions</span></th>@endif</tr></thead><tbody>
@@ -147,7 +155,15 @@
                                 <tr><td><strong>{{ $record->animal_type }}</strong><span class="apms-table-meta">{{ $record->breed ?: 'Breed not specified' }}</span></td><td>{{ $record->farm?->farmer?->user?->name ?: 'Farmer' }}<span class="apms-table-meta">{{ $record->farm?->name ?: 'Farm not recorded' }}</span></td><td>{{ number_format($record->quantity) }} head</td><td>{{ $record->recorded_on?->format('M j, Y') ?: '—' }}</td><td><span class="erp-pill {{ $record->status === 'active' ? 'erp-pill-success' : 'erp-pill-neutral' }}">{{ ucfirst($record->status) }}</span></td>
                                     @if($canUpdate)<td class="apms-actions-cell"><button type="button" class="apms-row-action" data-apms-open-editor="livestock" data-apms-mode="edit" data-apms-title="Edit livestock record" data-apms-record-id="{{ $record->id }}" data-apms-action="{{ route('modules.apms.livestock.update', ['record' => $record->id, 'tab' => 'production', 'record_type' => 'livestock']) }}" data-apms-record="{{ json_encode(['farmer_id' => $record->farmer_id, 'farm_id' => $record->farm_id, 'animal_type' => $record->animal_type, 'breed' => $record->breed, 'quantity' => $record->quantity, 'recorded_on' => $record->recorded_on?->format('Y-m-d'), 'status' => $record->status, 'notes' => $record->notes]) }}" aria-haspopup="dialog">Edit</button></td>@endif
                                 </tr>
-                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty"><strong>No livestock records match this view.</strong><span>Try another search or add a livestock record.</span></div></td></tr>@endforelse
+                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty">
+                                @if($stats['livestock'] === 0)
+                                    <strong>No livestock records available.</strong><span>Add a livestock record when verified field data is ready.</span>
+                                @elseif($livestock->total() === 0)
+                                    <strong>No livestock records match the selected filters.</strong><span>Adjust the search or livestock status filter to see other records.</span>
+                                @else
+                                    <strong>No livestock records on this page.</strong><span>Use the pagination controls to return to an available page.</span>
+                                @endif
+                            </div></td></tr>@endforelse
                         </tbody></table></div><div class="apms-pagination">{{ $livestock->links() }}</div>
                     @else
                         <div class="apms-table-wrap" role="region" aria-label="Fisheries records" tabindex="0"><table class="apms-table apms-table--fisheries"><thead><tr><th scope="col">Fishery</th><th scope="col">Farmer &amp; farm</th><th scope="col">Production</th><th scope="col">Recorded</th>@if($canUpdate)<th scope="col"><span class="sr-only">Actions</span></th>@endif</tr></thead><tbody>
@@ -155,7 +171,15 @@
                                 <tr><td><strong>{{ $record->fishery_type }}</strong><span class="apms-table-meta">{{ $record->species ?: 'Species not specified' }}</span></td><td>{{ $record->farm?->farmer?->user?->name ?: 'Farmer' }}<span class="apms-table-meta">{{ $record->farm?->name ?: 'Farm not recorded' }}</span></td><td>{{ $record->production_quantity !== null ? number_format((float) $record->production_quantity, 2).' '.$record->production_unit : 'Not recorded' }}</td><td>{{ $record->recorded_on?->format('M j, Y') ?: '—' }}</td>
                                     @if($canUpdate)<td class="apms-actions-cell"><button type="button" class="apms-row-action" data-apms-open-editor="fishery" data-apms-mode="edit" data-apms-title="Edit fisheries record" data-apms-record-id="{{ $record->id }}" data-apms-action="{{ route('modules.apms.fisheries.update', ['record' => $record->id, 'tab' => 'production', 'record_type' => 'fisheries']) }}" data-apms-record="{{ json_encode(['farmer_id' => $record->farmer_id, 'farm_id' => $record->farm_id, 'fishery_type' => $record->fishery_type, 'species' => $record->species, 'production_quantity' => $record->production_quantity, 'production_unit' => $record->production_unit, 'recorded_on' => $record->recorded_on?->format('Y-m-d'), 'notes' => $record->notes]) }}" aria-haspopup="dialog">Edit</button></td>@endif
                                 </tr>
-                            @empty<tr><td colspan="{{ $canUpdate ? 5 : 4 }}"><div class="apms-table-empty"><strong>No fisheries records match this view.</strong><span>Try another search or add a fisheries record.</span></div></td></tr>@endforelse
+                            @empty<tr><td colspan="{{ $canUpdate ? 5 : 4 }}"><div class="apms-table-empty">
+                                @if($stats['fisheries'] === 0)
+                                    <strong>No fisheries records available.</strong><span>Add a fisheries record when verified field data is ready.</span>
+                                @elseif($fisheries->total() === 0)
+                                    <strong>No fisheries records match the selected filters.</strong><span>Adjust the search to see other fisheries records.</span>
+                                @else
+                                    <strong>No fisheries records on this page.</strong><span>Use the pagination controls to return to an available page.</span>
+                                @endif
+                            </div></td></tr>@endforelse
                         </tbody></table></div><div class="apms-pagination">{{ $fisheries->links() }}</div>
                     @endif
                 </section>
@@ -183,7 +207,15 @@
                                 <tr><td><strong>{{ $incident->incident_type }}</strong><span class="apms-table-meta">{{ $incident->affected_crop_or_animal }}</span></td><td>{{ $incident->farm?->name ?: 'Farm not recorded' }}</td><td><span class="erp-pill {{ in_array($incident->severity, ['high','critical'], true) ? 'erp-pill-danger' : ($incident->severity === 'medium' ? 'erp-pill-warning' : 'erp-pill-neutral') }}">{{ ucfirst($incident->severity) }}</span></td><td>{{ $incident->reported_on?->format('M j, Y') ?: '—' }}</td><td><span class="erp-pill {{ in_array($incident->status, ['reported','investigating'], true) ? 'erp-pill-warning' : 'erp-pill-success' }}">{{ ucfirst($incident->status) }}</span></td>
                                     @if($canUpdate)<td class="apms-actions-cell"><button type="button" class="apms-row-action" data-apms-open-editor="incident" data-apms-mode="edit" data-apms-title="Edit incident" data-apms-record-id="{{ $incident->id }}" data-apms-action="{{ route('modules.apms.incidents.update', ['record' => $incident->id, 'tab' => 'monitoring', 'monitoring_type' => 'incidents']) }}" data-apms-record="{{ json_encode(['farmer_id' => $incident->farmer_id, 'farm_id' => $incident->farm_id, 'incident_type' => $incident->incident_type, 'affected_crop_or_animal' => $incident->affected_crop_or_animal, 'reported_on' => $incident->reported_on?->format('Y-m-d'), 'severity' => $incident->severity, 'status' => $incident->status, 'description' => $incident->description, 'action_taken' => $incident->action_taken]) }}" aria-haspopup="dialog">Edit</button></td>@endif
                                 </tr>
-                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty"><strong>No incidents match this view.</strong><span>Change your filters or report a new incident.</span></div></td></tr>@endforelse
+                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty">
+                                @if($stats['incident_records'] === 0)
+                                    <strong>No incident records available.</strong><span>Report a pest or disease incident after an authorized field assessment.</span>
+                                @elseif($incidents->total() === 0)
+                                    <strong>No incidents match the selected filters.</strong><span>Adjust the search, status or severity filter to see other incidents.</span>
+                                @else
+                                    <strong>No incidents on this page.</strong><span>Use the pagination controls to return to an available page.</span>
+                                @endif
+                            </div></td></tr>@endforelse
                         </tbody></table></div><div class="apms-pagination">{{ $incidents->links() }}</div>
                     @else
                         <div class="apms-table-wrap" role="region" aria-label="Farm monitoring visits" tabindex="0"><table class="apms-table apms-table--visits"><thead><tr><th scope="col">Visit type</th><th scope="col">Farm</th><th scope="col">Findings</th><th scope="col">Visit date</th><th scope="col">Status</th>@if($canUpdate)<th scope="col"><span class="sr-only">Actions</span></th>@endif</tr></thead><tbody>
@@ -191,7 +223,15 @@
                                 <tr><td><strong>{{ str_replace('_', ' ', ucfirst($record->monitoring_type)) }}</strong></td><td>{{ $record->farm?->name ?: 'Farm not recorded' }}</td><td><span class="apms-truncate">{{ $record->findings }}</span><span class="apms-table-meta">{{ $record->recommendations ?: 'No recommendation recorded' }}</span></td><td>{{ $record->visited_on?->format('M j, Y') ?: '—' }}</td><td><span class="erp-pill {{ $record->status === 'closed' ? 'erp-pill-success' : 'erp-pill-warning' }}">{{ str_replace('_', ' ', ucfirst($record->status)) }}</span></td>
                                     @if($canUpdate)<td class="apms-actions-cell"><button type="button" class="apms-row-action" data-apms-open-editor="monitoring" data-apms-mode="edit" data-apms-title="Edit farm monitoring visit" data-apms-record-id="{{ $record->id }}" data-apms-action="{{ route('modules.apms.monitoring.update', ['record' => $record->id, 'tab' => 'monitoring', 'monitoring_type' => 'visits']) }}" data-apms-record="{{ json_encode(['farmer_id' => $record->farmer_id, 'farm_id' => $record->farm_id, 'visited_on' => $record->visited_on?->format('Y-m-d'), 'monitoring_type' => $record->monitoring_type, 'findings' => $record->findings, 'recommendations' => $record->recommendations, 'status' => $record->status]) }}" aria-haspopup="dialog">Edit</button></td>@endif
                                 </tr>
-                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty"><strong>No farm visits match this view.</strong><span>Add a monitoring visit after an authorized field assessment.</span></div></td></tr>@endforelse
+                            @empty<tr><td colspan="{{ $canUpdate ? 6 : 5 }}"><div class="apms-table-empty">
+                                @if($stats['monitoring'] === 0)
+                                    <strong>No farm visits available.</strong><span>Add a monitoring visit after an authorized field assessment.</span>
+                                @elseif($monitoring->total() === 0)
+                                    <strong>No farm visits match the selected filters.</strong><span>Adjust the search or visit status filter to see other records.</span>
+                                @else
+                                    <strong>No farm visits on this page.</strong><span>Use the pagination controls to return to an available page.</span>
+                                @endif
+                            </div></td></tr>@endforelse
                         </tbody></table></div><div class="apms-pagination">{{ $monitoring->links() }}</div>
                     @endif
                 </section>
@@ -211,7 +251,15 @@
                             <tr><td><strong>{{ $season->name }}</strong></td><td>{{ $season->starts_on?->format('M j, Y') }} – {{ $season->ends_on?->format('M j, Y') }}</td><td><span class="erp-pill {{ $season->status === 'open' ? 'erp-pill-success' : 'erp-pill-neutral' }}">{{ ucfirst($season->status) }}</span></td>
                                 @if($canUpdate)<td class="apms-actions-cell"><button type="button" class="apms-row-action" data-apms-open-editor="season" data-apms-mode="edit" data-apms-title="Edit agricultural season" data-apms-record-id="{{ $season->id }}" data-apms-action="{{ route('modules.apms.seasons.update', ['season' => $season->id, 'tab' => 'seasons']) }}" data-apms-record="{{ json_encode(['name' => $season->name, 'starts_on' => $season->starts_on?->format('Y-m-d'), 'ends_on' => $season->ends_on?->format('Y-m-d'), 'status' => $season->status]) }}" aria-haspopup="dialog">Edit</button></td>@endif
                             </tr>
-                        @empty<tr><td colspan="{{ $canUpdate ? 4 : 3 }}"><div class="apms-table-empty"><strong>No seasons configured.</strong><span>Add a season to organize new production records and reports.</span></div></td></tr>@endforelse
+                        @empty<tr><td colspan="{{ $canUpdate ? 4 : 3 }}"><div class="apms-table-empty">
+                            @if($stats['seasons'] === 0)
+                                <strong>No seasons configured.</strong><span>Add a season to organize new production records and reports.</span>
+                            @elseif($seasonRecords->total() === 0)
+                                <strong>No seasons match your search.</strong><span>Try a different season name.</span>
+                            @else
+                                <strong>No seasons on this page.</strong><span>Use the pagination controls to return to an available page.</span>
+                            @endif
+                        </div></td></tr>@endforelse
                     </tbody></table></div><div class="apms-pagination">{{ $seasonRecords->links() }}</div>
                 </section>
                 <section class="erp-surface apms-surface apms-report-card">

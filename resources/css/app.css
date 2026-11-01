@@ -85,10 +85,13 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 .ffrms-status-card span { color: var(--muted); font-size: .73rem; font-weight: 700; }
 .ffrms-status-card strong { color: var(--forest); font-size: 1.25rem; font-weight: 850; font-variant-numeric: tabular-nums; }
 .ffrms-registry-panel { padding: 1.1rem; }
-.ffrms-filter-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 13rem auto; align-items: end; gap: .75rem; margin-top: 1rem; padding: .9rem; background: var(--off-white); border: 1px solid var(--line); border-radius: .8rem; }
+.ffrms-filter-toolbar { display: grid; grid-template-columns: minmax(18rem, 1.8fr) minmax(13rem, .8fr) auto; align-items: end; gap: .75rem; margin-top: 1rem; padding: .9rem; background: var(--off-white); border: 1px solid var(--line); border-radius: .8rem; }
 .ffrms-filter-toolbar > div { min-width: 0; }
-.ffrms-filter-actions { display: flex; align-items: end; gap: .5rem; }
-.ffrms-filter-actions .erp-button { white-space: nowrap; }
+.ffrms-filter-toolbar .erp-input { width: 100%; min-height: 2.65rem; }
+.ffrms-filter-toolbar .erp-input::placeholder { color: #66766b; opacity: 1; }
+.ffrms-filter-toolbar .erp-input:focus-visible { outline: 3px solid rgba(38, 134, 92, .55); outline-offset: 2px; }
+.ffrms-filter-actions { display: flex; align-items: end; justify-self: end; gap: .5rem; }
+.ffrms-filter-actions .erp-button { min-height: 2.65rem; white-space: nowrap; }
 .ffrms-table-wrap { width: 100%; margin-top: 1rem; overflow-x: auto; border: 1px solid var(--line); border-radius: .8rem; scrollbar-width: thin; }
 .ffrms-table { width: 100%; min-width: 48rem; table-layout: fixed; border-collapse: collapse; }
 .ffrms-table th, .ffrms-table td { padding: .8rem .85rem; border-bottom: 1px solid #e7eee8; text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
@@ -107,7 +110,12 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 .ffrms-view-record { min-height: 2.35rem; padding: .5rem .65rem; white-space: nowrap; }
 .ffrms-view-record svg { width: 1rem; height: 1rem; }
 .ffrms-pagination { margin-top: 1rem; }
-.ffrms-association-workspace { display: grid; grid-template-columns: minmax(17rem, .75fr) minmax(0, 1.5fr); align-items: start; gap: 1rem; }
+.ffrms-association-workspace { display: grid; grid-template-columns: minmax(18rem, .85fr) minmax(0, 1.35fr); align-items: stretch; gap: 1rem; }
+.ffrms-association-form-surface { align-self: start; }
+.ffrms-association-empty { display: grid; min-height: 12rem; align-content: center; justify-items: center; gap: .45rem; padding: 1.25rem; }
+.ffrms-association-empty strong { color: var(--forest); font-size: .85rem; }
+.ffrms-association-empty p { max-width: 25rem; margin: 0 0 .35rem; color: var(--muted); font-size: .74rem; line-height: 1.5; text-align: center; }
+.ffrms-association-empty-icon { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; color: var(--forest); background: var(--sage); border-radius: .75rem; }
 .ffrms-association-row { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(16rem, 1.2fr); align-items: end; gap: 1rem; padding: 1rem 0; border-top: 1px solid var(--line); }
 .ffrms-association-row strong { color: var(--forest); font-size: .85rem; }
 .ffrms-association-row p { margin: .2rem 0 0; color: var(--muted); font-size: .7rem; }
@@ -166,13 +174,13 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 @media (max-width: 1023px) {
     .ffrms-detail-grid { grid-template-columns: minmax(0, 1fr); }
     .ffrms-detail-aside { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    .ffrms-filter-toolbar { grid-template-columns: minmax(0, 1.4fr) minmax(12rem, .8fr); }
+    .ffrms-filter-actions { grid-column: 1 / -1; justify-self: start; }
+    .ffrms-association-workspace { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 800px) {
     .ffrms-overview-heading { align-items: flex-start; flex-direction: column; }
-    .ffrms-filter-toolbar { grid-template-columns: minmax(0, 1fr) minmax(12rem, .6fr); }
-    .ffrms-filter-actions { grid-column: 1 / -1; }
     .ffrms-filter-actions .erp-button { flex: 1 1 auto; }
-    .ffrms-association-workspace { grid-template-columns: minmax(0, 1fr); }
     .ffrms-detail-aside { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) {
@@ -623,7 +631,8 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 .apms-workspace { display: grid; gap: 1rem; }
 .apms-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
 .apms-stat { display: flex; min-width: 0; align-items: center; gap: .75rem; padding: .8rem .9rem; background: #fff; border: 1px solid var(--line); border-radius: .85rem; }
-.apms-stat-mark { display: grid; flex: 0 0 2.25rem; width: 2.25rem; height: 2.25rem; place-items: center; color: var(--forest); background: var(--sage); border-radius: .7rem; font-size: .68rem; font-weight: 900; }
+.apms-stat-mark { display: grid; flex: 0 0 2.25rem; width: 2.25rem; height: 2.25rem; place-items: center; color: var(--forest); background: var(--sage); border-radius: .7rem; }
+.apms-stat-mark svg { width: 1.15rem; height: 1.15rem; }
 .apms-stat-mark--alert { color: #8c6312; background: #fff4d8; }
 .apms-stat p { margin: 0; color: var(--muted); font-size: .7rem; font-weight: 700; }
 .apms-stat strong { display: block; margin-top: .15rem; color: var(--ink); font-size: 1.2rem; font-weight: 850; line-height: 1.2; }
@@ -676,9 +685,11 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 .apms-subtab.is-active { color: var(--forest); border-color: var(--gold); }
 .apms-record-panel { min-width: 0; padding: .8rem; background: #fff; border: 1px solid var(--line); border-radius: .9rem; }
 .apms-record-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .7rem; margin-bottom: .75rem; }
-.apms-filter-form { display: flex; flex: 1; min-width: 0; align-items: center; flex-wrap: wrap; gap: .45rem; }
-.apms-search-field { flex: 1 1 15rem; min-width: 10rem; }
-.apms-filter-form select { width: auto; min-width: 8rem; }
+.apms-filter-form { display: flex; flex: 1; min-width: 0; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.apms-filter-form > * { min-width: 0; }
+.apms-search-field { flex: 1 1 18rem; min-width: 12rem; }
+.apms-filter-form select { width: auto; min-width: 9rem; min-height: 2.55rem; flex: 0 1 12rem; }
+.apms-filter-form > .erp-button { min-height: 2.55rem; flex: 0 0 auto; white-space: nowrap; }
 .apms-table-wrap { width: 100%; overflow-x: auto; border: 1px solid #e7eee8; border-radius: .7rem; scrollbar-width: thin; }
 .apms-table-wrap:focus-visible { outline: 2px solid var(--emerald); outline-offset: 3px; }
 .apms-table { width: 100%; min-width: 45rem; border-collapse: collapse; text-align: left; font-size: .74rem; }
@@ -701,7 +712,7 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 .apms-pagination { padding: .7rem .1rem 0; }
 .apms-pagination nav { display: flex; justify-content: flex-end; }
 .apms-season-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(17rem, .75fr); gap: .9rem; align-items: start; }
-.apms-season-search { display: flex; gap: .45rem; margin: .8rem 0; }
+.apms-season-search { display: flex; min-width: 0; align-items: center; gap: .5rem; margin: .8rem 0; }
 .apms-season-search input { min-width: 0; flex: 1; }
 .apms-report-card { background: linear-gradient(155deg, #fff 0%, #f3f8f3 100%); }
 .apms-report-card > h3 { margin-top: .1rem; }
@@ -771,8 +782,9 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
     .apms-record-panel { padding: .55rem; }
     .apms-record-toolbar { align-items: stretch; flex-direction: column; }
     .apms-filter-form { align-items: stretch; }
-    .apms-search-field { flex-basis: 100%; }
+    .apms-search-field { min-width: 0; flex-basis: 100%; }
     .apms-filter-form select { flex: 1; min-width: 0; }
+    .apms-filter-form > .erp-button { flex: 1 1 auto; }
     .apms-record-toolbar > .erp-button { width: 100%; }
     .apms-season-search { flex-wrap: wrap; }
     .apms-season-search input { flex-basis: 100%; }

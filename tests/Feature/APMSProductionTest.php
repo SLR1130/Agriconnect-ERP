@@ -153,6 +153,78 @@ class APMSProductionTest extends TestCase
         $this->assertStringNotContainsString('Hidden Corn Crop', $cropPanel);
     }
 
+    public function test_apms_uses_semantic_stat_icons_production_stage_labels_and_distinct_empty_states(): void
+    {
+        $role = Role::create([
+            'name' => 'APMS UI QA',
+            'slug' => 'apms_ui_qa',
+            'permissions' => ['modules.apms.*'],
+            'is_active' => true,
+        ]);
+        $staff = User::factory()->create();
+        $staff->roles()->attach($role);
+
+        $emptyResponse = $this->actingAs($staff)
+            ->get('/modules/apms?tab=production&record_type=crops')
+            ->assertOk()
+            ->assertSee('Production stage')
+            ->assertSee('All production stages')
+            ->assertSee('No crop records available.');
+
+        $statGridStart = strpos($emptyResponse->getContent(), '<section class="apms-stat-grid"');
+        $statGridEnd = strpos($emptyResponse->getContent(), '</section>', $statGridStart);
+        $this->assertNotFalse($statGridStart);
+        $this->assertNotFalse($statGridEnd);
+        $statGrid = substr($emptyResponse->getContent(), $statGridStart, $statGridEnd - $statGridStart);
+        $this->assertSame(4, substr_count($statGrid, 'class="apms-stat-mark'));
+        $this->assertSame(4, substr_count($statGrid, '<svg'));
+
+        $this->assertStringNotContainsString('No crop records match the selected filters.', $emptyResponse->getContent());
+
+        $this->actingAs($staff)
+            ->get('/modules/apms?tab=monitoring&monitoring_type=incidents')
+            ->assertOk()
+            ->assertSee('No incident records available.');
+
+        $this->actingAs($staff)
+            ->get('/modules/apms?tab=monitoring&monitoring_type=visits')
+            ->assertOk()
+            ->assertSee('No farm visits available.');
+
+        $farmerUser = User::factory()->create();
+        $farmer = Farmer::create([
+            'user_id' => $farmerUser->id,
+            'farmer_code' => 'APMS-EMPTY-001',
+            'registration_status' => 'verified',
+        ]);
+        $farm = Farm::create([
+            'farmer_id' => $farmer->id,
+            'name' => 'Status Farm',
+            'barangay' => 'Demo Barangay',
+            'area' => 1,
+            'area_unit' => 'hectare',
+            'ownership_type' => 'owner',
+            'status' => 'active',
+        ]);
+        CropProductionRecord::create([
+            'farmer_id' => $farmer->id,
+            'farm_id' => $farm->id,
+            'crop_type' => 'Rice',
+            'area_unit' => 'hectare',
+            'yield_unit' => 'kilogram',
+            'status' => 'growing',
+            'recorded_by' => $staff->id,
+        ]);
+
+        $this->actingAs($staff)
+            ->get('/modules/apms?tab=production&record_type=crops&record_search=not-found&crop_status=planned')
+            ->assertOk()
+            ->assertSee('No crop records match the selected filters.')
+            ->assertSee('value="not-found"', false)
+            ->assertSee('value="planned" selected', false)
+            ->assertDontSee('No crop records available.');
+    }
+
     public function test_apms_csv_date_range_filters_records_by_their_event_date(): void
     {
         $role = Role::create([

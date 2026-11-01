@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActivityLog;
+use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\FarmerAssociation;
 use App\Models\FarmerRegistrationHistory;
-use App\Models\Farm;
-use App\Models\ActivityLog;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,6 +78,8 @@ class FFRMSWorkspaceTest extends TestCase
             ->assertSee('data-label="Farmer"', false)
             ->assertSee('data-label="Registration"', false)
             ->assertSee('View details')
+            ->assertSee('value="Belen"', false)
+            ->assertSee('value="pending" selected', false)
             ->assertSee(e(route('modules.ffrms.dashboard', ['workspace' => 'farmers', 'record' => $record['farmer']->id, 'search' => 'Belen', 'status' => 'pending', 'page' => 1]).'#ffrms-record-detail'), false)
             ->assertDontSee('ffrms-record-content');
 
@@ -91,6 +93,34 @@ class FFRMSWorkspaceTest extends TestCase
             ->assertSee('Available decision')
             ->assertDontSee('ffrms-record-content')
             ->assertSee(e(route('modules.ffrms.dashboard', ['workspace' => 'farmers', 'search' => 'Belen', 'status' => 'pending', 'page' => 1])), false);
+    }
+
+    public function test_module_titles_are_escaped_once_in_the_shared_topbar(): void
+    {
+        $staff = $this->staff(['modules.ffrms.view', 'modules.apms.view']);
+
+        foreach ([
+            ['/modules/ffrms', 'Farmer & Farm Registration'],
+            ['/modules/apms', 'Agricultural Production & Monitoring'],
+        ] as [$url, $title]) {
+            $html = $this->actingAs($staff)->get($url)->assertOk()->getContent();
+            $topbarTitle = '<div class="erp-context-title" aria-live="polite">'.e($title).'</div>';
+
+            $this->assertStringContainsString($topbarTitle, $html);
+            $this->assertStringNotContainsString(e(e($title)), $html);
+        }
+    }
+
+    public function test_association_empty_state_explains_the_next_step_and_links_to_registration(): void
+    {
+        $staff = $this->staff(['modules.ffrms.view', 'modules.ffrms.update']);
+
+        $this->actingAs($staff)->get('/modules/ffrms?workspace=associations')
+            ->assertOk()
+            ->assertSee('No associations registered yet')
+            ->assertSee('Register a farmer group')
+            ->assertSee('href="#association-name"', false)
+            ->assertSee('id="association-name"', false);
     }
 
     public function test_farmer_detail_shows_real_association_membership_and_restricted_review_actions(): void

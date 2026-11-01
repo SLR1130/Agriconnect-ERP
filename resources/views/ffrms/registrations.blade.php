@@ -1,5 +1,5 @@
 <x-layouts.app>
-    <x-slot name="header">Farmer &amp; Farm Registration</x-slot>
+    <x-slot name="header">Farmer & Farm Registration</x-slot>
     <x-slot name="description">Manage farmer identities, review registration decisions, and maintain the farm records used across AgriConnect.</x-slot>
 
     @if(session('status'))
@@ -85,7 +85,7 @@
             @if($canManageAssociations)
                 <section id="ffrms-panel-associations" class="erp-workspace-panel" role="tabpanel" aria-labelledby="ffrms-tab-associations" tabindex="0" data-erp-workspace-panel="associations" hidden>
                     <div class="ffrms-association-workspace">
-                        <section class="erp-surface p-5">
+                        <section class="erp-surface ffrms-association-form-surface p-5">
                             <p class="erp-page-eyebrow">Farmer groups</p><h2 class="erp-section-title">Register an association</h2><p class="mt-1 text-sm text-gray-600">Associations and membership are maintained separately from registration verification.</p>
                             <form method="POST" action="{{ route('modules.ffrms.associations.store') }}" class="mt-4 grid gap-3" data-ffrms-association-form>
                                 @csrf<input type="hidden" name="workspace" value="associations">
@@ -107,7 +107,12 @@
                                         </form>
                                     </article>
                                 @empty
-                                    <div class="erp-empty">No farmer associations have been registered.</div>
+                                    <div class="erp-empty-state ffrms-association-empty">
+                                        <span class="ffrms-association-empty-icon" aria-hidden="true"><x-ui.icon name="users" size="md" /></span>
+                                        <strong>No associations registered yet</strong>
+                                        <p>Register a farmer group to begin organizing existing farmer records and memberships.</p>
+                                        <a class="erp-button erp-button-primary" href="#association-name">Register the first association</a>
+                                    </div>
                                 @endforelse
                             </div>
                         </section>
