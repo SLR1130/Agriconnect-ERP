@@ -155,6 +155,48 @@ class PublicAgriculturalPublicationTest extends TestCase
         $this->assertDatabaseCount('notifications', 1);
     }
 
+    public function test_publication_form_preserves_filipino_unicode_and_renders_it_in_the_public_feed_and_detail(): void
+    {
+        $publisher = $this->account('mao_admin', [
+            'modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update', 'modules.aasms.publish',
+        ]);
+        $programName = "SYNTHETIC QA ONLY \u{2014} Tulong sa binhi ng palay";
+        $title = "Abiso para sa mga magsasaka \u{2014} panahon ng taniman";
+        $body = "Magtanim nang tama; tulong na \u{20B1}5,000 para sa \u{201C}palay\u{201D} at binhi.";
+        $program = $this->publishedProgram(['name' => $programName]);
+
+        $this->actingAs($publisher)->post(route('modules.aasms.announcements.store'), $this->draftPayload([
+            'title' => $title,
+            'body' => $body,
+            'category' => 'Service advisory',
+            'assistance_program_id' => $program->id,
+        ]))->assertRedirect();
+
+        $announcement = AgriculturalAnnouncement::query()->with('currentRevision')->firstOrFail();
+        $this->assertSame($title, $announcement->currentRevision->content['title']);
+        $this->assertSame($body, $announcement->currentRevision->content['body']);
+        $this->assertDatabaseCount('agricultural_announcements', 1);
+        $this->assertDatabaseCount('assistance_programs', 1);
+
+        $this->actingAs($publisher)->post(route('modules.aasms.announcements.publish', $announcement))->assertRedirect();
+
+        $this->get(route('public.agricultural-services.index'))
+            ->assertOk()
+            ->assertSee($title)
+            ->assertSee('Service advisory')
+            ->assertSee($programName)
+            ->assertDontSee("\u{00C3}")
+            ->assertDontSee("\u{00E2}\u{20AC}");
+
+        $this->get(route('public.announcements.show', $announcement))
+            ->assertOk()
+            ->assertSee($title)
+            ->assertSee('Magtanim nang tama;')
+            ->assertSee('Accepting applications')
+            ->assertSee('Sign in to check eligibility')
+            ->assertSee(route('public.agricultural-programs.show', $program), false);
+    }
+
     public function test_published_edits_are_private_revisions_until_approved_and_archive_preserves_history(): void
     {
         Storage::fake('local');
@@ -275,21 +317,65 @@ class PublicAgriculturalPublicationTest extends TestCase
         AssistanceProgram::query()->create(['name' => 'Private Program', 'description' => 'Must not show.', 'status' => 'closed', 'eligibility_rules' => []]);
 
         $this->get(route('public.agricultural-services.index', ['availability' => 'available']))
-            ->assertOk()->assertSee('Open Today')->assertDontSee('Opens Tomorrow')->assertDontSee('Ended Yesterday')->assertDontSee('Private Program');
+            ->assertOk()->assertSee('Open Today')->assertSee('Sign in to check eligibility')->assertDontSee('Opens Tomorrow')->assertDontSee('Ended Yesterday')->assertDontSee('Private Program');
         $this->get(route('public.agricultural-services.index', ['availability' => 'upcoming']))
             ->assertOk()->assertSee('Opens Tomorrow')->assertDontSee('Private Program');
         $this->get(route('public.agricultural-services.index', ['availability' => 'ended']))
-            ->assertOk()->assertSee('Ended Yesterday')->assertDontSee('Private Program');
+            ->assertOk()->assertSee('Ended Yesterday')->assertDontSee('Sign in to check eligibility')->assertDontSee(route('farmer.programs.show', $endedProgram), false)->assertDontSee('Private Program');
         $this->get(route('public.agricultural-services.index', ['availability' => 'all']))
             ->assertOk()->assertSee('Open Today')->assertSee('Opens Tomorrow')->assertSee('Ended Yesterday')->assertDontSee('Private Program');
         $this->get(route('public.agricultural-programs.show', $endedProgram))->assertOk()
             ->assertSee('The application period has ended.')
+            ->assertDontSee(route('farmer.programs.show', $endedProgram), false)
             ->assertDontSee('Submit application')
             ->assertDontSee(route('farmer.assistance.apply', $endedProgram), false);
         $verifiedFarmer = $this->account('farmer', [], 'verified');
         $this->actingAs($verifiedFarmer)->post(route('farmer.assistance.apply', $endedProgram), [])
             ->assertSessionHasErrors('program');
         $this->assertDatabaseCount('assistance_applications', 0);
+    }
+
+    public function test_public_announcement_details_never_offer_application_actions_for_upcoming_or_ended_programs(): void
+    {
+        $this->travelTo(now()->setTimezone('Asia/Manila')->startOfDay()->setTime(12, 0));
+        $publisher = $this->account('mao_admin', [
+            'modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update', 'modules.aasms.publish',
+        ]);
+        $upcomingProgram = $this->publishedProgram([
+            'name' => 'Upcoming public assistance',
+            'opens_on' => now('Asia/Manila')->addDay()->toDateString(),
+            'closes_on' => now('Asia/Manila')->addMonth()->toDateString(),
+        ]);
+        $endedProgram = $this->publishedProgram([
+            'name' => 'Ended public assistance',
+            'opens_on' => null,
+            'closes_on' => now('Asia/Manila')->subDay()->toDateString(),
+        ]);
+
+        foreach ([
+            [$upcomingProgram, 'Upcoming assistance announcement'],
+            [$endedProgram, 'Ended assistance announcement'],
+        ] as [$program, $title]) {
+            $this->actingAs($publisher)->post(route('modules.aasms.announcements.store'), $this->draftPayload([
+                'title' => $title,
+                'body' => 'Synthetic publication used to verify application availability messaging.',
+                'assistance_program_id' => $program->id,
+            ]))->assertRedirect();
+
+            $announcement = AgriculturalAnnouncement::query()->where('assistance_program_id', $program->id)->firstOrFail();
+            $this->actingAs($publisher)->post(route('modules.aasms.announcements.publish', $announcement))->assertRedirect();
+
+            $detail = $this->get(route('public.announcements.show', $announcement))->assertOk();
+            $detail->assertDontSee(route('farmer.programs.show', $program), false)
+                ->assertDontSee('Check eligibility and apply')
+                ->assertDontSee('Submit application');
+
+            if ($program->opens_on?->isAfter(now('Asia/Manila')->toDateString())) {
+                $detail->assertSee('Applications are not open yet.');
+            } else {
+                $detail->assertSee('The application period has ended.');
+            }
+        }
     }
 
     public function test_program_publication_is_audited_and_requires_the_separate_publish_permission(): void
@@ -322,6 +408,8 @@ class PublicAgriculturalPublicationTest extends TestCase
         $program = $this->publishedProgram();
         $verifiedFarmer = $this->account('farmer', [], 'verified');
 
+        $this->actingAs($verifiedFarmer)->get(route('public.agricultural-services.index'))
+            ->assertOk()->assertSee(route('farmer.programs.show', $program), false)->assertSee('Check eligibility');
         $this->actingAs($verifiedFarmer)->get(route('public.agricultural-programs.show', $program))
             ->assertOk()->assertSee(route('farmer.programs.show', $program), false);
         $this->actingAs($verifiedFarmer)->get(route('farmer.programs.show', $program))

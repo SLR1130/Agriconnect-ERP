@@ -26,6 +26,17 @@
                 @if($publication['content']['instructions'])<div><strong>How to proceed</strong><p>{{ $publication['content']['instructions'] }}</p></div>@endif
                 @if($publication['content']['contact_details'])<div><strong>Official contact</strong><p class="whitespace-pre-line">{{ $publication['content']['contact_details'] }}</p></div>@endif
                 @if($publication['program'])<a class="farmer-button public-article-cta" href="{{ route('public.agricultural-programs.show', $publication['program']) }}">View linked assistance program <x-ui.icon name="next" size="sm"/></a>@endif
+                @if($publication['program'])
+                    <div class="public-article-program-status">
+                        <strong>Application availability</strong>
+                        <span class="farmer-pill {{ $programAvailability === 'available' ? '' : 'farmer-pill-warn' }}">{{ ['available' => 'Accepting applications', 'upcoming' => 'Upcoming', 'ended' => 'Applications closed', 'unpublished' => 'Not published'][$programAvailability] }}</span>
+                        @if($programAvailability === 'available')
+                            @if(auth()->check() && auth()->user()->hasRole('farmer'))<a class="farmer-text-link" href="{{ route('farmer.programs.show', $publication['program']) }}">Check eligibility and apply</a>
+                            @else<a class="farmer-text-link" href="{{ route('login') }}">Sign in to check eligibility</a>@endif
+                        @elseif($programAvailability === 'upcoming')<p>Applications are not open yet. Review the schedule and return when the opening date arrives.</p>
+                        @else<p>The application period has ended. The published program information remains available.</p>@endif
+                    </div>
+                @endif
             </aside>
         </div>
         @if($publication['program'])<p class="public-article-schedule"><strong>Application schedule:</strong> {{ $publication['program']->opens_on ? 'Opens '.$publication['program']->opens_on->format('M j, Y') : 'No opening date specified' }} · {{ $publication['program']->closes_on ? 'Closes '.$publication['program']->closes_on->format('M j, Y') : 'No closing date specified' }}</p>@endif

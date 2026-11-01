@@ -29,6 +29,7 @@ class PublicAgriculturalServicesController extends Controller
         $date = $businessDate->toDateString();
 
         $programQuery = AssistanceProgram::query()->where('status', 'open')
+            ->with('supplyItem')
             ->with(['announcements' => fn ($query) => $query->visibleToFarmers()->with('publishedRevision.media')->latest('published_at')])
             ->when($availability === 'available', fn ($query) => $query
                 ->where(fn ($dates) => $dates->whereNull('opens_on')->orWhereDate('opens_on', '<=', $date))
@@ -41,7 +42,7 @@ class PublicAgriculturalServicesController extends Controller
 
         $programs = $programQuery->orderBy('closes_on')->orderBy('name')->paginate(9, ['*'], 'programs_page')->withQueryString();
         $announcementQuery = AgriculturalAnnouncement::query()->visibleToFarmers()
-            ->with(['program', 'publishedRevision.media'])
+            ->with(['program.supplyItem', 'publishedRevision.media'])
             ->when($search !== '', fn ($query) => $query->where(fn ($matches) => $matches
                 ->where('title', 'like', '%'.$search.'%')->orWhere('body', 'like', '%'.$search.'%')))
             ->when($category !== '', fn ($query) => $query->where('category', $category));
@@ -50,19 +51,41 @@ class PublicAgriculturalServicesController extends Controller
             ->merge(AssistanceProgram::query()->where('status', 'open')->whereNotNull('category')->distinct()->pluck('category'))
             ->unique()->sort()->values();
 
+        $feedItems = $programs->getCollection()->map(function (AssistanceProgram $program): array {
+            $linkedNotice = $program->announcements->first();
+            $sortTimestamp = $linkedNotice?->published_at?->getTimestamp()
+                ?? $program->created_at?->getTimestamp()
+                ?? 0;
+
+            return ['type' => 'program', 'record' => $program, 'sort_timestamp' => $sortTimestamp];
+        })->concat($announcements->getCollection()->map(fn (AgriculturalAnnouncement $announcement): array => [
+            'type' => 'announcement',
+            'record' => $announcement,
+            'sort_timestamp' => $announcement->published_at?->getTimestamp() ?? 0,
+        ]))->sortByDesc('sort_timestamp')->values();
+
         return view('public.agricultural-services.index', compact(
-            'search', 'category', 'availability', 'businessDate', 'programs', 'announcements', 'categories',
+            'search', 'category', 'availability', 'businessDate', 'programs', 'announcements', 'categories', 'feedItems',
         ));
     }
 
-    public function announcement(AgriculturalAnnouncement $announcement, AgriculturalAnnouncementPresenter $presenter): View
+    public function announcement(
+        AgriculturalAnnouncement $announcement,
+        AgriculturalAnnouncementPresenter $presenter,
+        AgriculturalBusinessCalendar $calendar,
+    ): View
     {
         abort_unless(AgriculturalAnnouncement::query()->visibleToFarmers()->whereKey($announcement->id)->exists(), 404);
         $announcement->load(['program', 'publishedRevision.media']);
+        $publication = $presenter->present($announcement, true);
+        $businessDate = $calendar->today();
+        $programAvailability = $publication['program']?->availabilityStateOn($businessDate);
 
         return view('public.agricultural-services.announcement', [
             'announcement' => $announcement,
-            'publication' => $presenter->present($announcement, true),
+            'publication' => $publication,
+            'businessDate' => $businessDate,
+            'programAvailability' => $programAvailability,
             'preview' => false,
         ]);
     }
@@ -71,6 +94,7 @@ class PublicAgriculturalServicesController extends Controller
     {
         abort_unless($program->status === 'open', 404);
         $businessDate = $calendar->today();
+        $program->load('supplyItem');
         $announcement = AgriculturalAnnouncement::query()->visibleToFarmers()
             ->where('assistance_program_id', $program->id)
             ->with(['publishedRevision.media'])

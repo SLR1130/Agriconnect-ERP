@@ -15,6 +15,7 @@
             <section class="public-program-detail-main"><h2>Application schedule</h2><dl class="public-schedule-facts"><div><dt>Opens</dt><dd>{{ $program->opens_on?->format('F j, Y') ?: 'No opening date specified' }}</dd></div><div><dt>Closes</dt><dd>{{ $program->closes_on?->format('F j, Y') ?: 'No closing date specified' }}</dd></div></dl>
                 <p class="public-date-note">Dates use the Philippine business calendar published by the MAO. The start and end dates are included.</p>
                 <h2>Published eligibility requirements</h2><ul class="public-requirement-list">@foreach($requirements as $requirement)<li><x-ui.icon name="success" size="sm"/>{{ $requirement }}</li>@endforeach</ul>
+                @if($program->supplyItem)<div class="public-requirement-summary"><strong>Assistance provided</strong><p>{{ $program->supplyItem->name }}</p></div>@endif
                 @if($publication && $publication['content']['requirements_summary'])<div class="public-requirement-summary"><strong>Program-specific instructions</strong><p>{{ $publication['content']['requirements_summary'] }}</p></div>@endif
                 @if($publication && $publication['content']['instructions'])<div class="public-requirement-summary"><strong>How to proceed</strong><p>{{ $publication['content']['instructions'] }}</p></div>@endif
                 @if($publication && $publication['content']['service_area'])<p class="public-detail-office"><x-ui.icon name="location" size="sm"/>Service area: {{ $publication['content']['service_area'] }}</p>@endif

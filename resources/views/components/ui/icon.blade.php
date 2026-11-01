@@ -6,7 +6,7 @@
         'notifications' => 'bell', 'profile' => 'user-circle', 'assistance' => 'sparkles', 'equipment' => 'wrench-screwdriver',
         'crop' => 'beaker', 'fish' => 'circle-stack', 'monitoring' => 'bug-ant', 'location' => 'map-pin', 'add' => 'plus',
         'next' => 'arrow-right', 'back' => 'arrow-left', 'chevron' => 'chevron-down', 'success' => 'check-circle',
-        'close' => 'x-mark', 'office' => 'building-office-2', 'search' => 'magnifying-glass',
+        'close' => 'x-mark', 'office' => 'building-office-2', 'search' => 'magnifying-glass', 'calendar' => 'calendar-days',
         'users' => 'user-group', 'chart' => 'chart-bar', 'inventory' => 'archive-box', 'finance' => 'banknotes',
         'reports' => 'document-chart-bar', 'security' => 'shield-check', 'modules' => 'squares-plus',
         'settings' => 'cog-6-tooth', 'sign-out' => 'arrow-left-start-on-rectangle', 'menu' => 'bars-3',
