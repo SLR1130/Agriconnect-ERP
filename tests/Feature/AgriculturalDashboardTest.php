@@ -246,6 +246,25 @@ class AgriculturalDashboardTest extends TestCase
         $this->assertStringContainsString('Generated at', $csv);
     }
 
+    public function test_available_assistance_program_analytics_uses_the_manila_calendar_date(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-31 16:00:00', 'UTC'));
+        $admin = $this->staff('super_admin');
+        AssistanceProgram::create(['name' => 'Open today', 'status' => 'open', 'opens_on' => '2026-11-01', 'closes_on' => '2026-11-01']);
+        AssistanceProgram::create(['name' => 'No date limits', 'status' => 'open']);
+        AssistanceProgram::create(['name' => 'Opens tomorrow', 'status' => 'open', 'opens_on' => '2026-11-02', 'closes_on' => '2026-11-05']);
+        AssistanceProgram::create(['name' => 'Closed yesterday', 'status' => 'open', 'opens_on' => '2026-10-01', 'closes_on' => '2026-10-31']);
+        AssistanceProgram::create(['name' => 'Unpublished', 'status' => 'draft', 'opens_on' => '2026-11-01', 'closes_on' => '2026-11-01']);
+
+        $analytics = app(AgriculturalAnalyticsService::class)->dashboard(
+            $admin,
+            CarbonImmutable::parse('2026-10-01'),
+            CarbonImmutable::parse('2026-11-30'),
+        );
+
+        $this->assertSame(2, $this->cardValue($analytics['sections']['aasms'], 'Available programs'));
+    }
+
     public function test_empty_database_metrics_are_zero_and_reports_show_empty_results(): void
     {
         $admin = $this->staff('super_admin');

@@ -9,7 +9,7 @@
             <section class="farmer-card" aria-labelledby="program-overview-title">
                 <div class="farmer-program-detail-badges">
                     <span class="farmer-program-category">{{ $program->category ?: 'Agricultural assistance' }}</span>
-                    @php($availabilityState = $program->availabilityState())
+                    @php($availabilityState = $program->availabilityStateOn($businessDate))
                     <span class="farmer-pill {{ $availabilityState === 'available' ? '' : 'farmer-pill-warn' }}">
                         {{ ['available' => 'Accepting applications', 'upcoming' => 'Opens soon', 'ended' => 'Application period ended', 'unpublished' => 'Not published'][$availabilityState] }}
                     </span>
@@ -50,7 +50,7 @@
             @if($application)
                 <p>You already applied to this program. Your recorded status is <strong>{{ ucfirst($application->status) }}</strong>.</p>
                 <a class="farmer-button farmer-button-gold" href="{{ route('farmer.applications.show', $application) }}">Track application <x-ui.icon name="next" size="sm" /></a>
-            @elseif(!$program->isAvailable())
+            @elseif(!$program->isAvailableOn($businessDate))
                 <p class="farmer-program-state-note">
                     @if($availabilityState === 'upcoming')
                         Applications have not opened yet. You can review the requirements now and return after {{ $program->opens_on?->format('M d, Y') }}.

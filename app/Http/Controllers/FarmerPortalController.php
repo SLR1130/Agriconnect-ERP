@@ -10,6 +10,7 @@ use App\Models\EquipmentRequest;
 use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\ProductionSubmission;
+use App\Services\AgriculturalBusinessCalendar;
 use App\Services\FarmerRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,18 +45,19 @@ class FarmerPortalController extends Controller
         return redirect()->route('farmer.portal')->with('status', 'Your account was created. Your farmer registration is pending MAO verification.');
     }
 
-    public function dashboard(Request $request): View
+    public function dashboard(Request $request, AgriculturalBusinessCalendar $calendar): View
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
 
         $farmer = $request->user()->farmer()->with(['farms', 'registrationHistory.processor'])->firstOrFail();
         $productionSubmissionsAvailable = Schema::hasTable('production_submissions');
+        $businessDate = $calendar->today()->toDateString();
 
         return view('farmer.portal', [
             'farmer' => $farmer,
             'programs' => AssistanceProgram::query()->with('supplyItem')->where('status', 'open')
-                ->where(fn ($query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', today()))
-                ->where(fn ($query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', today()))
+                ->where(fn ($query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', $businessDate))
+                ->where(fn ($query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', $businessDate))
                 ->orderBy('closes_on')->take(3)->get(),
             'applications' => AssistanceApplication::query()->with('program')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),
             'equipmentRequests' => EquipmentRequest::query()->with('asset')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),

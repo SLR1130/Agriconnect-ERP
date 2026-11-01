@@ -1,4 +1,4 @@
-@php($availabilityState = $program->availabilityState())
+@php($availabilityState = $program->availabilityStateOn($businessDate))
 @php($availabilityCopy = ['available' => 'Accepting applications', 'upcoming' => 'Opens soon', 'ended' => 'Application period ended', 'unpublished' => 'Not published'][$availabilityState])
 <article class="farmer-card farmer-program-card">
     <div class="farmer-program-card-heading">

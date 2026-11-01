@@ -16,7 +16,10 @@ use Illuminate\Support\Facades\DB;
 
 class AgriculturalAnalyticsService
 {
-    public function __construct(private readonly BudgetService $budget) {}
+    public function __construct(
+        private readonly BudgetService $budget,
+        private readonly AgriculturalBusinessCalendar $calendar,
+    ) {}
 
     /**
      * Return current operational summaries and period activity only for modules
@@ -278,9 +281,10 @@ class AgriculturalAnalyticsService
             ->whereIn('a.status', ['approved', 'completed'])->whereNotNull('a.approved_quantity')
             ->whereBetween('a.created_at', [$from->startOfDay(), $to->endOfDay()])
             ->groupBy('u.symbol')->orderBy('u.symbol')->get();
+        $businessDate = $this->calendar->today()->toDateString();
         $activePrograms = DB::table('assistance_programs')->where('status', 'open')
-            ->where(fn (Builder|EloquentBuilder $query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', today()))
-            ->where(fn (Builder|EloquentBuilder $query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', today()))->count();
+            ->where(fn (Builder|EloquentBuilder $query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', $businessDate))
+            ->where(fn (Builder|EloquentBuilder $query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', $businessDate))->count();
 
         return [
             'title' => 'Agricultural assistance',

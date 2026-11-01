@@ -4,9 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\AgriculturalAnnouncement;
 use App\Models\AssistanceApplication;
-use App\Models\EquipmentRequest;
 use App\Models\AssistanceProgram;
+use App\Models\EquipmentRequest;
 use App\Models\Farmer;
+use App\Services\AgriculturalBusinessCalendar;
 use App\Services\AssistanceProgramCatalogService;
 use App\Services\ProgramEligibilityService;
 use Illuminate\Http\RedirectResponse;
@@ -33,15 +34,17 @@ class FarmerExperienceController extends Controller
         ] + $catalogData);
     }
 
-    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility): View
+    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility, AgriculturalBusinessCalendar $calendar): View
     {
         $farmer = $this->farmer($request);
         abort_unless($program->status === 'open', 404);
+        $businessDate = $calendar->today();
 
         return view('farmer.program', [
             'farmer' => $farmer,
             'program' => $program->load('supplyItem'),
-            'eligibility' => $eligibility->check($program, $farmer->load('farms')),
+            'businessDate' => $businessDate,
+            'eligibility' => $eligibility->check($program, $farmer->load('farms'), $businessDate),
             'application' => AssistanceApplication::query()->where('farmer_id', $farmer->id)->where('program_id', $program->id)->first(),
         ]);
     }
