@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -48,12 +49,15 @@ class FarmerExperienceController extends Controller
             ->with('publishedRevision.media')
             ->latest('published_at')->first();
 
+        $program->load(['supplyItem', 'currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher']);
+
         return view('farmer.program', [
             'farmer' => $farmer,
-            'program' => $program->load('supplyItem'),
+            'program' => $program,
             'businessDate' => $businessDate,
             'eligibility' => $eligibility->check($program, $farmer->load('farms'), $businessDate),
             'application' => AssistanceApplication::query()->where('farmer_id', $farmer->id)->where('program_id', $program->id)->first(),
+            'submissionKey' => old('submission_key') ?: (string) Str::uuid(),
             'announcement' => $announcement,
             'publication' => $announcement ? $presenter->present($announcement, true) : null,
         ]);
@@ -68,6 +72,8 @@ class FarmerExperienceController extends Controller
             'farmer' => $farmer,
             'application' => $application->load([
                 'program.supplyItem',
+                'requirementVersion.documentRequirements',
+                'acknowledgment',
                 'approvedSupplyItem',
                 'history' => fn ($query) => $query->orderBy('created_at')->orderBy('id'),
                 'distributions.batch.item',

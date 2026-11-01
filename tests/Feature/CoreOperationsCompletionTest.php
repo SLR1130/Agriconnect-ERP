@@ -102,7 +102,7 @@ class CoreOperationsCompletionTest extends TestCase
             ->assertDontSee("@include('apms.farm-fields')", false);
     }
 
-    public function test_aasms_program_update_exposes_and_persists_eligibility_without_touching_applications(): void
+    public function test_aasms_program_update_saves_eligibility_as_a_draft_without_changing_effective_rules_or_applications(): void
     {
         $staff = $this->staff('aasms');
         $program = AssistanceProgram::create(['name' => 'Seed Support', 'category' => 'Seeds', 'status' => 'open', 'eligibility_rules' => ['requires_verified_farmer' => true, 'requires_farm' => false]]);
@@ -116,8 +116,11 @@ class CoreOperationsCompletionTest extends TestCase
 
         $updated = $program->fresh();
         $this->assertSame('Seed Support Updated', $updated->name);
-        $this->assertTrue(data_get($updated->eligibility_rules, 'requires_farm'));
-        $this->assertSame(['Poblacion', 'East Barangay'], data_get($updated->eligibility_rules, 'barangays'));
+        $this->assertFalse(data_get($updated->eligibility_rules, 'requires_farm'));
+        $this->assertSame([], data_get($updated->eligibility_rules, 'barangays', []));
+        $draft = $updated->draftRequirementVersion()->firstOrFail();
+        $this->assertTrue(data_get($draft->eligibility_rules, 'requires_farm'));
+        $this->assertSame(['Poblacion', 'East Barangay'], data_get($draft->eligibility_rules, 'barangays'));
         $this->assertDatabaseHas('assistance_applications', ['id' => $application->id, 'program_id' => $program->id, 'status' => 'submitted']);
     }
 

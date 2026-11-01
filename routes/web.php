@@ -5,6 +5,7 @@ use App\Http\Controllers\ABPMSController;
 use App\Http\Controllers\AEAMSController;
 use App\Http\Controllers\AISMSController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\ApplicationAcknowledgmentController;
 use App\Http\Controllers\APMSController;
 use App\Http\Controllers\Auth\AccountSetupController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -46,7 +47,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/admin/dashboard', [DashboardController::class, 'admin'])->name('admin.dashboard');
     Route::get('/mao/dashboard', [DashboardController::class, 'mao'])->name('mao.dashboard');
     Route::get('/overview', [DashboardController::class, 'overview'])->name('overview');
-    Route::post('/assistance/programs/{program}/apply', [AASMSController::class, 'apply'])->name('farmer.assistance.apply');
+    Route::post('/assistance/programs/{program}/apply', [AASMSController::class, 'apply'])->middleware('throttle:10,1')->name('farmer.assistance.apply');
     Route::post('/assistance/applications/{application}/resubmit', [AASMSController::class, 'resubmit'])->name('farmer.assistance.resubmit');
     Route::get('/farmer/assistance', [AASMSController::class, 'farmerPrograms'])->middleware('can:farmer-portal')->name('farmer.assistance');
 
@@ -57,6 +58,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/announcements/{announcement}', [AnnouncementController::class, 'farmerShow'])->name('farmer.announcements.show');
         Route::get('/programs/{program}', [FarmerExperienceController::class, 'program'])->name('farmer.programs.show');
         Route::get('/applications/{application}', [FarmerExperienceController::class, 'application'])->name('farmer.applications.show');
+        Route::get('/applications/{application}/acknowledgment', [ApplicationAcknowledgmentController::class, 'farmer'])->name('farmer.applications.acknowledgment');
         Route::get('/equipment-requests/{equipmentRequest}', [FarmerExperienceController::class, 'equipmentRequest'])->name('farmer.equipment-requests.show');
         Route::get('/farms', [FarmerPortalController::class, 'farms'])->name('farmer.farms');
         Route::get('/profile', [FarmerPortalController::class, 'profile'])->name('farmer.profile');
@@ -121,6 +123,9 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/aasms/programs', [AASMSController::class, 'storeProgram'])->name('modules.aasms.programs.store');
         Route::patch('/aasms/programs/{program}', [AASMSController::class, 'updateProgram'])->name('modules.aasms.programs.update');
         Route::post('/aasms/programs/{program}/toggle', [AASMSController::class, 'toggleProgram'])->name('modules.aasms.programs.toggle');
+        Route::post('/aasms/programs/{program}/requirements/{version}/publish', [AASMSController::class, 'publishRequirements'])->name('modules.aasms.requirements.publish');
+        Route::get('/aasms/applications/{application}', [AASMSController::class, 'showApplication'])->name('modules.aasms.applications.show');
+        Route::get('/aasms/applications/{application}/acknowledgment', [ApplicationAcknowledgmentController::class, 'staff'])->name('modules.aasms.applications.acknowledgment');
         Route::post('/aasms/applications/{application}/review', [AASMSController::class, 'review'])->name('modules.aasms.review');
         Route::post('/aasms/applications/{application}/distribute', [AASMSController::class, 'distribute'])->name('modules.aasms.distribute');
         Route::post('/aasms/programs/{program}/apply', [AASMSController::class, 'apply'])->name('modules.aasms.apply');

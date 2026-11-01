@@ -237,8 +237,8 @@ class IntegratedERPWorkflowTest extends TestCase
             ->post('/assistance/programs/'.$program->id.'/apply', [
                 'purpose' => 'Application submitted through the farmer assistance interface.',
             ])
-            ->assertRedirect(route('farmer.programs.show', $program))
-            ->assertSessionHas('status', 'Assistance application submitted.');
+            ->assertRedirect(route('farmer.applications.show', AssistanceApplication::query()->where('program_id', $program->id)->firstOrFail()))
+            ->assertSessionHas('status', 'Your application was received. Keep the reference shown below for tracking.');
 
         $this->assertDatabaseHas('assistance_applications', [
             'program_id' => $program->id,

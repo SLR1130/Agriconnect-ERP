@@ -700,3 +700,41 @@ document.addEventListener('DOMContentLoaded', () => {
         dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
     });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-requirement-editor]').forEach((editor) => {
+        const list = editor.querySelector('[data-requirement-list]');
+        const template = editor.querySelector('template[data-requirement-template]');
+        const empty = editor.querySelector('[data-requirement-empty]');
+        if (!list || !template) return;
+
+        const currentIndexes = [...editor.querySelectorAll('[name^="requirements["]')]
+            .map((field) => Number(field.name.match(/^requirements\[(\d+)\]/)?.[1]))
+            .filter(Number.isFinite);
+        let nextIndex = currentIndexes.length ? Math.max(...currentIndexes) + 1 : 0;
+        const syncEmpty = () => { if (empty) empty.hidden = list.children.length > 0; };
+
+        editor.addEventListener('click', (event) => {
+            const add = event.target.closest('[data-requirement-add]');
+            if (add) {
+                const container = document.createElement('div');
+                container.innerHTML = template.innerHTML.replaceAll('__INDEX__', String(nextIndex++));
+                const row = container.firstElementChild;
+                if (row) {
+                    list.append(row);
+                    syncEmpty();
+                    row.querySelector('input[name$="[display_name]"]')?.focus();
+                }
+                return;
+            }
+
+            const remove = event.target.closest('[data-requirement-remove]');
+            if (!remove) return;
+            remove.closest('[data-requirement-row]')?.remove();
+            syncEmpty();
+            editor.querySelector('[data-requirement-add]')?.focus();
+        });
+
+        syncEmpty();
+    });
+});

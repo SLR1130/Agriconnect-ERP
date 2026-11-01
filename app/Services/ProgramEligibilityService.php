@@ -14,7 +14,10 @@ class ProgramEligibilityService
 
     public function check(AssistanceProgram $program, Farmer $farmer, ?CarbonImmutable $businessDate = null): array
     {
-        $rules = $program->eligibility_rules ?: [];
+        $version = $program->relationLoaded('currentRequirementVersion')
+            ? $program->getRelation('currentRequirementVersion')
+            : $program->currentRequirementVersion()->first();
+        $rules = $version?->eligibility_rules ?? $program->eligibility_rules ?? [];
         $reasons = [];
         if (($rules['requires_verified_farmer'] ?? true) && ! $farmer->isVerified()) {
             $reasons[] = 'Farmer registration must be verified.';

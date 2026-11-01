@@ -94,7 +94,7 @@ class PublicAgriculturalServicesController extends Controller
     {
         abort_unless($program->status === 'open', 404);
         $businessDate = $calendar->today();
-        $program->load('supplyItem');
+        $program->load(['supplyItem', 'currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher']);
         $announcement = AgriculturalAnnouncement::query()->visibleToFarmers()
             ->where('assistance_program_id', $program->id)
             ->with(['publishedRevision.media'])

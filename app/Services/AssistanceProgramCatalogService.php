@@ -41,7 +41,7 @@ class AssistanceProgramCatalogService
                 ->orWhere('description', 'like', '%'.$search.'%')))
             ->when($category !== '', fn ($query) => $query->where('category', $category));
 
-        $programs = $programQuery->with('supplyItem')
+        $programs = $programQuery->with(['supplyItem', 'currentRequirementVersion.documentRequirements'])
             ->orderBy('closes_on')
             ->orderBy('name')
             ->paginate(9)

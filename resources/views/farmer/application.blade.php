@@ -1,4 +1,7 @@
 @php
+    $ackSnapshot = $application->acknowledgment?->snapshot ?? [];
+    $snapshotRules = data_get($ackSnapshot, 'eligibility.rules', $application->requirementVersion?->eligibility_rules ?? $application->program->eligibility_rules ?? []);
+    $snapshotSubmittedAt = $application->submitted_at?->timezone(config('agriculture.business_timezone'));
     $applicationEvents = $application->history->sortBy('created_at')->map(function ($entry) {
         $title = match (true) {
             is_null($entry->from_status) => 'Application submitted',
@@ -30,8 +33,9 @@
         service="Assistance and subsidies"
         :title="$application->program->name"
         :status="$application->status"
-        :submitted-at="$application->created_at"
-        :reference="'Application '.$application->id"
+        :submitted-at="$snapshotSubmittedAt ?? $application->created_at"
+        :date-label="$application->submitted_at ? 'Submitted' : 'Record created'"
+        :reference="$application->application_reference ?: 'Legacy record '.$application->id"
         :back-url="route('farmer.assistance').'#applications'"
         back-label="Back to my applications"
         icon="assistance"
@@ -43,10 +47,20 @@
         @endif
     </x-farmer.next-action>
 
+    @if(session('status'))<div class="farmer-message farmer-message-success" role="status">{{ session('status') }}</div>@endif
+
     <div class="farmer-tracking-layout">
         <div class="farmer-tracking-main">
             <section class="farmer-card">
                 <div class="farmer-section-heading"><div><h2>Application details</h2><p>Information submitted for this assistance program.</p></div></div>
+                @if($application->acknowledgment)
+                    <div class="farmer-application-ack-actions" aria-label="Application acknowledgment actions">
+                        <a class="farmer-button farmer-button-light" href="{{ route('farmer.applications.acknowledgment', $application) }}" target="_blank" rel="noopener">View / print acknowledgment</a>
+                        <a class="farmer-button" href="{{ route('farmer.applications.acknowledgment', ['application' => $application, 'download' => 1]) }}">Download acknowledgment</a>
+                    </div>
+                @else
+                    <p class="farmer-message farmer-message-warning">This legacy application predates acknowledgments. Its original reference and submission evidence were not recorded, so no receipt is being reconstructed.</p>
+                @endif
                 @if($application->purpose)<p class="farmer-tracking-purpose">{{ $application->purpose }}</p>@else<p class="text-sm text-slate-600">No additional purpose was provided.</p>@endif
                 @if($application->review_notes)<div class="farmer-message {{ $application->status === 'rejected' ? 'farmer-message-error' : 'farmer-message-warning' }} mt-4"><strong>MAO feedback:</strong> {{ $application->review_notes }}</div>@endif
                 @if($application->approved_quantity)<p class="mt-4 text-sm"><strong>Approved allocation:</strong> {{ $application->approved_quantity }} {{ $application->approvedSupplyItem?->name }}</p>@endif
@@ -59,11 +73,21 @@
                     @if($application->eligibility_notes)<p class="farmer-application-eligibility-note">{{ $application->eligibility_notes }}</p>@endif
                     <ul>
                         <li>Verified farmer registration</li>
-                        @if(data_get($application->program->eligibility_rules, 'requires_farm'))<li>Registered farm</li>@endif
-                        @if(data_get($application->program->eligibility_rules, 'barangays'))<li>Eligible barangays: {{ implode(', ', data_get($application->program->eligibility_rules, 'barangays')) }}</li>@endif
-                        @if(data_get($application->program->eligibility_rules, 'activities'))<li>Eligible activities: {{ implode(', ', data_get($application->program->eligibility_rules, 'activities')) }}</li>@endif
-                        @if(data_get($application->program->eligibility_rules, 'farm_categories'))<li>Eligible farm categories: {{ implode(', ', data_get($application->program->eligibility_rules, 'farm_categories')) }}</li>@endif
+                        @if(data_get($snapshotRules, 'requires_farm'))<li>Registered farm</li>@endif
+                        @if(data_get($snapshotRules, 'barangays'))<li>Eligible barangays: {{ implode(', ', data_get($snapshotRules, 'barangays')) }}</li>@endif
+                        @if(data_get($snapshotRules, 'activities'))<li>Eligible activities: {{ implode(', ', data_get($snapshotRules, 'activities')) }}</li>@endif
+                        @if(data_get($snapshotRules, 'farm_categories'))<li>Eligible farm categories: {{ implode(', ', data_get($snapshotRules, 'farm_categories')) }}</li>@endif
                     </ul>
+                    @if($application->requirementVersion)
+                        <p class="mt-3 text-xs text-slate-500">Requirements version {{ $application->requirementVersion->version_number }}@if($application->requirementVersion->source === 'legacy_snapshot') · legacy baseline; original publisher and publication date are unknown @endif</p>
+                        <h4 class="mt-4 font-semibold">Document requirements at submission</h4>
+                        @if(collect(data_get($ackSnapshot, 'requirements_version.documents', []))->isNotEmpty())
+                            <ul>@foreach(data_get($ackSnapshot, 'requirements_version.documents', []) as $requirement)<li>{{ $requirement['name'] }} · {{ $requirement['required'] ? 'Required' : 'Optional' }}</li>@endforeach</ul>
+                        @else
+                            <p>No digitized document checklist was recorded for this application version.</p>
+                        @endif
+                        <p class="mt-2 text-sm">Online document upload was not active when this application was submitted; the acknowledgment does not claim files were received.</p>
+                    @endif
                 </section>
 
                 @if($application->status === 'returned')

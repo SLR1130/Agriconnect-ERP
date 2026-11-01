@@ -114,8 +114,8 @@ class AgriculturalBusinessDateTest extends TestCase
         $this->actingAs($farmer['user'])
             ->from('/farmer/programs/'.$openingAndClosingToday->id)
             ->post(route('farmer.assistance.apply', $openingAndClosingToday), ['purpose' => 'Planting for the next season'])
-            ->assertRedirect('/farmer/programs/'.$openingAndClosingToday->id)
-            ->assertSessionHas('status', 'Assistance application submitted.');
+            ->assertRedirect(route('farmer.applications.show', AssistanceApplication::query()->where('program_id', $openingAndClosingToday->id)->firstOrFail()))
+            ->assertSessionHas('status', 'Your application was received. Keep the reference shown below for tracking.');
 
         $application = AssistanceApplication::query()->where('program_id', $openingAndClosingToday->id)->firstOrFail();
         $this->assertDatabaseHas('assistance_applications', [

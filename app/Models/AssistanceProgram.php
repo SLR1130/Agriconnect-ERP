@@ -27,6 +27,25 @@ class AssistanceProgram extends Model
         return $this->hasMany(AgriculturalAnnouncement::class, 'assistance_program_id');
     }
 
+    public function requirementVersions(): HasMany
+    {
+        return $this->hasMany(AssistanceProgramRequirementVersion::class, 'program_id');
+    }
+
+    public function currentRequirementVersion()
+    {
+        return $this->hasOne(AssistanceProgramRequirementVersion::class, 'program_id')
+            ->whereIn('status', ['published', 'legacy'])
+            ->orderByDesc('version_number');
+    }
+
+    public function draftRequirementVersion()
+    {
+        return $this->hasOne(AssistanceProgramRequirementVersion::class, 'program_id')
+            ->where('status', 'draft')
+            ->orderByDesc('version_number');
+    }
+
     public function availabilityStateOn(CarbonImmutable $businessDate): string
     {
         if ($this->status !== 'open') {
@@ -45,8 +64,11 @@ class AssistanceProgram extends Model
     public function isAvailableOn(CarbonImmutable $businessDate): bool
     {
         $date = $businessDate->toDateString();
-        $opensOn = $this->opens_on?->toDateString();
-        $closesOn = $this->closes_on?->toDateString();
+        $version = $this->relationLoaded('currentRequirementVersion')
+            ? $this->getRelation('currentRequirementVersion')
+            : $this->currentRequirementVersion()->first();
+        $opensOn = ($version?->opens_on ?? $this->opens_on)?->toDateString();
+        $closesOn = ($version?->closes_on ?? $this->closes_on)?->toDateString();
 
         return $this->status === 'open'
             && (! $opensOn || $opensOn <= $date)

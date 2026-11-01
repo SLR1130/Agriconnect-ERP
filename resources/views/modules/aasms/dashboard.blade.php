@@ -19,6 +19,9 @@
         .aas-stat{padding:1rem 1.1rem}.aas-stat p{margin:0;color:#718177;font-size:.65rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.aas-stat strong{display:block;margin-top:.35rem;color:#153d2b;font-size:1.55rem;line-height:1.2}.aas-stat p[data-aasms-stat]{margin-top:.5rem;font-size:1.875rem;font-weight:700;letter-spacing:normal;line-height:1.2;text-transform:none}
         .aas-disclosure{padding:.7rem;background:#f8faf7;border:1px solid #dfe9e1;border-radius:.75rem}.aas-disclosure>summary{list-style:none;cursor:pointer;color:#1c6a46;font-size:.72rem;font-weight:800}.aas-disclosure>summary::-webkit-details-marker{display:none}.aas-disclosure>summary:focus-visible{outline:3px solid #26865c88;outline-offset:2px}
         .aas-inline-label{display:block;margin-bottom:.3rem;color:#53645a;font-size:.67rem;font-weight:750}
+        .aas-requirement-row{border:1px solid #dfe9e1;border-radius:12px;background:#fff;padding:1rem}
+        .aas-requirement-row:focus-within{border-color:#26865c;box-shadow:0 0 0 3px #26865c20}
+        .aas-requirement-row legend{padding:0}
         @media(max-width:640px){.aas-stat{padding:.8rem}.aas-stat strong{font-size:1.3rem}.aas-table{min-width:720px}}
     </style>
 
@@ -70,6 +73,7 @@
                             <div><label class="aas-inline-label" for="aasms-create-categories">Farm categories</label><input id="aasms-create-categories" class="aas-input" name="farm_categories" value="{{ old('_aasms_form') === 'create-program' ? old('farm_categories') : '' }}" placeholder="Comma separated"></div>
                             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="requires_farm" value="1" @checked(old('_aasms_form') === 'create-program' && old('requires_farm'))> Require a registered farm</label>
                             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="previous_beneficiary_restricted" value="1" @checked(old('_aasms_form') === 'create-program' && old('previous_beneficiary_restricted'))> Restrict previous beneficiaries</label>
+                            @include('modules.aasms.partials.requirement-editor', ['formKey' => 'create-program', 'requirementItems' => []])
                             <button class="aas-btn aas-primary sm:col-span-2 xl:col-span-3" type="submit">Save private program</button>
                         </form>
                     </details>
@@ -82,12 +86,18 @@
                     @forelse($programs as $program)
                         @php($programEditorOpen = old('_aasms_program_id') == $program->id)
                         <tr>
-                            <td><strong class="text-forest-green">{{ $program->name }}</strong><div class="mt-1 text-xs text-gray-500">{{ $program->category ?: 'General assistance' }}</div><div class="mt-1 max-w-sm text-xs text-gray-500">{{ $program->description ?: 'No description' }}</div>@if($program->status === 'open')<a class="mt-1 inline-flex text-xs font-bold text-emerald-700 underline" href="{{ route('public.agricultural-programs.show', $program) }}" target="_blank" rel="noopener">View public program</a>@endif</td>
+                            <td><strong class="text-forest-green">{{ $program->name }}</strong><div class="mt-1 text-xs text-gray-500">{{ $program->category ?: 'General assistance' }}</div><div class="mt-1 max-w-sm text-xs text-gray-500">{{ $program->description ?: 'No description' }}</div>
+                                @if($program->currentRequirementVersion)<div class="mt-2 text-xs text-gray-600">Requirements v{{ $program->currentRequirementVersion->version_number }} · {{ $program->currentRequirementVersion->source === 'legacy_snapshot' ? 'legacy baseline; original publisher/date unknown' : ($program->currentRequirementVersion->publisher?->name ?: 'publisher not recorded') }}@if($program->currentRequirementVersion->published_at) · {{ $program->currentRequirementVersion->published_at->timezone(config('agriculture.business_timezone'))->format('M d, Y') }}@endif</div>@endif
+                                @if($program->draftRequirementVersion)<span class="aas-status aas-pending mt-2">Draft v{{ $program->draftRequirementVersion->version_number }} · not effective</span>@endif
+                                @if($program->status === 'open')<a class="mt-1 inline-flex text-xs font-bold text-emerald-700 underline" href="{{ route('public.agricultural-programs.show', $program) }}" target="_blank" rel="noopener">View public program</a>@endif</td>
                             <td>{{ $program->opens_on?->format('M d, Y') ?: 'No start date' }}<div class="text-xs text-gray-500">through {{ $program->closes_on?->format('M d, Y') ?: 'No closing date' }}</div></td>
                             <td>{{ $program->supplyItem?->name ?: 'Assigned during review' }}<div class="mt-1 text-xs text-gray-500">{{ data_get($program->eligibility_rules, 'requires_farm') ? 'Farm required' : 'Farm optional' }} · {{ implode(', ', data_get($program->eligibility_rules, 'barangays', [])) ?: 'All barangays' }}</div></td>
                             <td><span class="aas-status {{ $program->status === 'open' ? 'aas-open' : 'aas-closed' }}">{{ $program->status === 'open' ? 'Published' : 'Private' }}</span><div class="mt-1 text-xs text-gray-500">{{ ['available' => 'Accepting applications', 'upcoming' => 'Application period upcoming', 'ended' => 'Applications ended', 'unpublished' => 'Hidden from public'][$program->availabilityStateOn($businessDate)] }}</div></td>
                             <td><div class="min-w-[12rem] space-y-2">
                                 @if($canPublish)
+                                    @if($program->draftRequirementVersion)
+                                        <form method="POST" action="{{ route('modules.aasms.requirements.publish', [$program, $program->draftRequirementVersion]) }}" data-confirm-submit="Publish requirements version {{ $program->draftRequirementVersion->version_number }}? New applications will use it; existing applications will retain their version.">@csrf<input type="hidden" name="_aasms_workspace" value="programs"><button class="aas-btn aas-gold w-full" type="submit">Publish requirements v{{ $program->draftRequirementVersion->version_number }}</button></form>
+                                    @endif
                                     <form method="POST" action="{{ route('modules.aasms.programs.toggle', $program) }}" data-confirm-submit="{{ $program->status === 'open' ? 'Hide' : 'Publish' }} this assistance program?">@csrf<input type="hidden" name="_aasms_workspace" value="programs"><button class="aas-btn aas-sage w-full" type="submit">{{ $program->status === 'open' ? 'Hide from public' : 'Publish for public' }}</button></form>
                                 @endif
                                 @if($canUpdate)
@@ -105,6 +115,8 @@
                                             <label class="aas-inline-label">Farm categories<input class="aas-input mt-1" name="farm_categories" value="{{ implode(', ', data_get($program->eligibility_rules, 'farm_categories', [])) }}"></label>
                                             <label class="flex items-center gap-2 text-xs"><input type="checkbox" name="requires_farm" value="1" @checked(data_get($program->eligibility_rules, 'requires_farm'))> Require a farm</label>
                                             <label class="flex items-center gap-2 text-xs"><input type="checkbox" name="previous_beneficiary_restricted" value="1" @checked(data_get($program->eligibility_rules, 'previous_beneficiary_restricted'))> Restrict previous beneficiaries</label>
+                                            @php($requirementsVersionForEditor = $program->draftRequirementVersion ?: $program->currentRequirementVersion)
+                                            @include('modules.aasms.partials.requirement-editor', ['formKey' => 'edit-program', 'programId' => $program->id, 'requirementItems' => $requirementsVersionForEditor?->documentRequirements ?? []])
                                             <button class="aas-btn aas-primary" type="submit">Save program</button>
                                         </form>
                                     </details>
@@ -127,11 +139,12 @@
                 <div class="aas-table-wrap mt-4"><table class="aas-table"><thead><tr><th>Application</th><th>Farmer</th><th>Eligibility</th><th>Status</th><th>Actions</th></tr></thead><tbody>
                     @forelse($applications as $application)
                         <tr>
-                            <td><strong class="text-forest-green">#{{ $application->id }} · {{ $application->program->name }}</strong><div class="mt-1 max-w-xs text-xs text-gray-500">{{ $application->purpose ?: 'No stated purpose' }}</div></td>
+                            <td><strong class="text-forest-green">{{ $application->application_reference ?: 'Legacy record #'.$application->id }}</strong><div class="mt-1 max-w-xs text-xs text-gray-700">{{ $application->program->name }}</div><div class="mt-1 max-w-xs text-xs text-gray-500">@if($application->submitted_at){{ $application->submitted_at->timezone(config('agriculture.business_timezone'))->format('M d, Y · h:i A') }} Manila time @else Historical submission time not separately recorded @endif</div><div class="mt-1 text-xs text-gray-500">{{ $application->requirementVersion ? 'Requirements v'.$application->requirementVersion->version_number : 'Legacy requirements evidence unavailable' }}</div></td>
                             <td>{{ $application->farmer->user->name }}<div class="text-xs text-gray-500">{{ $application->farmer->farmer_code }} · {{ $application->farmer->barangay ?: 'No barangay' }}</div></td>
                             <td><span class="aas-status {{ $application->eligibility_passed ? 'aas-open' : 'aas-pending' }}">{{ $application->eligibility_passed ? 'Passed' : 'Needs review' }}</span></td>
                             <td><span class="aas-status {{ match($application->status) { 'submitted' => 'aas-pending', 'rejected' => 'aas-rejected', 'returned' => 'aas-returned', 'completed' => 'aas-completed', default => 'aas-approved' } }}">{{ ucfirst($application->status) }}</span></td>
                             <td>
+                                <div class="mb-2 flex flex-wrap gap-2"><a class="aas-btn aas-sage" href="{{ route('modules.aasms.applications.show', $application) }}">View details</a>@if($application->acknowledgment)<a class="aas-btn aas-sage" href="{{ route('modules.aasms.applications.acknowledgment', $application) }}" target="_blank" rel="noopener">Acknowledgment</a>@endif</div>
                                 <details class="aas-disclosure" @if(old('_aasms_application_id') == $application->id) open @endif><summary>Review &amp; distribution</summary>
                                     <div class="mt-3 space-y-3">
                                         @if(in_array($application->status, ['submitted','returned'], true) && ($canReview || $canApprove || $canReject))

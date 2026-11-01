@@ -6,11 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class AssistanceApplication extends Model
 {
-    protected $fillable = ['program_id','farmer_id','purpose','eligibility_passed','eligibility_notes','status','reviewed_by','review_notes','approved_quantity','approved_supply_item_id','allocation_confirmed_at'];
-    protected $casts = ['approved_quantity'=>'decimal:2','eligibility_passed'=>'boolean','allocation_confirmed_at'=>'datetime'];
+    protected $fillable = ['program_id','farmer_id','purpose','eligibility_passed','eligibility_notes','status','reviewed_by','review_notes','approved_quantity','approved_supply_item_id','allocation_confirmed_at','application_reference','submission_key','requirement_version_id','submitted_at','submitted_business_date','submission_channel'];
+    protected $casts = ['approved_quantity'=>'decimal:2','eligibility_passed'=>'boolean','allocation_confirmed_at'=>'datetime','submitted_at'=>'immutable_datetime','submitted_business_date'=>'immutable_date'];
     public function program(){ return $this->belongsTo(AssistanceProgram::class, 'program_id'); }
     public function farmer(){ return $this->belongsTo(Farmer::class); }
     public function distributions(){ return $this->hasMany(AssistanceDistribution::class, 'application_id'); }
     public function history(){ return $this->hasMany(AssistanceStatusHistory::class, 'application_id'); }
     public function approvedSupplyItem(){ return $this->belongsTo(SupplyItem::class, 'approved_supply_item_id'); }
+    public function requirementVersion(){ return $this->belongsTo(AssistanceProgramRequirementVersion::class, 'requirement_version_id'); }
+    public function acknowledgment(){ return $this->hasOne(AssistanceApplicationAcknowledgment::class, 'application_id'); }
 }

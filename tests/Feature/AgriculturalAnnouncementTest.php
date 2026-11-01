@@ -74,6 +74,8 @@ class AgriculturalAnnouncementTest extends TestCase
         $program = AssistanceProgram::firstOrFail();
         $this->assertSame('closed', $program->status);
         $this->actingAs($farmer)->get('/farmer/services')->assertOk()->assertDontSee('Private Rice Program');
+        $draft = $program->draftRequirementVersion()->firstOrFail();
+        $this->actingAs($staff)->post(route('modules.aasms.requirements.publish', [$program, $draft]))->assertRedirect();
         $this->actingAs($staff)->post('/modules/aasms/programs/'.$program->id.'/toggle')->assertRedirect();
         $this->actingAs($farmer)->get('/farmer/services')->assertOk()->assertSee('Private Rice Program');
     }

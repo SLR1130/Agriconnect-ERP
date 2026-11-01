@@ -25,7 +25,7 @@
                     <div class="farmer-application-main">
                         <span class="farmer-service-kicker">{{ $application->program->category ?: 'Agricultural assistance' }}</span>
                         <h3>{{ $application->program->name }}</h3>
-                        <p>Submitted {{ $application->created_at?->format('M d, Y') }}@if($application->distributions->isNotEmpty()) · {{ $application->distributions->count() }} {{ \Illuminate\Support\Str::plural('distribution', $application->distributions->count()) }} recorded @endif</p>
+                        <p>@if($application->application_reference)<strong>Reference {{ $application->application_reference }}</strong> · @endif{{ $application->submitted_at ? 'Submitted '.$application->submitted_at->timezone(config('agriculture.business_timezone'))->format('M d, Y') : 'Historical submission date not separately recorded' }}@if($application->distributions->isNotEmpty()) · {{ $application->distributions->count() }} {{ \Illuminate\Support\Str::plural('distribution', $application->distributions->count()) }} recorded @endif</p>
                         @if($application->review_notes)<p class="farmer-review-note"><strong>MAO feedback:</strong> {{ $application->review_notes }}</p>@endif
                         @foreach($application->distributions as $distribution)
                             <p class="farmer-distribution-line"><x-ui.icon name="success" size="sm" />{{ $distribution->batch->item->name }} · {{ $distribution->quantity }} · Ref {{ $distribution->reference }}</p>
@@ -34,6 +34,7 @@
                     <div class="farmer-application-actions">
                         <span class="farmer-pill {{ $application->status === 'rejected' ? 'farmer-pill-bad' : (in_array($application->status, ['returned', 'pending'], true) ? 'farmer-pill-warn' : '') }}">{{ ucfirst($application->status) }}</span>
                         <a class="farmer-button farmer-button-light" href="{{ route('farmer.applications.show', $application) }}">View status and history <x-ui.icon name="next" size="sm" /></a>
+                        @if($application->acknowledgment)<a class="farmer-text-link" href="{{ route('farmer.applications.acknowledgment', $application) }}">Open acknowledgment</a>@endif
                     </div>
                 </article>
             @empty

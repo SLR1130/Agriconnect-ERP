@@ -43,6 +43,24 @@
                         @if(data_get($program->eligibility_rules, 'previous_beneficiary_restricted'))<li>Farmers who previously completed this program cannot apply again.</li>@endif
                     </ul>
                 </div>
+                <div class="farmer-requirements-panel mt-4" aria-labelledby="program-documents-title">
+                    <h2 id="program-documents-title">Program document checklist</h2>
+                    @if($program->currentRequirementVersion?->documentRequirements?->isNotEmpty())
+                        <ul>
+                            @foreach($program->currentRequirementVersion->documentRequirements as $requirement)
+                                <li><strong>{{ $requirement->display_name }}</strong> — {{ $requirement->is_required ? 'Required' : 'Optional' }}
+                                    @if($requirement->description)<span>: {{ $requirement->description }}</span>@endif
+                                    @if($requirement->instructions)<span> {{ $requirement->instructions }}</span>@endif
+                                    <small class="block">Accepted types: {{ collect($requirement->accepted_mime_types)->map(fn ($mime) => match ($mime) { 'application/pdf' => 'PDF', 'image/jpeg' => 'JPEG', 'image/png' => 'PNG', default => $mime })->join(', ') }} · Maximum {{ number_format($requirement->max_size_bytes / 1048576, 1) }} MiB</small>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p>No digitized supporting-document checklist is on file for this program. Follow the published MAO notice or contact the office for current instructions.</p>
+                    @endif
+                    <p class="mt-3 text-sm">Online document upload is not available yet. Do not submit files through this page; the MAO may provide instructions for physical document submission.</p>
+                    @if($program->currentRequirementVersion)<p class="mt-2 text-xs text-slate-500">Requirements version {{ $program->currentRequirementVersion->version_number }}@if($program->currentRequirementVersion->published_at) · published {{ $program->currentRequirementVersion->published_at->timezone(config('agriculture.business_timezone'))->format('M d, Y') }}@endif</p>@endif
+                </div>
             </section>
 
             <div class="farmer-journey-strip" aria-label="Assistance application steps">
@@ -76,13 +94,15 @@
                 @endif
             @else
                 <p>Review the details above. You can send one application while the program is open and your profile meets the listed checks.</p>
+                <div class="farmer-requirements-panel my-4"><strong>Applying as:</strong> {{ $farmer->user->name }} · {{ $farmer->farmer_code }} · {{ $farmer->barangay }}. These details come from your FFRMS record.</div>
                 <form method="POST" action="{{ route('farmer.assistance.apply', $program) }}" class="farmer-program-apply-form">
-                    @csrf
+                    @csrf<input type="hidden" name="submission_key" value="{{ $submissionKey }}">
                     <div class="farmer-field">
                         <label for="application-purpose">How will this support your farm? <span class="font-normal">(optional)</span></label>
                         <textarea id="application-purpose" name="purpose" maxlength="2000" rows="4">{{ old('purpose') }}</textarea>
                         <small>Do not include sensitive personal information. The MAO will review this note with your application.</small>
                     </div>
+                    <p class="mb-3 text-xs text-slate-600">Submitting records receipt of your application. It does not guarantee approval or entitlement to assistance.</p>
                     <button class="farmer-button farmer-button-gold" type="submit">Submit application <x-ui.icon name="next" size="sm" /></button>
                 </form>
             @endif
