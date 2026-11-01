@@ -226,6 +226,8 @@ class FarmerProductionSubmissionTest extends TestCase
             ->assertOk()
             ->assertSee('Production review queue')
             ->assertSee('Owner farm')
+            ->assertSee('Queue test rice')
+            ->assertSee('Submission #'.$submission->id)
             ->assertSee('Pending')
             ->assertSee(e($detail), false)
             ->assertSee('Review submission');

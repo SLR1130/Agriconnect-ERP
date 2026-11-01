@@ -28,6 +28,10 @@ class APMSController extends Controller
             : null;
         $recordSearch = trim($request->string('record_search')->toString());
         $seasonSearch = trim($request->string('season_search')->toString());
+        $monitoringTypeOptions = FarmMonitoringRecord::query()
+            ->whereNotNull('monitoring_type')->where('monitoring_type', '<>', '')
+            ->distinct()->orderBy('monitoring_type')->pluck('monitoring_type')
+            ->prepend('field_visit')->unique()->values();
         $farms = Farm::query()->whereHas('farmer', fn ($query) => $query->where('registration_status', 'verified'))
             ->with('farmer.user')->orderBy('name')->get();
         $seasons = AgriculturalSeason::query()->orderByDesc('starts_on')->get();
@@ -115,6 +119,7 @@ class APMSController extends Controller
         return view('apms.index', [
             'farms' => $farms,
             'seasons' => $seasons,
+            'monitoringTypeOptions' => $monitoringTypeOptions,
             'crops' => $crops,
             'livestock' => $livestock,
             'fisheries' => $fisheries,
@@ -146,7 +151,12 @@ class APMSController extends Controller
     public function season(Request $request): RedirectResponse
     {
         $this->authorizeModule($request, 'create');
-        $data = $request->validate(['name' => ['required', 'string', 'max:150'], 'starts_on' => ['required', 'date'], 'ends_on' => ['required', 'date', 'after_or_equal:starts_on']]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'status' => ['sometimes', 'required', Rule::in(['active', 'open', 'closed'])],
+        ]);
         $season = AgriculturalSeason::create($data);
         ActivityLog::log('created', 'Agricultural season created.', 'season:'.$season->id, $request->user()->id, 'apms');
 
@@ -156,7 +166,12 @@ class APMSController extends Controller
     public function updateSeason(Request $request, AgriculturalSeason $season): RedirectResponse
     {
         $this->authorizeModule($request, 'update');
-        $data = $request->validate(['name' => ['required', 'string', 'max:150'], 'starts_on' => ['required', 'date'], 'ends_on' => ['required', 'date', 'after_or_equal:starts_on'], 'status' => ['required', Rule::in(['open', 'closed'])]]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'status' => ['required', Rule::in(['active', 'open', 'closed'])],
+        ]);
         $old = $season->only(array_keys($data));
         $season->update($data);
         ActivityLog::log('updated', 'Agricultural season updated.', 'season:'.$season->id, $request->user()->id, 'apms', $old, $season->fresh()->only(array_keys($data)));

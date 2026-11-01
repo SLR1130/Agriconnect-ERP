@@ -34,4 +34,19 @@ class ProductionSubmission extends Model
     {
         return $this->hasMany(ProductionSubmissionHistory::class);
     }
+
+    public function summary(): ?string
+    {
+        $payload = $this->payload ?? [];
+
+        $summary = match ($this->category) {
+            'crop' => data_get($payload, 'crop_type'),
+            'livestock' => data_get($payload, 'animal_type'),
+            'fishery' => collect([data_get($payload, 'species'), data_get($payload, 'fishery_type')])
+                ->filter(fn ($value): bool => filled($value))->unique()->implode(' / '),
+            default => null,
+        };
+
+        return filled($summary) ? (string) $summary : null;
+    }
 }

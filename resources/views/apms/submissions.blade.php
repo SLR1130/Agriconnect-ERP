@@ -29,12 +29,12 @@
 
             <div class="apms-submission-table-wrap">
                 <table class="apms-submission-table">
-                    <thead><tr><th scope="col">Farmer and farm</th><th scope="col">Production type</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+                    <thead><tr><th scope="col">Farmer and farm</th><th scope="col">Production type and details</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
                     <tbody>
                         @forelse($submissions as $submission)
                             <tr>
                                 <td><strong>{{ $submission->farmer->user->name }}</strong><span>{{ $submission->farm->name }} · {{ $submission->farm->barangay ?: 'Barangay not recorded' }}</span></td>
-                                <td><span class="apms-submission-type"><x-ui.icon name="{{ $submission->category === 'crop' ? 'crop' : ($submission->category === 'fishery' ? 'fish' : 'farms') }}" size="sm" />{{ ucfirst($submission->category) }}</span></td>
+                                <td><div class="apms-submission-identification"><span class="apms-submission-type"><x-ui.icon name="{{ $submission->category === 'crop' ? 'crop' : ($submission->category === 'fishery' ? 'fish' : 'farms') }}" size="sm" />{{ ucfirst($submission->category) }}</span>@if($submission->summary())<strong>{{ ucfirst(str_replace('_', ' ', $submission->summary())) }}</strong>@endif<small>Submission #{{ $submission->id }}</small></div></td>
                                 <td><time datetime="{{ $submission->created_at?->toIso8601String() }}">{{ $submission->created_at?->format('M j, Y') }}<span>{{ $submission->created_at?->format('g:i A') }}</span></time></td>
                                 <td><span class="erp-pill {{ $submission->status === 'approved' ? 'erp-pill-success' : (in_array($submission->status, ['returned', 'rejected'], true) ? 'erp-pill-warning' : 'erp-pill-neutral') }}">{{ ucfirst($submission->status) }}</span></td>
                                 <td><a class="erp-button erp-button-secondary apms-submission-view" href="{{ route('modules.apms.submissions.show', array_filter(['submission' => $submission, 'status' => $status, 'search' => $search], fn ($value) => $value !== '')) }}">{{ $canReview && $submission->status === 'pending' ? 'Review' : 'View' }}<x-ui.icon name="next" size="xs" /></a></td>
@@ -50,6 +50,8 @@
                 @forelse($submissions as $submission)
                     <article class="apms-submission-card">
                         <div class="apms-submission-card-top"><span class="apms-submission-type"><x-ui.icon name="{{ $submission->category === 'crop' ? 'crop' : ($submission->category === 'fishery' ? 'fish' : 'farms') }}" size="sm" />{{ ucfirst($submission->category) }}</span><span class="erp-pill {{ $submission->status === 'approved' ? 'erp-pill-success' : (in_array($submission->status, ['returned', 'rejected'], true) ? 'erp-pill-warning' : 'erp-pill-neutral') }}">{{ ucfirst($submission->status) }}</span></div>
+                        @if($submission->summary())<p class="apms-submission-card-summary">{{ ucfirst(str_replace('_', ' ', $submission->summary())) }}</p>@endif
+                        <small class="apms-submission-card-reference">Submission #{{ $submission->id }}</small>
                         <h3>{{ $submission->farmer->user->name }}</h3><p class="apms-submission-card-farm">{{ $submission->farm->name }} · {{ $submission->farm->barangay ?: 'Barangay not recorded' }}</p>
                         <time datetime="{{ $submission->created_at?->toIso8601String() }}">Submitted {{ $submission->created_at?->format('M j, Y g:i A') }}</time>
                         <a class="erp-button erp-button-secondary" href="{{ route('modules.apms.submissions.show', array_filter(['submission' => $submission, 'status' => $status, 'search' => $search], fn ($value) => $value !== '')) }}">{{ $canReview && $submission->status === 'pending' ? 'Review submission' : 'View submission' }}<x-ui.icon name="next" size="xs" /></a>

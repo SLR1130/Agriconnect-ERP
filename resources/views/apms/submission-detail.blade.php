@@ -27,7 +27,7 @@
                     <dl class="apms-submission-payload-grid">
                         @foreach($submission->payload ?? [] as $key => $value)
                             @if($value !== null && $value !== '')
-                                @php($displayValue = is_array($value) ? implode(', ', array_map(fn ($item) => is_scalar($item) ? (string) $item : json_encode($item), $value)) : (is_bool($value) ? ($value ? 'Yes' : 'No') : $value))
+                                @php($displayValue = is_array($value) ? implode(', ', array_map(fn ($item) => is_string($item) && str_contains($item, '_') ? ucfirst(str_replace('_', ' ', $item)) : (is_scalar($item) ? (string) $item : json_encode($item)), $value)) : (is_bool($value) ? ($value ? 'Yes' : 'No') : (is_string($value) && str_contains($value, '_') ? ucfirst(str_replace('_', ' ', $value)) : $value)))
                                 <div><dt>{{ \Illuminate\Support\Str::headline((string) $key) }}</dt><dd>{{ $displayValue }}</dd></div>
                             @endif
                         @endforeach

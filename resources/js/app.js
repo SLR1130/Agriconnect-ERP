@@ -336,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const editorDialog = document.getElementById('apms-editor-dialog');
         const editorContent = document.getElementById('apms-editor-content');
         const editorTitle = document.getElementById('apms-editor-title');
+        let editorTrigger = null;
 
         const filterFarmOptions = (form, selectedFarmerId, selectedFarmId = null) => {
             const farmSelect = form.querySelector('[data-apms-farm-select]');
@@ -354,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const openEditor = (trigger, preserveOldInput = false) => {
             if (!editorDialog || !editorContent) return;
+            editorTrigger = trigger;
             const type = trigger.dataset.apmsOpenEditor;
             const template = document.getElementById(`apms-form-${type}`);
             if (!template) return;
@@ -378,6 +380,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 Object.entries(values).forEach(([name, value]) => {
                     const field = form.elements.namedItem(name);
                     if (field && value !== null && value !== undefined) field.value = value;
+                });
+            }
+
+            const monitoringTypeChoice = form.querySelector('[data-apms-monitoring-type-choice]');
+            const monitoringTypeValue = form.querySelector('[data-apms-monitoring-type-value]');
+            const monitoringTypeCustom = form.querySelector('[data-apms-monitoring-custom]');
+            const monitoringTypeCustomInput = form.querySelector('[data-apms-monitoring-type-custom]');
+            if (monitoringTypeChoice && monitoringTypeValue && monitoringTypeCustom && monitoringTypeCustomInput) {
+                const isKnownType = [...monitoringTypeChoice.options].some((option) => option.value === monitoringTypeValue.value);
+                monitoringTypeChoice.value = isKnownType ? monitoringTypeValue.value : '__custom__';
+                monitoringTypeCustom.hidden = isKnownType;
+                monitoringTypeCustomInput.required = !isKnownType;
+                monitoringTypeCustomInput.value = isKnownType ? '' : monitoringTypeValue.value;
+
+                monitoringTypeChoice.addEventListener('change', () => {
+                    const custom = monitoringTypeChoice.value === '__custom__';
+                    monitoringTypeCustom.hidden = !custom;
+                    monitoringTypeCustomInput.required = custom;
+                    monitoringTypeValue.value = custom ? monitoringTypeCustomInput.value : monitoringTypeChoice.value;
+                    if (custom) monitoringTypeCustomInput.focus();
+                });
+                monitoringTypeCustomInput.addEventListener('input', () => {
+                    monitoringTypeValue.value = monitoringTypeCustomInput.value;
                 });
             }
 
@@ -407,6 +432,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!editorDialog.open) editorDialog.showModal();
             requestAnimationFrame(() => form.querySelector('input:not([type="hidden"]), select, textarea')?.focus());
         };
+
+        editorDialog?.addEventListener('close', () => {
+            if (editorTrigger?.isConnected) editorTrigger.focus();
+            editorTrigger = null;
+        });
 
         workspace.addEventListener('click', (event) => {
             const trigger = event.target.closest('[data-apms-open-editor]');

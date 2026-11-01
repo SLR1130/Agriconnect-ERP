@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AgriculturalSeason;
 use App\Models\CropProductionRecord;
 use App\Models\Farm;
 use App\Models\Farmer;
@@ -85,6 +86,9 @@ class APMSProductionTest extends TestCase
             ->assertSee('Cattle')
             ->assertSee('Tilapia')
             ->assertSee('Pest report')
+            ->assertSee('Field visit')
+            ->assertSee('data-apms-monitoring-type-choice', false)
+            ->assertSee('name="monitoring_type"', false)
             ->assertSee('Field visit');
     }
 
@@ -354,6 +358,44 @@ class APMSProductionTest extends TestCase
             ->assertSee('data-error-form="crop"', false)
             ->assertSee('The farmer id field is required.')
             ->assertSee('The crop type field is required.');
+    }
+
+    public function test_existing_active_season_edit_form_preserves_and_persists_its_status(): void
+    {
+        $role = Role::create([
+            'name' => 'APMS Season Editor',
+            'slug' => 'apms_season_editor',
+            'permissions' => ['modules.apms.*'],
+            'is_active' => true,
+        ]);
+        $staff = User::factory()->create();
+        $staff->roles()->attach($role);
+        $season = AgriculturalSeason::create([
+            'name' => 'Active Season Regression',
+            'starts_on' => '2026-06-01',
+            'ends_on' => '2026-11-30',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($staff)->get('/modules/apms?tab=seasons')
+            ->assertOk()
+            ->assertSee('data-apms-record-id="'.$season->id.'"', false)
+            ->assertSee('&quot;status&quot;:&quot;active&quot;', false)
+            ->assertSee('<option value="active"', false)
+            ->assertSee('>Active</option>', false);
+
+        $this->actingAs($staff)->patch('/modules/apms/seasons/'.$season->id.'?tab=seasons', [
+            'name' => 'Edited Active Season Regression',
+            'starts_on' => '2026-06-01',
+            'ends_on' => '2026-11-30',
+            'status' => 'active',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('agricultural_seasons', [
+            'id' => $season->id,
+            'name' => 'Edited Active Season Regression',
+            'status' => 'active',
+        ]);
     }
 
     private function cropPanel(string $html): string
