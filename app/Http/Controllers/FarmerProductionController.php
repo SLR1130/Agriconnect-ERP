@@ -52,7 +52,7 @@ class FarmerProductionController extends Controller
 
         return view('farmer.production-submission', [
             'farmer' => $farmer->load('farms'),
-            'submission' => $submission->load(['farm', 'history.actor']),
+            'submission' => $submission->load(['farm', 'history' => fn ($query) => $query->with('actor')->orderBy('created_at')->orderBy('id')]),
             'seasons' => AgriculturalSeason::query()->where('status', 'open')->orderByDesc('starts_on')->get(),
         ]);
     }

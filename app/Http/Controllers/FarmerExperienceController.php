@@ -9,10 +9,10 @@ use App\Models\EquipmentRequest;
 use App\Models\Farmer;
 use App\Services\AgriculturalBusinessCalendar;
 use App\Services\AssistanceProgramCatalogService;
+use App\Services\FarmerActivityFeedService;
 use App\Services\ProgramEligibilityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -56,7 +56,12 @@ class FarmerExperienceController extends Controller
 
         return view('farmer.application', [
             'farmer' => $farmer,
-            'application' => $application->load(['program.supplyItem', 'approvedSupplyItem', 'history', 'distributions.batch.item']),
+            'application' => $application->load([
+                'program.supplyItem',
+                'approvedSupplyItem',
+                'history' => fn ($query) => $query->orderBy('created_at')->orderBy('id'),
+                'distributions.batch.item',
+            ]),
         ]);
     }
 
@@ -67,89 +72,37 @@ class FarmerExperienceController extends Controller
 
         return view('farmer.equipment-request', [
             'farmer' => $farmer,
-            'equipmentRequest' => $equipmentRequest->load(['asset.category', 'transactions' => fn ($query) => $query->orderBy('created_at')]),
+            'equipmentRequest' => $equipmentRequest->load(['asset.category', 'transactions' => fn ($query) => $query->orderBy('created_at')->orderBy('id')]),
         ]);
     }
 
-    public function activities(Request $request): View
+    public function activities(Request $request, FarmerActivityFeedService $feed): View
     {
         $farmer = $this->farmer($request);
         $filters = $request->validate([
-            'status' => ['nullable', Rule::in(['pending', 'approved', 'completed', 'rejected'])],
+            'status' => ['nullable', 'string', 'max:40'],
             'type' => ['nullable', Rule::in([
                 'Assistance application', 'Equipment request', 'Registration update', 'Farm record',
                 'Assistance received', 'Crop record', 'Livestock record', 'Fisheries record',
-                'Pest or disease report', 'Agricultural submission', 'Notification',
+                'Pest or disease report', 'Agricultural submission',
             ])],
             'search' => ['nullable', 'string', 'max:100'],
         ]);
-        $filter = $filters['status'] ?? '';
+        $status = $filters['status'] ?? '';
         $type = $filters['type'] ?? '';
         $search = trim($filters['search'] ?? '');
-        $activitySources = [];
-        $activitySources[] = DB::table('assistance_applications')
-            ->join('assistance_programs', 'assistance_programs.id', '=', 'assistance_applications.program_id')
-            ->where('assistance_applications.farmer_id', $farmer->id)
-            ->selectRaw("'Assistance application' AS activity_type")
-            ->selectRaw("assistance_applications.id AS source_id, assistance_programs.name AS title_primary, NULL AS title_secondary, assistance_applications.status AS activity_status, CASE assistance_applications.status WHEN 'approved' THEN 'approved' WHEN 'completed' THEN 'completed' WHEN 'rejected' THEN 'rejected' ELSE 'pending' END AS activity_group, assistance_applications.updated_at AS activity_at, NULL AS related_id");
-        $activitySources[] = DB::table('equipment_requests')
-            ->join('equipment_assets', 'equipment_assets.id', '=', 'equipment_requests.equipment_asset_id')
-            ->where('equipment_requests.farmer_id', $farmer->id)
-            ->selectRaw("'Equipment request' AS activity_type")
-            ->selectRaw("equipment_requests.id AS source_id, equipment_assets.name AS title_primary, NULL AS title_secondary, equipment_requests.status AS activity_status, CASE WHEN equipment_requests.status IN ('approved', 'issued') THEN 'approved' WHEN equipment_requests.status = 'returned' THEN 'completed' WHEN equipment_requests.status IN ('rejected', 'cancelled') THEN 'rejected' ELSE 'pending' END AS activity_group, equipment_requests.updated_at AS activity_at, NULL AS related_id");
-        $activitySources[] = DB::table('farmer_registration_histories')
-            ->where('farmer_id', $farmer->id)
-            ->selectRaw("'Registration update' AS activity_type")
-            ->selectRaw("id AS source_id, 'Farmer registration' AS title_primary, reason AS title_secondary, to_status AS activity_status, CASE to_status WHEN 'verified' THEN 'approved' WHEN 'rejected' THEN 'rejected' ELSE 'pending' END AS activity_group, created_at AS activity_at, NULL AS related_id");
-        $activitySources[] = DB::table('farms')
-            ->where('farmer_id', $farmer->id)
-            ->selectRaw("'Farm record' AS activity_type")
-            ->selectRaw("id AS source_id, name AS title_primary, NULL AS title_secondary, 'registered' AS activity_status, 'completed' AS activity_group, created_at AS activity_at, NULL AS related_id");
-        $activitySources[] = DB::table('assistance_distributions')
-            ->join('assistance_applications', 'assistance_applications.id', '=', 'assistance_distributions.application_id')
-            ->join('assistance_programs', 'assistance_programs.id', '=', 'assistance_applications.program_id')
-            ->where('assistance_applications.farmer_id', $farmer->id)
-            ->selectRaw("'Assistance received' AS activity_type")
-            ->selectRaw("assistance_distributions.id AS source_id, assistance_programs.name AS title_primary, NULL AS title_secondary, 'distributed' AS activity_status, 'completed' AS activity_group, COALESCE(assistance_distributions.distributed_at, assistance_distributions.created_at) AS activity_at, assistance_distributions.application_id AS related_id");
-        $activitySources[] = DB::table('crop_production_records')
-            ->where('farmer_id', $farmer->id)
-            ->selectRaw("'Crop record' AS activity_type")
-            ->selectRaw("id AS source_id, crop_type AS title_primary, NULL AS title_secondary, status AS activity_status, 'completed' AS activity_group, created_at AS activity_at, NULL AS related_id");
-        $activitySources[] = DB::table('livestock_records')
-            ->where('farmer_id', $farmer->id)
-            ->selectRaw("'Livestock record' AS activity_type")
-            ->selectRaw("id AS source_id, animal_type AS title_primary, NULL AS title_secondary, status AS activity_status, 'completed' AS activity_group, created_at AS activity_at, NULL AS related_id");
-        $activitySources[] = DB::table('fishery_records')
-            ->where('farmer_id', $farmer->id)
-            ->selectRaw("'Fisheries record' AS activity_type")
-            ->selectRaw("id AS source_id, fishery_type AS title_primary, NULL AS title_secondary, 'recorded' AS activity_status, 'completed' AS activity_group, created_at AS activity_at, NULL AS related_id");
-        $activitySources[] = DB::table('pest_disease_incidents')
-            ->where('farmer_id', $farmer->id)
-            ->selectRaw("'Pest or disease report' AS activity_type")
-            ->selectRaw("id AS source_id, incident_type AS title_primary, NULL AS title_secondary, status AS activity_status, CASE WHEN status IN ('resolved', 'closed') THEN 'completed' ELSE 'pending' END AS activity_group, created_at AS activity_at, NULL AS related_id");
+        $baseQuery = $feed->query($farmer);
+        $statusOptions = DB::query()
+            ->fromSub((clone $baseQuery)->reorder(), 'activity_status_rows')
+            ->whereNotNull('activity_status')
+            ->select('activity_status')
+            ->distinct()
+            ->orderBy('activity_status')
+            ->pluck('activity_status')
+            ->mapWithKeys(fn (string $value) => [$value => str($value)->replace('_', ' ')->headline()->toString()]);
 
-        if (Schema::hasTable('production_submissions')) {
-            $activitySources[] = DB::table('production_submissions')
-                ->join('farms', 'farms.id', '=', 'production_submissions.farm_id')
-                ->where('production_submissions.farmer_id', $farmer->id)
-                ->selectRaw("'Agricultural submission' AS activity_type")
-                ->selectRaw("production_submissions.id AS source_id, production_submissions.category AS title_primary, farms.name AS title_secondary, production_submissions.status AS activity_status, CASE production_submissions.status WHEN 'approved' THEN 'approved' WHEN 'rejected' THEN 'rejected' ELSE 'pending' END AS activity_group, production_submissions.updated_at AS activity_at, NULL AS related_id");
-        }
-
-        $activitySources[] = DB::table('notifications')
-            ->where('notifiable_type', $request->user()->getMorphClass())
-            ->where('notifiable_id', $request->user()->getKey())
-            ->selectRaw("'Notification' AS activity_type")
-            ->selectRaw("id AS source_id, data AS title_primary, NULL AS title_secondary, CASE WHEN read_at IS NULL THEN 'unread' ELSE 'read' END AS activity_status, CASE WHEN read_at IS NULL THEN 'pending' ELSE 'completed' END AS activity_group, created_at AS activity_at, NULL AS related_id");
-
-        $activityUnion = array_shift($activitySources);
-        foreach ($activitySources as $source) {
-            $activityUnion->unionAll($source);
-        }
-
-        $activityQuery = DB::query()->fromSub($activityUnion, 'farmer_activity')
-            ->select('farmer_activity.*')
-            ->when($filter !== '', fn ($query) => $query->where('activity_group', $filter))
+        $activityQuery = $baseQuery
+            ->when($status !== '', fn ($query) => $query->where('activity_status', $status))
             ->when($type !== '', fn ($query) => $query->where('activity_type', $type))
             ->when($search !== '', function ($query) use ($search) {
                 $term = '%'.$search.'%';
@@ -157,53 +110,21 @@ class FarmerExperienceController extends Controller
                     ->where('title_primary', 'like', $term)
                     ->orWhere('title_secondary', 'like', $term)
                     ->orWhere('activity_status', 'like', $term)
-                    ->orWhere('activity_type', 'like', $term));
+                    ->orWhere('activity_type', 'like', $term)
+                    ->orWhere('event_status', 'like', $term)
+                    ->orWhere('event_notes', 'like', $term));
             })
-            ->orderByDesc('activity_at')
-            ->orderByDesc('source_id')
-            ->orderBy('activity_type');
+            ;
 
         $paginatedActivities = $activityQuery->paginate(15)->withQueryString();
-        $paginatedActivities->getCollection()->transform(function (object $row): array {
-            $title = $row->title_primary;
-            if ($row->activity_type === 'Notification') {
-                $payload = json_decode((string) $title, true);
-                $title = data_get($payload, 'message', 'Agricultural service update');
-            } elseif ($row->activity_type === 'Agricultural submission') {
-                $title = ucfirst((string) $title).' information'.($row->title_secondary ? ' · '.$row->title_secondary : '');
-            }
-
-            $url = match ($row->activity_type) {
-                'Assistance application' => route('farmer.applications.show', $row->source_id),
-                'Equipment request' => route('farmer.equipment-requests.show', $row->source_id),
-                'Registration update' => route('farmer.farms'),
-                'Farm record' => route('farmer.farms').'#farm-'.$row->source_id,
-                'Assistance received' => route('farmer.applications.show', $row->related_id),
-                'Crop record' => route('farmer.production', ['section' => 'crops']),
-                'Livestock record' => route('farmer.production', ['section' => 'livestock']),
-                'Fisheries record' => route('farmer.production', ['section' => 'fisheries']),
-                'Pest or disease report' => route('farmer.production', ['section' => 'incidents']),
-                'Agricultural submission' => route('farmer.production.submissions.show', $row->source_id),
-                'Notification' => route('farmer.notifications').'#notification-'.$row->source_id,
-                default => route('farmer.activities'),
-            };
-
-            return [
-                'title' => $title,
-                'detail' => $row->activity_type === 'Registration update' ? $row->title_secondary : null,
-                'type' => $row->activity_type,
-                'status' => $row->activity_status,
-                'group' => $row->activity_group,
-                'date' => $row->activity_at ? Carbon::parse($row->activity_at) : null,
-                'url' => $url,
-            ];
-        });
+        $paginatedActivities->setCollection($feed->present($paginatedActivities->getCollection()));
 
         return view('farmer.activities', [
             'farmer' => $farmer,
-            'filter' => $filter,
+            'filter' => $status,
             'type' => $type,
             'search' => $search,
+            'statusOptions' => $statusOptions,
             'activities' => $paginatedActivities,
         ]);
     }
@@ -211,10 +132,36 @@ class FarmerExperienceController extends Controller
     public function notifications(Request $request): View
     {
         $farmer = $this->farmer($request);
+        $filters = $request->validate([
+            'read' => ['nullable', Rule::in(['unread', 'read'])],
+            'category' => ['nullable', Rule::in(['assistance', 'production', 'equipment', 'registration', 'announcements', 'other'])],
+        ]);
+        $readFilter = $filters['read'] ?? '';
+        $categoryFilter = $filters['category'] ?? '';
+        $categoryTypes = [
+            'assistance' => ['assistance_application_status', 'assistance_distribution_completed'],
+            'production' => ['production_submission_review'],
+            'equipment' => ['equipment_request_status'],
+            'registration' => ['farmer_registration_status'],
+            'announcements' => ['agricultural_announcement'],
+        ];
+        $knownTypes = collect($categoryTypes)->flatten()->all();
+        $notifications = $request->user()->notifications()
+            ->when($readFilter === 'unread', fn ($query) => $query->whereNull('read_at'))
+            ->when($readFilter === 'read', fn ($query) => $query->whereNotNull('read_at'))
+            ->when(isset($categoryTypes[$categoryFilter]), fn ($query) => $query->whereIn('data->type', $categoryTypes[$categoryFilter]))
+            ->when($categoryFilter === 'other', fn ($query) => $query->where(function ($types) use ($knownTypes) {
+                $types->whereNull('data->type')->orWhereNotIn('data->type', $knownTypes);
+            }))
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
 
         return view('farmer.notifications', [
             'farmer' => $farmer,
-            'notifications' => $request->user()->notifications()->latest()->paginate(20),
+            'notifications' => $notifications,
+            'readFilter' => $readFilter,
+            'categoryFilter' => $categoryFilter,
         ]);
     }
 

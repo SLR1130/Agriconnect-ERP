@@ -120,7 +120,7 @@ class FarmerProductionSubmissionTest extends TestCase
         ]);
 
         $this->actingAs($owner['user'])->get('/farmer')->assertOk()
-            ->assertSee('My ongoing services')
+            ->assertSee('Recent service activity')
             ->assertSee('Owner pending rice')
             ->assertSee('Owner returned goats')
             ->assertSee('MAO requested a correction')
@@ -183,8 +183,15 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->actingAs($auditor)->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'approved'])->assertForbidden();
         $this->actingAs($staff)->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'returned'])->assertSessionHasErrors('review_notes');
         $this->actingAs($staff)->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'returned', 'review_notes' => 'Please confirm the measured quantity.'])->assertRedirect();
-        $this->actingAs($owner['user'])->get('/farmer/production/submissions/'.$submission->id)->assertOk()->assertSee('Please confirm the measured quantity.');
+        $this->actingAs($owner['user'])->get('/farmer/production/submissions/'.$submission->id)->assertOk()
+            ->assertSee('The MAO requested a correction. Read the feedback and use the correction form below to resubmit.')
+            ->assertSee('MAO returned the information for correction')
+            ->assertSee('Please confirm the measured quantity.')->assertSee('<svg', false);
+        $this->actingAs($owner['user'])->get('/farmer/activities?type=Agricultural%20submission&status=returned')
+            ->assertOk()->assertSee('Returned')->assertSee('Please confirm the measured quantity.');
         $this->actingAs($owner['user'])->post('/farmer/production/submissions/'.$submission->id.'/resubmit', array_replace($payload, ['production_quantity' => 7]))->assertRedirect();
+        $this->actingAs($owner['user'])->get('/farmer/production/submissions/'.$submission->id)->assertOk()
+            ->assertSee('Corrected information resubmitted')->assertSee('Pending');
         $this->actingAs($staff)->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'rejected', 'review_notes' => 'Unverifiable information.'])->assertRedirect();
         $this->actingAs($staff)->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'approved'])->assertSessionHasErrors('decision');
         $this->actingAs($owner['user'])->get('/farmer/notifications')->assertOk()

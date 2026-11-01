@@ -1,16 +1,65 @@
+@php
+    $equipmentEvents = $equipmentRequest->transactions->map(function ($transaction) {
+        $title = match ($transaction->action) {
+            'requested' => 'Equipment request submitted',
+            'approved' => 'MAO approved the request',
+            'rejected' => 'MAO declined the request',
+            'issued' => 'Equipment issued',
+            'returned' => 'Equipment return recorded',
+            'cancelled' => 'Request cancelled',
+            default => str($transaction->action)->replace('_', ' ')->headline()->toString(),
+        };
+
+        return ['title' => $title, 'status' => $transaction->action, 'date' => $transaction->created_at, 'notes' => $transaction->notes, 'condition' => $transaction->condition];
+    })->values();
+    [$guidance, $tone] = match ($equipmentRequest->status) {
+        'pending' => ['Your request is waiting for MAO review. The requested schedule is not confirmed until approved.', 'info'],
+        'approved' => ['The MAO approved the schedule. Watch your notifications for an equipment issue update.', 'success'],
+        'rejected' => ['The MAO did not approve this request. Review the recorded reason and contact the office if you need help.', 'danger'],
+        'issued' => ['The equipment has been issued. Follow the approved schedule and coordinate the return with the MAO.', 'warning'],
+        'returned' => ['The MAO recorded the equipment return. See the recorded condition and notes in the history.', 'success'],
+        'cancelled' => ['This request was cancelled. No further action is required.', 'info'],
+        default => ['The status above reflects the latest request record. Review the recorded transactions below.', 'info'],
+    };
+@endphp
+
 <x-layouts.farmer>
     <x-slot name="title">Equipment request</x-slot>
-    <x-slot name="description">{{ $equipmentRequest->reference }} · {{ $equipmentRequest->asset->name }}</x-slot>
-    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('farmer.equipment') }}"><x-ui.icon name="back" size="sm"/> Back to equipment services</a>
-    <div class="grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><section class="farmer-card"><div class="flex flex-wrap justify-between gap-2"><h2 class="text-xl font-bold">{{ $equipmentRequest->asset->name }}</h2><span class="farmer-pill {{ $equipmentRequest->status === 'rejected' ? 'farmer-pill-bad' : '' }}">{{ ucfirst($equipmentRequest->status) }}</span></div><p class="farmer-message mt-4" role="status">@switch($equipmentRequest->status)
-        @case('pending') Your request is waiting for MAO review. The requested schedule is not confirmed until approved. @break
-        @case('approved') The MAO approved this schedule. Watch your notifications for the equipment issue update. @break
-        @case('rejected') The MAO did not approve this request. Review any feedback below and contact the office if you need help. @break
-        @case('issued') Equipment has been issued to you. Follow the recorded schedule and coordinate return with the MAO. @break
-        @case('returned') The MAO recorded the equipment return. Any return condition notes are shown in the history. @break
-        @case('cancelled') This request was cancelled. No further action is required. @break
-        @default The current request status is shown above. Review its history for recorded updates.
-    @endswitch</p><dl class="mt-5 space-y-3 text-sm"><div><dt class="font-bold text-forest-green">Requested schedule</dt><dd>{{ $equipmentRequest->schedule_start?->format('M d, Y h:i A') }} to {{ $equipmentRequest->schedule_end?->format('M d, Y h:i A') }}</dd></div><div><dt class="font-bold text-forest-green">Agricultural use</dt><dd>{{ $equipmentRequest->intended_use }}</dd></div>@if($equipmentRequest->review_notes)<div><dt class="font-bold text-forest-green">MAO feedback</dt><dd>{{ $equipmentRequest->review_notes }}</dd></div>@endif
-@if($equipmentRequest->issued_at)<div><dt class="font-bold text-forest-green">Issued</dt><dd>{{ $equipmentRequest->issued_at->format('M d, Y h:i A') }}</dd></div>@endif
-    @if($equipmentRequest->returned_at)<div><dt class="font-bold text-forest-green">Returned</dt><dd>{{ $equipmentRequest->returned_at->format('M d, Y h:i A') }}</dd></div>@endif</dl>@if(in_array($equipmentRequest->status, ['pending','approved'], true))<form method="POST" action="{{ route('modules.aeams.requests.cancel', $equipmentRequest) }}" class="mt-5 border-t border-slate-100 pt-5">@csrf<button class="farmer-button farmer-button-light" type="submit">Cancel my request</button></form>@endif</section><aside class="farmer-card self-start"><h2 class="text-lg font-bold">Request history</h2><ol class="mt-3 space-y-3">@forelse($equipmentRequest->transactions as $transaction)<li class="border-l-2 border-sage pl-3 text-sm"><span class="font-bold text-forest-green">{{ ucfirst(str_replace('_',' ',$transaction->action)) }}</span><p class="text-xs text-slate-600">{{ $transaction->created_at?->format('M d, Y h:i A') }}</p>@if($transaction->condition)<p class="text-xs text-slate-600">Condition: {{ ucfirst($transaction->condition) }}</p>@endif @if($transaction->notes)<p class="mt-1 text-sm text-slate-700">{{ $transaction->notes }}</p>@endif</li>@empty<li class="text-sm text-slate-600">No history recorded yet.</li>@endforelse</ol></aside></div>
+    <x-slot name="description">Track the MAO review, approved schedule, issue and return of requested equipment.</x-slot>
+
+    <x-farmer.tracking-header
+        service="Equipment services"
+        :title="$equipmentRequest->asset->name"
+        :status="$equipmentRequest->status"
+        :submitted-at="$equipmentRequest->created_at"
+        :reference="$equipmentRequest->reference"
+        :back-url="route('farmer.equipment')"
+        back-label="Back to equipment services"
+        icon="equipment"
+    />
+
+    <x-farmer.next-action :message="$guidance" :tone="$tone">
+        @if(in_array($equipmentRequest->status, ['pending', 'approved'], true))
+            <form method="POST" action="{{ route('modules.aeams.requests.cancel', $equipmentRequest) }}">
+                @csrf
+                <button class="farmer-button farmer-button-light" type="submit">Cancel my request</button>
+            </form>
+        @endif
+    </x-farmer.next-action>
+
+    <div class="farmer-tracking-layout">
+        <div class="farmer-tracking-main">
+            <section class="farmer-card">
+                <div class="farmer-section-heading"><div><h2>Request details</h2><p>{{ $equipmentRequest->asset->category->name ?? 'Agricultural equipment' }}</p></div></div>
+                <dl class="farmer-equipment-details">
+                    <div><dt>Requested schedule</dt><dd>{{ $equipmentRequest->schedule_start?->format('M d, Y · h:i A') }} to {{ $equipmentRequest->schedule_end?->format('M d, Y · h:i A') }}</dd></div>
+                    <div><dt>Agricultural use</dt><dd>{{ $equipmentRequest->intended_use }}</dd></div>
+                    @if($equipmentRequest->review_notes)<div><dt>MAO feedback</dt><dd>{{ $equipmentRequest->review_notes }}</dd></div>@endif
+                    @if($equipmentRequest->issued_at)<div><dt>Issued</dt><dd>{{ $equipmentRequest->issued_at->format('M d, Y · h:i A') }}</dd></div>@endif
+                    @if($equipmentRequest->returned_at)<div><dt>Returned</dt><dd>{{ $equipmentRequest->returned_at->format('M d, Y · h:i A') }}</dd></div>@endif
+                </dl>
+            </section>
+        </div>
+        <aside><x-farmer.status-timeline :events="$equipmentEvents" empty-message="No equipment transactions have been recorded yet." /></aside>
+    </div>
 </x-layouts.farmer>

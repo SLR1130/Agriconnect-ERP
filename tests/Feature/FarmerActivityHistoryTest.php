@@ -155,7 +155,6 @@ class FarmerActivityHistoryTest extends TestCase
             'Fisheries record' => 'fishery-history-01',
             'Pest or disease report' => 'incident-history-01',
             'Agricultural submission' => 'crop-history-01',
-            'Notification' => 'notification-history-01',
         ];
 
         foreach ($searches as $type => $search) {
@@ -163,10 +162,17 @@ class FarmerActivityHistoryTest extends TestCase
             $response->assertOk()->assertSee('1 matching record')->assertSee($search);
         }
 
-        $this->actingAs($user)->get('/farmer/activities?type=Notification&status=pending&search=notification-history')
+        $this->actingAs($user)->get('/farmer/activities?type=Pest%20or%20disease%20report&status=reported&search=incident-history')
             ->assertOk()->assertSee('51 matching records')->assertSee('page=4');
-        $this->actingAs($user)->get('/farmer/activities?type=Notification&status=completed')
-            ->assertOk()->assertSee('0 matching records');
+        $this->actingAs($user)->get('/farmer/activities?type=Notification')
+            ->assertSessionHasErrors('type');
+        $this->actingAs($user)->get('/farmer/activities?search=notification-history-01')
+            ->assertOk()->assertSee('0 matching records')->assertDontSee('<article class="farmer-activity-item', false);
+        $notificationPage = $this->actingAs($user)->get('/farmer/notifications?category=other&read=unread');
+        $notificationPage->assertOk()->assertViewHas('notifications', fn ($notifications) => $notifications->total() === 51)
+            ->assertSee('notification-history-51')->assertDontSee('notification-history-01');
+        $this->actingAs($user)->get('/farmer/notifications?category=other&read=unread&page=3')
+            ->assertOk()->assertSee('notification-history-01');
         $this->assertDatabaseCount('assistance_distributions', 51);
         $this->assertDatabaseCount('equipment_requests', 51);
     }

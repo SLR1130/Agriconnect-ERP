@@ -185,6 +185,9 @@ class AASMSAssistanceTest extends TestCase
         $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 1, 'idempotency_key' => 'owner-history'])->assertRedirect();
         $reference = AssistanceDistribution::first()->reference;
         $this->actingAs($x['fu'])->get('/farmer/assistance')->assertOk()->assertSee('Seed Support')->assertSee($reference);
+        $this->actingAs($x['fu'])->get('/farmer/applications/'.$x['app']->id)->assertOk()
+            ->assertSee('Distributions received')->assertSee($reference)->assertSee('Assistance distribution completed')
+            ->assertSee('1.00')->assertSee('<svg', false);
     }
 
     public function test_dashboard_counts_are_not_limited_to_the_current_page_and_hides_closed_review_controls(): void

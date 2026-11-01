@@ -14,6 +14,7 @@ use App\Models\PestDiseaseIncident;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\EquipmentRequestStatusChanged;
+use App\Notifications\AssistanceStatusNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,7 +48,7 @@ class FarmerExperienceTest extends TestCase
         $open = AssistanceProgram::create(['name' => 'Rice Seed Support', 'status' => 'open', 'category' => 'Seeds']);
         $closed = AssistanceProgram::create(['name' => 'Internal Draft', 'status' => 'closed']);
 
-        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertSee('My ongoing services')->assertSee('1 registered farm')->assertDontSee('name="phone"', false);
+        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertSee('Recent service activity')->assertSee('1 registered farm')->assertDontSee('name="phone"', false);
         $this->actingAs($data['user'])->get('/farmer/services?search=Rice')->assertOk()->assertSee('Rice Seed Support')->assertDontSee('Internal Draft');
         $this->actingAs($data['user'])->get('/farmer/assistance')->assertOk()->assertSee('Rice Seed Support');
         $this->actingAs($data['user'])->get('/farmer/programs/'.$open->id)->assertOk()->assertSee('Farmer registration must be verified');
@@ -165,7 +166,9 @@ class FarmerExperienceTest extends TestCase
         $secondPage->assertOk()->assertSee('Portal tracking item 01')->assertDontSee('Portal tracking item 22');
 
         $this->actingAs($data['user'])->get('/farmer/activities?status=approved&type=Assistance%20application')
-            ->assertOk()->assertSee('Portal tracking item 22')->assertDontSee('Portal tracking item 21');
+            ->assertOk()->assertSee('11 matching records')->assertSee('Portal tracking item 22')->assertDontSee('Portal tracking item 21');
+        $this->actingAs($data['user'])->get('/farmer/activities?status=pending&type=Assistance%20application')
+            ->assertOk()->assertSee('0 matching records');
         $this->assertDatabaseCount('assistance_applications', 22);
     }
 
@@ -184,7 +187,7 @@ class FarmerExperienceTest extends TestCase
         $this->actingAs($data['user'])->get('/farmer/applications/'.$application->id)->assertOk()->assertSee('Seed Grant');
         $this->actingAs($data['user'])->get('/farmer/applications/'.$application->id)
             ->assertOk()->assertSee('Program details')->assertSee('Eligibility at submission:')
-            ->assertSee('Checks passed')->assertSee('Status history')->assertSee('Distributions received');
+            ->assertSee('Checks passed')->assertSee('Service history')->assertSee('Application submitted')->assertSee('Distributions received');
         $this->actingAs($data['user'])->post('/assistance/programs/'.$program->id.'/apply', [])->assertRedirect()->assertSessionHasErrors('program');
         $this->actingAs($other['user'])->get('/farmer/applications/'.$application->id)->assertNotFound();
         $this->assertDatabaseCount('assistance_applications', 1);
@@ -250,7 +253,12 @@ class FarmerExperienceTest extends TestCase
         $this->actingAs($data['user'])->get('/farmer/notifications')->assertOk()
             ->assertSee('View equipment request')
             ->assertSee(route('farmer.equipment-requests.show', $equipmentRequest), false);
-        $this->actingAs($data['user'])->get('/farmer/equipment-requests/'.$equipmentRequest->id)->assertOk()->assertSee('Request history');
+        $this->actingAs($data['user'])->get('/farmer/equipment-requests/'.$equipmentRequest->id)
+            ->assertOk()->assertSee('Service history')->assertSee('Equipment return recorded');
+        $this->actingAs($data['user'])->get('/farmer/activities?type=Equipment%20request&status=returned')
+            ->assertOk()->assertSee('1 matching record')->assertSee('Returned');
+        $this->actingAs($data['user'])->get('/farmer/activities?type=Equipment%20request&status=completed')
+            ->assertOk()->assertSee('0 matching records');
     }
 
     public function test_notification_read_action_is_owner_scoped(): void
@@ -268,5 +276,57 @@ class FarmerExperienceTest extends TestCase
         $this->assertNull($notice->fresh()->read_at);
         $this->actingAs($data['user'])->post('/farmer/notifications/'.$notice->id.'/read')->assertRedirect();
         $this->assertNotNull($notice->fresh()->read_at);
+    }
+
+    public function test_notification_inbox_filters_by_read_state_and_real_service_category(): void
+    {
+        $data = $this->farmer();
+        $program = AssistanceProgram::create(['name' => 'Inbox Rice Support', 'status' => 'open']);
+        $application = AssistanceApplication::create(['program_id' => $program->id, 'farmer_id' => $data['farmer']->id, 'status' => 'approved']);
+        $data['user']->notify(new AssistanceStatusNotification($application->id, 'approved', 'Your application is approved.', 'AA-TEST-1'));
+        $data['user']->notify(new EquipmentRequestStatusChanged('EQ-TEST-1', 'approved'));
+        $equipmentNotice = $data['user']->notifications()->where('data->type', 'equipment_request_status')->firstOrFail();
+        $equipmentNotice->markAsRead();
+
+        $this->actingAs($data['user'])->get('/farmer/notifications?read=unread&category=assistance')
+            ->assertOk()->assertSee('Your assistance application was approved by the MAO.')
+            ->assertSee('View assistance application')->assertSee(route('farmer.applications.show', $application), false)
+            ->assertDontSee('EQ-TEST-1');
+
+        $this->actingAs($data['user'])->get('/farmer/notifications?read=read&category=equipment')
+            ->assertOk()->assertSee('EQ-TEST-1')->assertSee('Read')
+            ->assertDontSee('Your assistance application was approved by the MAO.');
+
+        $this->actingAs($data['user'])->get('/farmer/activities?search=Your%20assistance%20application%20was%20approved')
+            ->assertOk()->assertSee('0 matching records');
+        $this->assertDatabaseCount('notifications', 2);
+    }
+
+    public function test_activity_rows_show_exact_record_status_and_real_history_without_notification_duplicates(): void
+    {
+        $data = $this->farmer();
+        $program = AssistanceProgram::create(['name' => 'Returned Application Program', 'status' => 'open']);
+        $application = AssistanceApplication::create([
+            'program_id' => $program->id,
+            'farmer_id' => $data['farmer']->id,
+            'status' => 'returned',
+            'review_notes' => 'Confirm your current farm area.',
+        ]);
+        $application->history()->create(['from_status' => null, 'to_status' => 'submitted', 'notes' => 'Farmer submitted application.']);
+        $application->history()->create(['from_status' => 'submitted', 'to_status' => 'returned', 'notes' => 'Confirm your current farm area.']);
+        $data['user']->notify(new AssistanceStatusNotification($application->id, 'returned', 'Confirm your current farm area.'));
+
+        $this->actingAs($data['user'])->get('/farmer/activities?type=Assistance%20application&status=returned')
+            ->assertOk()->assertSee('1 matching record')->assertSee('Returned Application Program')
+            ->assertSee('Application status recorded as Returned.')
+            ->assertSee('Confirm your current farm area.')
+            ->assertSee('Read the MAO feedback and correct your application.')
+            ->assertDontSee('Your assistance application status was updated.');
+
+        $this->actingAs($data['user'])->get('/farmer/applications/'.$application->id)
+            ->assertOk()->assertSee('MAO returned the application for correction')
+            ->assertSee('Confirm your current farm area.')->assertSee('<svg', false);
+        $this->assertDatabaseCount('assistance_status_histories', 2);
+        $this->assertDatabaseCount('notifications', 1);
     }
 }

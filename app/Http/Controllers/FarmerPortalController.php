@@ -3,14 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AgriculturalAnnouncement;
-use App\Models\AssistanceApplication;
 use App\Models\AssistanceDistribution;
 use App\Models\AssistanceProgram;
-use App\Models\EquipmentRequest;
 use App\Models\Farm;
 use App\Models\Farmer;
-use App\Models\ProductionSubmission;
 use App\Services\AgriculturalBusinessCalendar;
+use App\Services\FarmerActivityFeedService;
 use App\Services\FarmerRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,13 +43,24 @@ class FarmerPortalController extends Controller
         return redirect()->route('farmer.portal')->with('status', 'Your account was created. Your farmer registration is pending MAO verification.');
     }
 
-    public function dashboard(Request $request, AgriculturalBusinessCalendar $calendar): View
+    public function dashboard(Request $request, AgriculturalBusinessCalendar $calendar, FarmerActivityFeedService $activityFeed): View
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
 
         $farmer = $request->user()->farmer()->with(['farms', 'registrationHistory.processor'])->firstOrFail();
-        $productionSubmissionsAvailable = Schema::hasTable('production_submissions');
         $businessDate = $calendar->today()->toDateString();
+        $activityQuery = $activityFeed->query($farmer);
+        $needsAttention = $activityFeed->present((clone $activityQuery)->reorder()
+            ->whereIn('activity_type', ['Assistance application', 'Agricultural submission'])
+            ->where('activity_status', 'returned')
+            ->orderByDesc('activity_at')
+            ->limit(4)
+            ->get());
+        $attentionKeys = $needsAttention->map(fn (array $activity) => $activity['type'].':'.$activity['record_id'])->all();
+        $recentActivities = $activityFeed->present((clone $activityQuery)->reorder()->limit(12)->get())
+            ->reject(fn (array $activity) => in_array($activity['type'].':'.$activity['record_id'], $attentionKeys, true))
+            ->take(5)
+            ->values();
 
         return view('farmer.portal', [
             'farmer' => $farmer,
@@ -59,12 +68,8 @@ class FarmerPortalController extends Controller
                 ->where(fn ($query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', $businessDate))
                 ->where(fn ($query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', $businessDate))
                 ->orderBy('closes_on')->take(3)->get(),
-            'applications' => AssistanceApplication::query()->with('program')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),
-            'equipmentRequests' => EquipmentRequest::query()->with('asset')->where('farmer_id', $farmer->id)->latest()->take(3)->get(),
-            'productionSubmissions' => $productionSubmissionsAvailable
-                ? ProductionSubmission::query()->with('farm')->where('farmer_id', $farmer->id)
-                    ->whereIn('status', ['pending', 'returned'])->latest()->take(3)->get()
-                : collect(),
+            'needsAttention' => $needsAttention,
+            'recentActivities' => $recentActivities,
             'distributions' => AssistanceDistribution::query()->with(['application.program', 'batch.item'])
                 ->whereHas('application', fn ($query) => $query->where('farmer_id', $farmer->id))->latest('distributed_at')->take(3)->get(),
             'unreadCount' => $request->user()->unreadNotifications()->count(),

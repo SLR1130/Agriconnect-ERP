@@ -1,66 +1,53 @@
 <x-layouts.farmer>
     <x-slot name="title">Notifications</x-slot>
-    <x-slot name="description">Read status updates sent to your own account by AgriConnect.</x-slot>
+    <x-slot name="description">Messages from the MAO about your registration and agricultural services.</x-slot>
 
-    <section class="space-y-3">
-        @forelse($notifications as $notification)
-            @php
-                $type = data_get($notification->data, 'type');
-                $destinationId = match ($type) {
-                    'production_submission_review' => data_get($notification->data, 'submission_id'),
-                    'assistance_application_status', 'assistance_distribution_completed' => data_get($notification->data, 'application_id'),
-                    'equipment_request_status' => data_get($notification->data, 'equipment_request_id'),
-                    'agricultural_announcement' => data_get($notification->data, 'announcement_id'),
-                    default => null,
-                };
-                $destination = match ($type) {
-                    'farmer_registration_status' => route('farmer.farms'),
-                    'production_submission_review' => $destinationId ? route('farmer.production.submissions.show', $destinationId) : route('farmer.activities'),
-                    'assistance_application_status', 'assistance_distribution_completed' => $destinationId ? route('farmer.applications.show', $destinationId) : route('farmer.activities'),
-                    'equipment_request_status' => $destinationId ? route('farmer.equipment-requests.show', $destinationId) : route('farmer.activities'),
-                    'agricultural_announcement' => $destinationId ? route('farmer.announcements.show', $destinationId) : route('farmer.activities'),
-                    default => route('farmer.activities'),
-                };
-                $destinationLabel = match ($type) {
-                    'farmer_registration_status' => 'View registration progress',
-                    'production_submission_review' => $destinationId ? 'View production submission' : 'View my activities',
-                    'assistance_application_status', 'assistance_distribution_completed' => $destinationId ? 'View assistance application' : 'View my activities',
-                    'equipment_request_status' => $destinationId ? 'View equipment request' : 'View my activities',
-                    'agricultural_announcement' => $destinationId ? 'Read official notice' : 'View my activities',
-                    default => 'View my activities',
-                };
-            @endphp
+    <form method="GET" action="{{ route('farmer.notifications') }}" class="farmer-notification-filters" aria-label="Filter notifications">
+        <div class="farmer-field">
+            <label for="notification-read">Read status</label>
+            <select id="notification-read" name="read">
+                <option value="">All messages</option>
+                <option value="unread" @selected($readFilter === 'unread')>Unread</option>
+                <option value="read" @selected($readFilter === 'read')>Read</option>
+            </select>
+        </div>
+        <div class="farmer-field">
+            <label for="notification-category">Service category</label>
+            <select id="notification-category" name="category">
+                <option value="">All services</option>
+                @foreach(['assistance' => 'Assistance', 'production' => 'Production', 'equipment' => 'Equipment', 'registration' => 'Registration', 'announcements' => 'Official announcements', 'other' => 'Other updates'] as $value => $label)
+                    <option value="{{ $value }}" @selected($categoryFilter === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="farmer-notification-filter-actions">
+            <button class="farmer-button" type="submit">Apply filters</button>
+            <a class="farmer-button farmer-button-light" href="{{ route('farmer.notifications') }}">Clear</a>
+        </div>
+    </form>
 
-            <article id="notification-{{ $notification->id }}" class="farmer-card {{ !$notification->read_at ? 'border-emerald-400' : '' }}">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <p class="text-sm leading-6 text-slate-800">{{ data_get($notification->data, 'message', 'An update is available for your account.') }}</p>
-                        @if(data_get($notification->data, 'reason'))
-                            <p class="mt-1 text-sm text-slate-600">{{ data_get($notification->data, 'reason') }}</p>
-                        @endif
-                        @if(data_get($notification->data, 'reference'))
-                            <p class="mt-1 text-xs text-slate-500">Reference {{ data_get($notification->data, 'reference') }}</p>
-                        @endif
-                        <p class="mt-2 text-xs text-slate-500">{{ $notification->created_at?->format('M d, Y h:i A') }}</p>
-                        @if($destination)
-                            <a class="mt-2 inline-block text-sm font-bold text-emerald-700 underline" href="{{ $destination }}">{{ $destinationLabel }}</a>
-                        @endif
-                    </div>
-
-                    @if(!$notification->read_at)
-                        <form method="POST" action="{{ route('farmer.notifications.read', $notification->id) }}">
-                            @csrf
-                            <button class="farmer-button farmer-button-light" type="submit">Mark read</button>
-                        </form>
-                    @else
-                        <span class="farmer-pill">Read</span>
-                    @endif
-                </div>
-            </article>
-        @empty
-            <div class="farmer-empty">No notifications yet. Verification and service status updates will appear here when available.</div>
-        @endforelse
+    <section class="farmer-notification-results" aria-labelledby="notification-results-title">
+        <div class="farmer-activity-results-heading">
+            <h2 id="notification-results-title">Your messages</h2>
+            <p>{{ $notifications->total() }} message{{ $notifications->total() === 1 ? '' : 's' }}</p>
+        </div>
+        @if($notifications->count())
+            <ol class="farmer-notification-list">
+                @foreach($notifications as $notification)
+                    <li><x-farmer.notification-item :notification="$notification" /></li>
+                @endforeach
+            </ol>
+            <nav class="farmer-activity-pagination" aria-label="Notification pages">{{ $notifications->links() }}</nav>
+        @else
+            <x-ui.empty-state
+                :title="($readFilter || $categoryFilter) ? 'No matching messages' : 'No notifications yet'"
+                :description="($readFilter || $categoryFilter) ? 'Try another read status or service category.' : 'Messages about verification and service updates will appear here when the MAO sends them.'"
+                icon="notifications"
+            >
+                @if($readFilter || $categoryFilter)
+                    <a class="farmer-button farmer-button-light" href="{{ route('farmer.notifications') }}">Clear filters</a>
+                @endif
+            </x-ui.empty-state>
+        @endif
     </section>
-
-    <div class="mt-4">{{ $notifications->links() }}</div>
 </x-layouts.farmer>
