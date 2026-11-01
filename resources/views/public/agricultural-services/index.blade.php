@@ -46,7 +46,7 @@
                             @if($cover)
                                 <a class="public-feed-card-media" href="{{ route('public.agricultural-programs.show', $program) }}"><img src="{{ route('public.announcements.media', [$notice, $cover]) }}" alt="{{ $cover->alt_text ?: 'Official photograph for '.$program->name }}" loading="lazy"></a>
                             @else
-                                <div class="public-feed-card-fallback" aria-hidden="true"><x-ui.icon name="crop" size="xl"/><span>{{ $program->name }}</span><small>Official photograph not provided</small></div>
+                                <div class="public-feed-card-fallback" role="img" aria-label="No official photograph provided for this assistance program"><x-ui.icon name="crop" size="xl"/><span>{{ $program->name }}</span><small>Official photograph not provided</small></div>
                             @endif
                             <div class="public-feed-card-content">
                                 <div class="public-feed-card-meta">
@@ -84,7 +84,7 @@
                             @if($cover)
                                 <a class="public-feed-card-media" href="{{ route('public.announcements.show', $announcement) }}"><img src="{{ route('public.announcements.media', [$announcement, $cover]) }}" alt="{{ $cover->alt_text ?: 'Official photograph for '.$content['title'] }}" loading="lazy"></a>
                             @else
-                                <div class="public-feed-card-fallback public-feed-card-fallback-notice" aria-hidden="true"><x-ui.icon name="office" size="xl"/><span>{{ $content['category'] ?: 'Agricultural service update' }}</span><small>Official photograph not provided</small></div>
+                                <div class="public-feed-card-fallback public-feed-card-fallback-notice" role="img" aria-label="No official photograph provided for this agricultural notice"><x-ui.icon name="office" size="xl"/><span>{{ $content['category'] ?: 'Agricultural service update' }}</span><small>Official photograph not provided</small></div>
                             @endif
                             <div class="public-feed-card-content">
                                 <div class="public-feed-card-meta"><span class="public-feed-type"><x-ui.icon name="office" size="sm"/>{{ $isAdvisory ? 'Service advisory' : 'Official announcement' }}</span><time datetime="{{ $announcement->published_at?->toIso8601String() }}">{{ $announcement->published_at?->timezone('Asia/Manila')->format('M j, Y') }}</time></div>

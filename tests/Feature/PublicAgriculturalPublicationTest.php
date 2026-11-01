@@ -321,7 +321,8 @@ class PublicAgriculturalPublicationTest extends TestCase
         $this->get(route('public.agricultural-services.index', ['availability' => 'upcoming']))
             ->assertOk()->assertSee('Opens Tomorrow')->assertDontSee('Private Program');
         $this->get(route('public.agricultural-services.index', ['availability' => 'ended']))
-            ->assertOk()->assertSee('Ended Yesterday')->assertDontSee('Sign in to check eligibility')->assertDontSee(route('farmer.programs.show', $endedProgram), false)->assertDontSee('Private Program');
+            ->assertOk()->assertSee('Ended Yesterday')->assertSee('role="img" aria-label="No official photograph provided for this assistance program"', false)
+            ->assertDontSee('Sign in to check eligibility')->assertDontSee(route('farmer.programs.show', $endedProgram), false)->assertDontSee('Private Program');
         $this->get(route('public.agricultural-services.index', ['availability' => 'all']))
             ->assertOk()->assertSee('Open Today')->assertSee('Opens Tomorrow')->assertSee('Ended Yesterday')->assertDontSee('Private Program');
         $this->get(route('public.agricultural-programs.show', $endedProgram))->assertOk()
