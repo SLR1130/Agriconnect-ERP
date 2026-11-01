@@ -203,6 +203,63 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->assertSame(4, $submission->history()->count());
     }
 
+    public function test_apms_review_queue_filters_preserve_context_and_read_only_roles_cannot_decide(): void
+    {
+        $owner = $this->farmer();
+        $staff = $this->reviewer();
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/crop', [
+            'farm_id' => $owner['farm']->id,
+            'crop_type' => 'Queue test rice',
+            'planted_on' => '2026-10-10',
+            'area_planted' => '1.50',
+            'area_unit' => 'hectare',
+            'yield_unit' => 'kilogram',
+            'status' => 'growing',
+            'idempotency_key' => (string) Str::uuid(),
+        ])->assertRedirect();
+        $submission = ProductionSubmission::firstOrFail();
+
+        $queue = route('modules.apms.submissions', ['status' => 'pending', 'search' => 'Owner farm']);
+        $detail = route('modules.apms.submissions.show', ['submission' => $submission, 'status' => 'pending', 'search' => 'Owner farm']);
+
+        $this->actingAs($staff)->get($queue)
+            ->assertOk()
+            ->assertSee('Production review queue')
+            ->assertSee('Owner farm')
+            ->assertSee('Pending')
+            ->assertSee(e($detail), false)
+            ->assertSee('Review submission');
+
+        $this->actingAs($staff)->get($detail)
+            ->assertOk()
+            ->assertSee('Submitted information')
+            ->assertSee('Review history')
+            ->assertSee('Decision')
+            ->assertSee('data-apms-review-decision', false)
+            ->assertSee('data-apms-review-notes', false)
+            ->assertSee(e($queue), false);
+
+        $auditorRole = Role::firstOrCreate(['slug' => 'auditor'], ['name' => 'Auditor', 'permissions' => ['modules.apms.view'], 'is_active' => true]);
+        $auditor = User::factory()->create();
+        $auditor->roles()->attach($auditorRole);
+        $this->actingAs($auditor)->get($detail)
+            ->assertOk()
+            ->assertSee('Read-only review')
+            ->assertDontSee('data-apms-review-form', false);
+        $this->actingAs($auditor)->post(route('modules.apms.submissions.review', $submission), ['decision' => 'approved'])->assertForbidden();
+
+        $this->actingAs($staff)->post(route('modules.apms.submissions.review', $submission), [
+            'decision' => 'approved',
+            'review_notes' => 'Field record checked.',
+            'queue_status' => 'pending',
+            'queue_search' => 'Owner farm',
+        ])->assertRedirect($detail);
+
+        $this->assertDatabaseHas('production_submissions', ['id' => $submission->id, 'status' => 'approved', 'reviewed_by' => $staff->id]);
+        $this->assertDatabaseHas('production_submission_histories', ['production_submission_id' => $submission->id, 'to_status' => 'approved']);
+        $this->assertDatabaseHas('crop_production_records', ['farmer_id' => $owner['farmer']->id, 'farm_id' => $owner['farm']->id, 'crop_type' => 'Queue test rice']);
+    }
+
     public function test_existing_farmer_pages_render_while_phase_7b_tables_are_pending(): void
     {
         $owner = $this->farmer();

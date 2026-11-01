@@ -129,6 +129,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (form && !window.confirm(form.dataset.confirmSubmit)) event.preventDefault();
     });
 
+    document.addEventListener('click', (event) => {
+        const cancel = event.target.closest('[data-ffrms-close-edit]');
+        if (!cancel) return;
+        const disclosure = cancel.closest('details');
+        disclosure?.querySelector('form')?.reset();
+        if (disclosure) {
+            disclosure.open = false;
+            disclosure.querySelector('summary')?.focus();
+        }
+    });
+
     document.querySelectorAll('[data-erp-workspace]').forEach((workspace) => {
         const tabs = [...workspace.querySelectorAll('[data-erp-workspace-tab]')];
         const parameter = workspace.dataset.workspaceParam || 'workspace';
@@ -436,6 +447,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (trigger) openEditor(trigger, true);
         }
     }
+
+    document.querySelectorAll('[data-apms-review-form]').forEach((form) => {
+        const decision = form.querySelector('[data-apms-review-decision]');
+        const notes = form.querySelector('[data-apms-review-notes]');
+        const help = form.querySelector('#apms-review-notes-help');
+        if (!decision || !notes || !help) return;
+
+        const syncReviewNotes = () => {
+            const required = ['returned', 'rejected'].includes(decision.value);
+            notes.required = required;
+            notes.setAttribute('aria-required', String(required));
+            help.textContent = required
+                ? 'Required for this decision. Explain what the farmer should correct or why the submission cannot be accepted.'
+                : 'Optional for approval. Clear notes help the farmer understand the recorded outcome.';
+        };
+
+        decision.addEventListener('change', syncReviewNotes);
+        form.addEventListener('submit', () => {
+            const submit = form.querySelector('button[type="submit"]');
+            if (submit) {
+                submit.disabled = true;
+                submit.setAttribute('aria-busy', 'true');
+            }
+        });
+        syncReviewNotes();
+    });
 
     document.querySelectorAll('form').forEach((form) => {
         const stage = form.querySelector('[data-crop-stage]');

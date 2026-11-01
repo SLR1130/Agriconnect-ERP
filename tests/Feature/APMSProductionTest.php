@@ -241,8 +241,8 @@ class APMSProductionTest extends TestCase
             ->get('/modules/apms?tab=production&record_type=crops&crop_status=planned')
             ->assertOk();
         $firstPanel = $this->cropPanel($firstPage->getContent());
-        $this->assertStringContainsString('Pagination Crop 01', $firstPanel);
-        $this->assertStringNotContainsString('Pagination Crop 11', $firstPanel);
+        $this->assertStringContainsString('Pagination Crop 11', $firstPanel);
+        $this->assertStringNotContainsString('Pagination Crop 01', $firstPanel);
         $this->assertStringContainsString('crop_status=planned&amp;crops=2', $firstPage->getContent());
 
         $secondPage = $this->get('/modules/apms?tab=production&record_type=crops&crop_status=planned&crops=2')
@@ -250,8 +250,8 @@ class APMSProductionTest extends TestCase
             ->assertSee('data-initial-tab="production"', false)
             ->assertSee('data-initial-record-type="crops"', false);
         $secondPanel = $this->cropPanel($secondPage->getContent());
-        $this->assertStringContainsString('Pagination Crop 11', $secondPanel);
-        $this->assertStringNotContainsString('Pagination Crop 01', $secondPanel);
+        $this->assertStringContainsString('Pagination Crop 01', $secondPanel);
+        $this->assertStringNotContainsString('Pagination Crop 11', $secondPanel);
     }
 
     public function test_invalid_crop_submission_returns_with_workspace_and_form_errors(): void

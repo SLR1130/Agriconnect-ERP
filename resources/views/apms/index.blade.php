@@ -1,7 +1,13 @@
 ﻿<x-layouts.app>
     <x-slot name="header">Agricultural Production &amp; Monitoring</x-slot>
     <x-slot name="description">Manage agricultural production, field assessments and monitoring records.</x-slot>
-    @if(\Illuminate\Support\Facades\Schema::hasTable('production_submissions'))<a class="mb-4 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('modules.apms.submissions') }}">Review farmer-submitted production →</a>@endif
+    @if($pendingSubmissionCount !== null)
+        <a class="apms-review-callout" href="{{ route('modules.apms.submissions') }}">
+            <span class="apms-review-callout-icon"><x-ui.icon name="action" size="md" /></span>
+            <span class="apms-review-callout-copy"><strong>Farmer production submissions</strong><small>Review verified farmer entries before they become official APMS records.</small></span>
+            <span class="apms-review-callout-action"><span>{{ number_format($pendingSubmissionCount) }} pending</span><x-ui.icon name="next" size="sm" /></span>
+        </a>
+    @endif
 
     @php
         $tabs = [
@@ -81,9 +87,9 @@
                         <div class="apms-section-heading"><div><p class="apms-kicker">Shortcuts</p><h2>Common tasks</h2><p>Open only the editor you need.</p></div></div>
                         <div class="apms-quick-actions">
                             @if($canCreate)
-                                <button type="button" class="apms-quick-action" data-apms-open-editor="crop" data-apms-title="Add crop record"><span aria-hidden="true">CR</span><span><strong>Record crop production</strong><small>Crop, area, planting and yield</small></span><b aria-hidden="true">→</b></button>
-                                <button type="button" class="apms-quick-action" data-apms-open-editor="incident" data-apms-title="Report pest or disease incident"><span aria-hidden="true">!</span><span><strong>Report an incident</strong><small>Capture severity and affected crop</small></span><b aria-hidden="true">→</b></button>
-                                <button type="button" class="apms-quick-action" data-apms-open-editor="monitoring" data-apms-title="Add farm monitoring visit"><span aria-hidden="true">FV</span><span><strong>Log a farm visit</strong><small>Record findings and recommendations</small></span><b aria-hidden="true">→</b></button>
+                                <button type="button" class="apms-quick-action" data-apms-open-editor="crop" data-apms-title="Add crop record"><span class="apms-quick-action-icon"><x-ui.icon name="crop" size="sm" /></span><span><strong>Record crop production</strong><small>Crop, area, planting and yield</small></span><x-ui.icon name="next" size="sm" /></button>
+                                <button type="button" class="apms-quick-action" data-apms-open-editor="incident" data-apms-title="Report pest or disease incident"><span class="apms-quick-action-icon"><x-ui.icon name="monitoring" size="sm" /></span><span><strong>Report an incident</strong><small>Capture severity and affected crop</small></span><x-ui.icon name="next" size="sm" /></button>
+                                <button type="button" class="apms-quick-action" data-apms-open-editor="monitoring" data-apms-title="Add farm monitoring visit"><span class="apms-quick-action-icon"><x-ui.icon name="farms" size="sm" /></span><span><strong>Log a farm visit</strong><small>Record findings and recommendations</small></span><x-ui.icon name="next" size="sm" /></button>
                             @else
                                 <p class="apms-readonly-note">This account can review APMS records but cannot create operational entries.</p>
                             @endif

@@ -10,9 +10,11 @@ use App\Models\FarmMonitoringRecord;
 use App\Models\FisheryRecord;
 use App\Models\LivestockRecord;
 use App\Models\PestDiseaseIncident;
+use App\Models\ProductionSubmission;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -21,6 +23,9 @@ class APMSController extends Controller
     public function index(Request $request): View
     {
         $this->authorizeModule($request, 'view');
+        $pendingSubmissionCount = Schema::hasTable('production_submissions')
+            ? ProductionSubmission::query()->where('status', 'pending')->count()
+            : null;
         $recordSearch = trim($request->string('record_search')->toString());
         $seasonSearch = trim($request->string('season_search')->toString());
         $farms = Farm::query()->whereHas('farmer', fn ($query) => $query->where('registration_status', 'verified'))
@@ -38,7 +43,7 @@ class APMSController extends Controller
                 });
             })
             ->when($request->filled('crop_status'), fn (Builder $query) => $query->where('status', $request->string('crop_status')->toString()))
-            ->latest()->paginate(10, ['*'], 'crops')->withQueryString();
+            ->orderByDesc('created_at')->orderByDesc('id')->paginate(10, ['*'], 'crops')->withQueryString();
 
         $livestock = LivestockRecord::query()->with('farm')
             ->when($recordSearch !== '', function (Builder $query) use ($recordSearch): void {
@@ -50,7 +55,7 @@ class APMSController extends Controller
                 });
             })
             ->when($request->filled('livestock_status'), fn (Builder $query) => $query->where('status', $request->string('livestock_status')->toString()))
-            ->latest()->paginate(10, ['*'], 'livestock_page')->withQueryString();
+            ->orderByDesc('created_at')->orderByDesc('id')->paginate(10, ['*'], 'livestock_page')->withQueryString();
 
         $fisheries = FisheryRecord::query()->with('farm')
             ->when($recordSearch !== '', function (Builder $query) use ($recordSearch): void {
@@ -61,7 +66,7 @@ class APMSController extends Controller
                         ->orWhereHas('farm', fn (Builder $farmQuery) => $farmQuery->where('name', 'like', $like));
                 });
             })
-            ->latest()->paginate(10, ['*'], 'fisheries_page')->withQueryString();
+            ->orderByDesc('created_at')->orderByDesc('id')->paginate(10, ['*'], 'fisheries_page')->withQueryString();
 
         $incidents = PestDiseaseIncident::query()->with('farm')
             ->when($recordSearch !== '', function (Builder $query) use ($recordSearch): void {
@@ -75,7 +80,7 @@ class APMSController extends Controller
             })
             ->when($request->filled('incident_status'), fn (Builder $query) => $query->where('status', $request->string('incident_status')->toString()))
             ->when($request->filled('severity'), fn (Builder $query) => $query->where('severity', $request->string('severity')->toString()))
-            ->latest()->paginate(10, ['*'], 'incidents_page')->withQueryString();
+            ->orderByDesc('created_at')->orderByDesc('id')->paginate(10, ['*'], 'incidents_page')->withQueryString();
 
         $monitoring = FarmMonitoringRecord::query()->with('farm')
             ->when($recordSearch !== '', function (Builder $query) use ($recordSearch): void {
@@ -88,7 +93,7 @@ class APMSController extends Controller
                 });
             })
             ->when($request->filled('monitoring_status'), fn (Builder $query) => $query->where('status', $request->string('monitoring_status')->toString()))
-            ->latest()->paginate(10, ['*'], 'monitoring_page')->withQueryString();
+            ->orderByDesc('created_at')->orderByDesc('id')->paginate(10, ['*'], 'monitoring_page')->withQueryString();
 
         $recentActivity = collect([
             ['type' => 'Crop', 'records' => CropProductionRecord::with('farm')->latest()->limit(3)->get(), 'title' => 'crop_type', 'date' => 'planted_on'],
@@ -115,8 +120,9 @@ class APMSController extends Controller
             'fisheries' => $fisheries,
             'incidents' => $incidents,
             'monitoring' => $monitoring,
-            'seasonRecords' => AgriculturalSeason::query()->when($seasonSearch !== '', fn (Builder $query) => $query->where('name', 'like', '%'.$seasonSearch.'%'))->orderByDesc('starts_on')->paginate(10, ['*'], 'seasons_page')->withQueryString(),
+            'seasonRecords' => AgriculturalSeason::query()->when($seasonSearch !== '', fn (Builder $query) => $query->where('name', 'like', '%'.$seasonSearch.'%'))->orderByDesc('starts_on')->orderByDesc('id')->paginate(10, ['*'], 'seasons_page')->withQueryString(),
             'recentActivity' => $recentActivity,
+            'pendingSubmissionCount' => $pendingSubmissionCount,
             'selectedTab' => in_array($request->query('tab'), $allowedTabs, true) ? $request->query('tab') : 'overview',
             'selectedRecordType' => in_array($request->query('record_type'), $allowedRecordTypes, true) ? $request->query('record_type') : 'crops',
             'selectedMonitoringType' => in_array($request->query('monitoring_type'), $allowedMonitoringTypes, true) ? $request->query('monitoring_type') : 'incidents',

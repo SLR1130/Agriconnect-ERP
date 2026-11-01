@@ -46,7 +46,15 @@ class CoreOperationsCompletionTest extends TestCase
         $staff = $this->staff('ffrms');
         $data = $this->farmerAndFarm();
 
-        $this->actingAs($staff)->get('/modules/ffrms')->assertOk()->assertSee('Correct farmer information')->assertSee('Edit farm record');
+        $this->actingAs($staff)->get('/modules/ffrms')
+            ->assertOk()
+            ->assertSee($data['farmerUser']->name)
+            ->assertSee('View details')
+            ->assertDontSee('Correct farmer information');
+        $this->actingAs($staff)->get('/modules/ffrms?record='.$data['farmer']->id)
+            ->assertOk()
+            ->assertSee('Correct farmer information')
+            ->assertSee('Edit farm record');
         $this->actingAs($staff)->patch('/modules/ffrms/registrations/'.$data['farmer']->id, [
             'name' => 'Corrected Farmer', 'email' => $data['farmerUser']->email, 'phone' => '09170000000', 'address' => 'Updated address', 'barangay' => 'East Barangay',
         ])->assertRedirect();
