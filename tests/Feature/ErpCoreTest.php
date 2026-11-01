@@ -63,8 +63,8 @@ class ErpCoreTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('AgriConnect ERP')
-            ->assertSee('Live records from')
-            ->assertSee('Isolated SQLite')
+            ->assertSee('Operational snapshot')
+            ->assertDontSee('Isolated SQLite')
             ->assertDontSee(':memory:');
     }
 

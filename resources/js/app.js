@@ -2,23 +2,53 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('app-sidebar');
     const shell = document.querySelector('.erp-shell');
     const sidebarToggle = document.getElementById('mobile-sidebar-toggle');
+    const sidebarCloseButton = document.getElementById('mobile-sidebar-close');
     const desktopSidebarToggle = document.getElementById('desktop-sidebar-toggle');
     const backdrop = document.getElementById('mobile-sidebar-backdrop');
+    let drawerOpener = null;
+    const mobileDrawer = () => window.matchMedia('(max-width: 1023px)').matches;
 
-    const closeSidebar = () => {
+    const closeSidebar = (restoreFocus = false) => {
         sidebar?.classList.remove('is-open');
         sidebarToggle?.setAttribute('aria-expanded', 'false');
         if (backdrop) backdrop.hidden = true;
+        document.body.classList.remove('erp-nav-open');
+        sidebar?.removeAttribute('aria-modal');
+        sidebar?.removeAttribute('role');
+        if (sidebar) sidebar.inert = mobileDrawer();
+        if (restoreFocus) {
+            drawerOpener?.focus();
+            drawerOpener = null;
+        }
     };
 
     sidebarToggle?.addEventListener('click', () => {
-        const open = sidebar?.classList.toggle('is-open') ?? false;
-        sidebarToggle.setAttribute('aria-expanded', String(open));
-        if (backdrop) backdrop.hidden = !open;
+        if (sidebar?.classList.contains('is-open')) {
+            closeSidebar(true);
+            return;
+        }
+        drawerOpener = sidebarToggle;
+        sidebar?.classList.add('is-open');
+        if (sidebar) {
+            sidebar.inert = false;
+            sidebar.setAttribute('role', 'dialog');
+            sidebar.setAttribute('aria-modal', 'true');
+        }
+        document.body.classList.add('erp-nav-open');
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+        if (backdrop) backdrop.hidden = false;
+        requestAnimationFrame(() => sidebar?.querySelector('button:not([disabled]), a[href]')?.focus());
     });
-    backdrop?.addEventListener('click', closeSidebar);
-    sidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeSidebar));
-    window.addEventListener('resize', () => { if (window.innerWidth >= 1024) closeSidebar(); });
+    sidebarCloseButton?.addEventListener('click', () => closeSidebar(true));
+    backdrop?.addEventListener('click', () => closeSidebar(true));
+    sidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => closeSidebar(false)));
+    if (sidebar && mobileDrawer()) {
+        sidebar.inert = true;
+    }
+    window.addEventListener('resize', () => {
+        if (!mobileDrawer()) closeSidebar(false);
+        else if (!sidebar?.classList.contains('is-open') && sidebar) sidebar.inert = true;
+    });
 
     const setDesktopSidebarCollapsed = (collapsed) => {
         if (!shell || !desktopSidebarToggle) return;
@@ -70,6 +100,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('keydown', (event) => {
+        if (mobileDrawer() && sidebar?.classList.contains('is-open')) {
+            const focusable = [...sidebar.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+            if (event.key === 'Tab' && focusable.length) {
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+            if (event.key === 'Escape') {
+                closeSidebar(true);
+                return;
+            }
+        }
         if (event.key !== 'Escape') return;
 
         document.querySelectorAll('[data-topbar-menu]').forEach((menu) => { menu.hidden = true; });

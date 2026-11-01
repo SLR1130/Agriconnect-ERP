@@ -12,6 +12,7 @@
     @endif
 </head>
 <body class="erp-body font-sans antialiased">
+    <a class="erp-skip-link" href="#erp-main-content">Skip to main content</a>
     @php
         $currentUser = auth()->user();
         $rolePriority = ['super_admin', 'mao_admin', 'municipal_agriculturist', 'module_personnel', 'authorized_viewer', 'farmer'];
@@ -25,9 +26,9 @@
         <button id="mobile-sidebar-backdrop" class="erp-backdrop" type="button" hidden aria-label="Close navigation"></button>
 
         <div class="erp-main">
-            @include('components.navbar', ['currentUser' => $currentUser, 'currentRoleName' => $currentRoleName, 'currentInitials' => $currentInitials])
+            @include('components.navbar', ['currentUser' => $currentUser, 'currentRoleName' => $currentRoleName, 'currentInitials' => $currentInitials, 'header' => $header ?? null])
 
-            <main class="erp-content">
+            <main id="erp-main-content" class="erp-content" tabindex="-1">
                 @if(isset($header))
                     <header class="erp-page-heading">
                         <div>

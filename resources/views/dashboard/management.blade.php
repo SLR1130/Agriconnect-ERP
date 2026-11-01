@@ -5,46 +5,24 @@
     $hasResources = isset($sections['aisms']) || isset($sections['aasms']) || isset($sections['aeams']);
     $hasFinance = isset($sections['abpms']);
     $canSeeActivity = count($activities) > 0;
+    $dashboardIcons = ['ffrms' => 'users', 'apms' => 'chart', 'aisms' => 'inventory', 'aasms' => 'assistance', 'aeams' => 'equipment', 'abpms' => 'finance'];
 @endphp
 
 <x-layouts.app>
     <x-slot name="header">{{ $roleContext['dashboard_title'] }}</x-slot>
-    <x-slot name="description">Live records from {{ $databaseLabel }} · {{ $roleContext['description'] }}</x-slot>
+    <x-slot name="description">{{ $roleContext['description'] }}</x-slot>
 
-    <section class="mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102f23] via-[#153d2b] to-[#26865c] px-5 py-6 text-white shadow-sm md:px-7">
-        <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div class="max-w-3xl">
-                <p class="text-xs font-black uppercase tracking-[.18em] text-[#e3c878]">{{ $roleContext['eyebrow'] }} <span class="mx-1 text-white/50">·</span> {{ $roleContext['role_label'] }}</p>
-                <h2 class="mt-2 text-2xl font-extrabold tracking-tight md:text-[1.75rem]">{{ $roleContext['headline'] }}</h2>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/90">{{ $roleContext['description'] }}</p>
-            </div>
-            <form method="GET" action="{{ route($dashboardRoute) }}" class="grid grid-cols-2 gap-2 rounded-xl border border-white/15 bg-white/10 p-3 {{ count($analytics['seasons']) ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }} lg:min-w-[22rem]" aria-label="Filter dashboard period">
-                <div>
-                    <label class="mb-1 block text-[.68rem] font-bold uppercase tracking-wide text-white/75" for="dashboard-from">From</label>
-                    <input id="dashboard-from" class="w-full rounded-lg border-white/20 bg-white px-2.5 py-2 text-sm text-[#153d2b]" type="date" name="from" value="{{ $analytics['period']['from'] }}" required>
-                </div>
-                <div>
-                    <label class="mb-1 block text-[.68rem] font-bold uppercase tracking-wide text-white/75" for="dashboard-to">Through</label>
-                    <input id="dashboard-to" class="w-full rounded-lg border-white/20 bg-white px-2.5 py-2 text-sm text-[#153d2b]" type="date" name="to" value="{{ $analytics['period']['to'] }}" min="{{ $analytics['period']['from'] }}" required>
-                </div>
-                @if(count($analytics['seasons']))
-                    <div>
-                        <label class="mb-1 block text-[.68rem] font-bold uppercase tracking-wide text-white/75" for="dashboard-season">Season</label>
-                        <select id="dashboard-season" class="w-full rounded-lg border-white/20 bg-white px-2.5 py-2 text-sm text-[#153d2b]" name="season">
-                            <option value="">All seasons</option>
-                            @foreach($analytics['seasons'] as $season)
-                                <option value="{{ $season->id }}" @selected((int) $analytics['selected_season'] === (int) $season->id)>{{ $season->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-                <div class="col-span-2 flex items-end gap-2 {{ count($analytics['seasons']) ? 'sm:col-span-3' : 'sm:col-span-2' }}">
-                    <button class="rounded-lg bg-[#d5ad55] px-4 py-2 text-sm font-extrabold text-[#243324] transition hover:bg-[#e3c878] focus:outline-none focus:ring-2 focus:ring-white" type="submit">Apply period</button>
-                    <a class="rounded-lg border border-white/30 px-4 py-2 text-sm font-bold text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white" href="{{ route($dashboardRoute) }}">Reset</a>
-                </div>
-            </form>
+    <form method="GET" action="{{ route($dashboardRoute) }}" class="erp-dashboard-filter erp-surface mb-5" aria-label="Filter dashboard reporting period">
+        <div class="erp-dashboard-filter-intro"><p class="erp-page-eyebrow">Reporting period</p><p>Choose a date range to refresh the operational summaries.</p></div>
+        <div class="erp-dashboard-filter-fields">
+            <div class="erp-field"><label for="dashboard-from">From</label><input id="dashboard-from" type="date" name="from" value="{{ $analytics['period']['from'] }}" required></div>
+            <div class="erp-field"><label for="dashboard-to">Through</label><input id="dashboard-to" type="date" name="to" value="{{ $analytics['period']['to'] }}" min="{{ $analytics['period']['from'] }}" required></div>
+            @if(count($analytics['seasons']))
+                <div class="erp-field"><label for="dashboard-season">Season</label><select id="dashboard-season" name="season"><option value="">All seasons</option>@foreach($analytics['seasons'] as $season)<option value="{{ $season->id }}" @selected((int) $analytics['selected_season'] === (int) $season->id)>{{ $season->name }}</option>@endforeach</select></div>
+            @endif
+            <div class="erp-dashboard-filter-actions"><button class="erp-button erp-button-primary" type="submit">Apply filters</button><a class="erp-button erp-button-secondary" href="{{ route($dashboardRoute) }}">Reset</a></div>
         </div>
-    </section>
+    </form>
 
     @if($errors->any())
         <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
@@ -53,35 +31,58 @@
         </div>
     @endif
 
-    @if($health)
-        <section class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5" aria-label="System administration indicators">
-            @foreach([
-                ['label' => 'Accounts', 'key' => 'total_users'],
-                ['label' => 'Active accounts', 'key' => 'active_users'],
-                ['label' => 'Active roles', 'key' => 'active_roles'],
-                ['label' => 'Enabled modules', 'key' => 'enabled_modules'],
-                ['label' => 'Audit events', 'key' => 'activity_logs'],
-            ] as $stat)
-                <article class="erp-surface px-4 py-3">
-                    <p class="text-[.68rem] font-bold uppercase tracking-wide text-gray-500">{{ $stat['label'] }}</p>
-                    <p class="mt-1 text-2xl font-extrabold text-[#153d2b]">{{ number_format($systemStats[$stat['key']]['value']) }}</p>
-                </article>
-            @endforeach
+    @if(count($pendingActions))
+        <section class="erp-action-center erp-surface mb-5" aria-labelledby="pending-action-center-title">
+            <div class="erp-section-header"><div><p class="erp-page-eyebrow">Authorized work queues</p><h2 id="pending-action-center-title" class="erp-section-title">Action center</h2><p class="mt-1 text-sm text-gray-500">Review the pending records available to your role.</p></div><span class="erp-pill">{{ collect($pendingActions)->sum('count') }} awaiting attention</span></div>
+            <div class="erp-action-grid">
+                @foreach($pendingActions as $queue)
+                    <article class="erp-action-card">
+                        <div class="erp-action-card-heading"><span class="erp-action-icon"><x-ui.icon :name="$dashboardIcons[strtolower($queue['module'])] ?? 'action'" size="sm" /></span><div class="min-w-0"><p class="erp-action-module">{{ $queue['module'] }}</p><h3>{{ $queue['title'] }}</h3></div><span class="erp-action-count {{ $queue['count'] > 0 ? 'is-pending' : 'is-clear' }}">{{ $queue['count'] }}</span></div>
+                        @if(count($queue['items']))
+                            <ul class="erp-action-list">
+                                @foreach($queue['items'] as $item)
+                                    <li><a href="{{ $item['href'] }}"><span class="erp-action-item-title">{{ $item['title'] }}</span><span class="erp-action-item-detail">{{ $item['detail'] }}</span></a><time datetime="{{ $item['date']->toIso8601String() }}">{{ $item['date']->format('M j') }}</time></li>
+                                @endforeach
+                            </ul>
+                        @else
+                            <p class="erp-action-empty">No records are waiting in this queue.</p>
+                        @endif
+                        <a class="erp-action-link" href="{{ $queue['href'] }}">Open {{ strtolower($queue['module']) }} queue <x-ui.icon name="next" size="xs" /></a>
+                    </article>
+                @endforeach
+            </div>
         </section>
     @endif
 
-    <section class="mb-6" aria-label="Operational indicators for selected period">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+    @if($health)
+        <section class="erp-admin-summary erp-surface mb-5" aria-label="System administration indicators">
+            <div class="erp-admin-summary-heading"><div><p class="erp-page-eyebrow">System administration</p><h2 class="erp-section-title">Account and platform summary</h2></div><span class="erp-pill">Current status</span></div>
+            <dl class="erp-admin-summary-grid">
+                @foreach([
+                    ['label' => 'Accounts', 'key' => 'total_users'],
+                    ['label' => 'Active accounts', 'key' => 'active_users'],
+                    ['label' => 'Active roles', 'key' => 'active_roles'],
+                    ['label' => 'Enabled modules', 'key' => 'enabled_modules'],
+                    ['label' => 'Audit events', 'key' => 'activity_logs'],
+                ] as $stat)
+                    <div><dt>{{ $stat['label'] }}</dt><dd>{{ number_format($systemStats[$stat['key']]['value']) }}</dd></div>
+                @endforeach
+            </dl>
+        </section>
+    @endif
+
+    <section class="erp-operational-snapshot mb-6" aria-label="Operational indicators for selected period">
+        <div class="erp-operational-heading">
             <div><p class="erp-page-eyebrow">Selected period</p><h2 class="erp-section-title text-lg">Operational snapshot</h2></div>
-            <p class="text-xs text-gray-500">{{ \Illuminate\Support\Carbon::parse($analytics['period']['from'])->format('M j, Y') }} – {{ \Illuminate\Support\Carbon::parse($analytics['period']['to'])->format('M j, Y') }} <span class="text-gray-400">· current stock and asset states are as of today</span></p>
+            <p>{{ \Illuminate\Support\Carbon::parse($analytics['period']['from'])->format('M j, Y') }} – {{ \Illuminate\Support\Carbon::parse($analytics['period']['to'])->format('M j, Y') }} <span>Current stock and asset availability are as of today.</span></p>
         </div>
         @if($overviewCards->isNotEmpty())
-            <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <div class="erp-operational-grid">
                 @foreach($overviewCards as $card)
-                    <article class="erp-surface min-w-0 px-4 py-4">
-                        <p class="truncate text-xs font-bold uppercase tracking-wide text-gray-500">{{ $card['label'] }}</p>
-                        <p class="mt-2 break-words text-2xl font-extrabold text-[#153d2b]">{{ is_numeric($card['value']) ? number_format((float) $card['value'], str_contains((string) $card['value'], '.') ? 2 : 0) : $card['value'] }}</p>
-                        <p class="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">{{ $card['note'] }}</p>
+                    <article class="erp-dashboard-stat">
+                        <p>{{ $card['label'] }}</p>
+                        <strong>{{ is_numeric($card['value']) ? number_format((float) $card['value'], str_contains((string) $card['value'], '.') ? 2 : 0) : $card['value'] }}</strong>
+                        <span>{{ $card['note'] }}</span>
                     </article>
                 @endforeach
             </div>
@@ -89,7 +90,6 @@
             <div class="erp-surface erp-empty">No agricultural module access is assigned to this account. Contact an administrator if this is unexpected.</div>
         @endif
     </section>
-
     <div class="erp-workspace" data-erp-workspace data-workspace-param="workspace" data-workspace-default="{{ request('workspace', 'overview') }}">
         <nav class="erp-workspace-tabs" role="tablist" aria-label="Management dashboard sections">
             <button class="erp-workspace-tab" id="dashboard-tab-overview" role="tab" type="button" aria-selected="true" aria-controls="dashboard-panel-overview" data-erp-workspace-tab="overview">Overview</button>
@@ -100,40 +100,17 @@
         </nav>
 
         <section class="erp-workspace-panel" id="dashboard-panel-overview" role="tabpanel" aria-labelledby="dashboard-tab-overview" tabindex="0" data-erp-workspace-panel="overview">
-            @if(count($pendingActions))
-                <section class="mb-5 erp-surface p-5 md:p-6" aria-labelledby="pending-action-center-title">
-                    <div class="erp-section-header"><div><p class="erp-page-eyebrow">Farmer-to-MAO service flow</p><h2 id="pending-action-center-title" class="erp-section-title">Action center</h2><p class="mt-1 text-sm text-gray-500">Pending records that your role is authorized to review.</p></div><span class="erp-pill">Live queue</span></div>
-                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach($pendingActions as $queue)
-                            <article class="min-w-0 rounded-xl border border-[#e4ebe5] bg-white p-4">
-                                <div class="flex items-start justify-between gap-2"><div><p class="text-[.68rem] font-black uppercase tracking-wide text-emerald-700">{{ $queue['module'] }}</p><h3 class="mt-1 text-sm font-extrabold text-[#243324]">{{ $queue['title'] }}</h3></div><span class="erp-pill {{ $queue['count'] > 0 ? 'erp-pill-warning' : 'erp-pill-success' }}">{{ $queue['count'] }}</span></div>
-                                @if(count($queue['items']))
-                                    <ul class="mt-3 divide-y divide-gray-100">
-                                        @foreach($queue['items'] as $item)
-                                            <li class="py-2 first:pt-0"><a class="block text-sm font-semibold text-[#153d2b] underline decoration-transparent hover:decoration-current" href="{{ $item['href'] }}">{{ $item['title'] }}</a><p class="mt-0.5 text-xs leading-5 text-gray-500">{{ $item['detail'] }} · Added {{ $item['date']->format('M j, Y') }}</p></li>
-                                        @endforeach
-                                    </ul>
-                                @else
-                                    <p class="mt-3 text-sm text-gray-500">No records are waiting in this queue.</p>
-                                @endif
-                                <a class="mt-3 inline-flex min-h-10 items-center text-sm font-bold text-emerald-700 underline" href="{{ $queue['href'] }}">Open {{ strtolower($queue['module']) }} queue <span class="ml-1" aria-hidden="true">→</span></a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
             <div class="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
                 <div class="erp-surface p-5 md:p-6">
                     <div class="erp-section-header"><div><p class="erp-page-eyebrow">Authorized shortcuts</p><h2 class="erp-section-title text-lg">Your workspaces</h2></div><span class="erp-pill">{{ count($modules) }} available</span></div>
                     @if(count($modules))
                         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             @foreach($modules as $slug => $module)
-                                <a href="{{ route('modules.'.$slug.'.dashboard') }}" class="group rounded-xl border border-[#e4ebe5] bg-white p-4 transition hover:border-[#26865c] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#26865c]">
-                                    <div class="flex items-center justify-between gap-2"><span class="rounded-md bg-[#e7f0e8] px-2 py-1 text-[.65rem] font-extrabold tracking-wide text-[#153d2b]">{{ strtoupper($slug) }}</span><span class="text-[.68rem] font-semibold {{ $module['enabled'] ? 'text-emerald-700' : 'text-amber-700' }}">{{ $module['enabled'] ? 'Enabled' : 'Registry disabled' }}</span></div>
-                                    <h3 class="mt-3 text-sm font-extrabold text-[#243324] group-hover:text-[#26865c]">{{ $module['name'] }}</h3>
-                                    <p class="mt-1 text-xs leading-5 text-gray-500">{{ $module['description'] }}</p>
-                                    <span class="mt-3 inline-block text-xs font-extrabold text-[#26865c]">Open workspace <span aria-hidden="true">→</span></span>
-                                </a>
+                                <a href="{{ route('modules.'.$slug.'.dashboard') }}" class="erp-dashboard-workspace group rounded-xl border border-[#e4ebe5] bg-white p-4 transition hover:border-[#26865c] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#26865c]">
+    <div class="flex items-center justify-between gap-2"><span class="rounded-md bg-[#e7f0e8] px-2 py-1 text-[.65rem] font-extrabold tracking-wide text-[#153d2b]">{{ strtoupper($slug) }}</span><span class="text-[.68rem] font-semibold {{ $module['enabled'] ? 'text-emerald-700' : 'text-amber-700' }}">{{ $module['enabled'] ? 'Enabled' : 'Registry disabled' }}</span></div>
+    <div class="erp-dashboard-shortcut mt-4"><span class="erp-dashboard-shortcut-icon"><x-ui.icon :name="$dashboardIcons[$slug] ?? 'modules'" size="md" /></span><span class="erp-dashboard-shortcut-copy"><h3 class="text-sm font-extrabold text-[#243324] group-hover:text-[#26865c]">{{ $module['name'] }}</h3><p class="mt-1 text-xs leading-5 text-gray-500">{{ $module['description'] }}</p></span></div>
+    <span class="mt-4 inline-flex items-center gap-1 text-xs font-extrabold text-[#26865c]">Open workspace <x-ui.icon name="next" size="xs" /></span>
+</a>
                             @endforeach
                         </div>
                     @else

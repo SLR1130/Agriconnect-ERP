@@ -200,6 +200,48 @@ class GranularRbacTest extends TestCase
             ->assertDontSee('Budget &amp; Procurement', false);
     }
 
+    public function test_staff_shell_uses_clear_icon_navigation_and_keeps_module_links_permission_scoped(): void
+    {
+        $admin = $this->account('super_admin', ['dashboard.view']);
+        $this->actingAs($admin)->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('aria-label="Main menu"', false)
+            ->assertSee('aria-label="Breadcrumb"', false)
+            ->assertSee('id="mobile-sidebar-toggle"', false)
+            ->assertSee('id="mobile-sidebar-close"', false)
+            ->assertSee('id="erp-main-content"', false)
+            ->assertSee('System administration')
+            ->assertSee('User management')
+            ->assertDontSee('title="Overview"', false)
+            ->assertSee('Action center')
+            ->assertDontSee('Development Progress');
+
+        $municipal = $this->account('municipal_agriculturist', [
+            'dashboard.view',
+            'modules.ffrms.view',
+            'modules.apms.view',
+            'modules.aasms.view',
+            'reports.view',
+        ]);
+        $municipalResponse = $this->actingAs($municipal)->get('/mao/dashboard')->assertOk()
+            ->assertSee('Agricultural operations')
+            ->assertSee('Programs &amp; resources', false)
+            ->assertSee('Reporting &amp; oversight', false)
+            ->assertSee('Farmer &amp; Farm Registration', false)
+            ->assertSee('Production &amp; Monitoring', false)
+            ->assertSee('Assistance &amp; Subsidies', false)
+            ->assertDontSee('Inventory &amp; Supply', false)
+            ->assertDontSee('Finance &amp; Procurement', false)
+            ->assertDontSee('System administration')
+            ->assertDontSee(route('modules.abpms.dashboard'), false);
+
+        $this->assertLessThan(
+            strpos($municipalResponse->getContent(), 'Operational snapshot'),
+            strpos($municipalResponse->getContent(), 'Action center'),
+            'Authorized pending queues should appear before the dashboard metrics.',
+        );
+    }
+
     public function test_municipal_agriculturist_cannot_approve_an_assistance_application(): void
     {
         $municipal = $this->account('municipal_agriculturist', [
