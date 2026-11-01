@@ -82,6 +82,7 @@
                                 <p><span class="font-bold text-dark-slate">View:</span> read-only operational access.</p>
                                 <p><span class="font-bold text-dark-slate">Write:</span> create, update, receive, release, adjust, issue, or return.</p>
                                 <p><span class="font-bold text-dark-slate">Workflow:</span> review, approve, reject, or distribute.</p>
+                                <p><span class="font-bold text-dark-slate">AASMS publishing:</span> exact <code>modules.aasms.publish</code> grant required; no operational role receives it by default, and broad legacy wildcards do not imply it.</p>
                                 <p><span class="font-bold text-dark-slate">Restricted:</span> system administration remains Super Administrator-only.</p>
                             </div>
                         </div>

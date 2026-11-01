@@ -129,6 +129,73 @@ document.addEventListener('DOMContentLoaded', () => {
         if (form && !window.confirm(form.dataset.confirmSubmit)) event.preventDefault();
     });
 
+    document.querySelectorAll('[data-publication-gallery-input]').forEach((input) => {
+        const form = input.closest('form');
+        const list = form?.querySelector('[data-publication-gallery-alt-list]');
+        if (!list) return;
+
+        input.addEventListener('change', () => {
+            list.replaceChildren();
+            const files = [...(input.files || [])];
+            if (files.length > 6) {
+                input.value = '';
+                list.textContent = 'Select no more than six gallery photographs.';
+                return;
+            }
+
+            files.forEach((file, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'farmer-field publication-gallery-alt';
+                const label = document.createElement('label');
+                const field = document.createElement('input');
+                field.type = 'text';
+                field.name = `gallery_alt[${index}]`;
+                field.maxLength = 180;
+                field.required = true;
+                field.placeholder = 'Describe the photograph';
+                label.htmlFor = `${input.id || 'publication-gallery'}-alt-${index}`;
+                label.textContent = `Alternative text for ${file.name}`;
+                field.id = label.htmlFor;
+                wrapper.append(label, field);
+                list.append(wrapper);
+            });
+        });
+    });
+
+    document.querySelectorAll('[data-publication-media-list]').forEach((list) => {
+        list.querySelectorAll('[data-publication-media-item]').forEach((row) => {
+            const keep = row.querySelector('input[name="keep_media_ids[]"]');
+            const cover = row.querySelector('input[name="existing_cover_id"]');
+            if (!keep || !cover) return;
+            cover.disabled = !keep.checked;
+            keep.addEventListener('change', () => {
+                cover.disabled = !keep.checked;
+                if (!keep.checked && cover.checked) cover.checked = false;
+            });
+        });
+        list.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-publication-move]');
+            const item = button?.closest('[data-publication-media-item]');
+            if (!button || !item) return;
+            if (button.dataset.publicationMove === 'up' && item.previousElementSibling) {
+                list.insertBefore(item, item.previousElementSibling);
+            } else if (button.dataset.publicationMove === 'down' && item.nextElementSibling) {
+                list.insertBefore(item.nextElementSibling, item);
+            }
+            list.querySelectorAll('[data-publication-media-item]').forEach((row, index, rows) => {
+                const up = row.querySelector('[data-publication-move="up"]');
+                const down = row.querySelector('[data-publication-move="down"]');
+                if (up) up.disabled = index === 0;
+                if (down) down.disabled = index === rows.length - 1;
+            });
+            button.focus();
+        });
+        list.querySelectorAll('[data-publication-media-item]').forEach((row, index, rows) => {
+            row.querySelector('[data-publication-move="up"]')?.toggleAttribute('disabled', index === 0);
+            row.querySelector('[data-publication-move="down"]')?.toggleAttribute('disabled', index === rows.length - 1);
+        });
+    });
+
     document.addEventListener('click', (event) => {
         const cancel = event.target.closest('[data-ffrms-close-edit]');
         if (!cancel) return;

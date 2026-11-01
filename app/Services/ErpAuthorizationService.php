@@ -136,6 +136,13 @@ class ErpAuthorizationService
             return true;
         }
 
+        if ($permission === 'modules.aasms.publish') {
+            // Publishing is a separate, explicit MAO role grant. Broad legacy
+            // wildcards and delegated Module Personnel assignments do not imply it.
+            return $role->slug === 'mao_admin'
+                && in_array($permission, $role->permissions ?? [], true);
+        }
+
         if (! in_array($role->slug, self::BUILT_IN_ROLES, true)) {
             return $this->rawRoleGrant($role, $permission);
         }

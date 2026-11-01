@@ -7,6 +7,12 @@
     <div class="farmer-program-detail-layout">
         <div class="farmer-program-detail-main">
             <section class="farmer-card" aria-labelledby="program-overview-title">
+                @if($publication)
+                    @php($cover = $publication['media']->first(fn ($media) => $media->is_cover) ?? $publication['media']->first())
+                    @if($cover)<figure class="farmer-announcement-cover farmer-program-published-cover"><img src="{{ route('public.announcements.media', [$announcement, $cover]) }}" alt="{{ $cover->alt_text }}"><figcaption>{{ $cover->alt_text }}</figcaption></figure>@endif
+                    @if($publication['content']['office'] || $publication['content']['service_area'])<p class="farmer-notice-byline">@if($publication['content']['office'])<x-ui.icon name="office" size="sm"/>{{ $publication['content']['office'] }}@endif @if($publication['content']['service_area'])<span>· {{ $publication['content']['service_area'] }}</span>@endif</p>@endif
+                    @if($publication['content']['requirements_summary'])<div class="farmer-requirements-panel"><h2>Program-specific requirements summary</h2><p>{{ $publication['content']['requirements_summary'] }}</p></div>@endif
+                @endif
                 <div class="farmer-program-detail-badges">
                     <span class="farmer-program-category">{{ $program->category ?: 'Agricultural assistance' }}</span>
                     @php($availabilityState = $program->availabilityStateOn($businessDate))

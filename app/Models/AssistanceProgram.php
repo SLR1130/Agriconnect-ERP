@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssistanceProgram extends Model
 {
@@ -19,6 +20,11 @@ class AssistanceProgram extends Model
     public function supplyItem()
     {
         return $this->belongsTo(SupplyItem::class, 'supply_item_id');
+    }
+
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(AgriculturalAnnouncement::class, 'assistance_program_id');
     }
 
     public function availabilityStateOn(CarbonImmutable $businessDate): string

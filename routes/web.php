@@ -15,10 +15,15 @@ use App\Http\Controllers\FarmerPortalController;
 use App\Http\Controllers\FarmerProductionController;
 use App\Http\Controllers\FFRMSController;
 use App\Http\Controllers\ProductionReviewController;
+use App\Http\Controllers\PublicAgriculturalServicesController;
 use App\Http\Controllers\SetupStatusController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [SetupStatusController::class, 'home'])->name('home');
+Route::get('/agricultural-services', [PublicAgriculturalServicesController::class, 'index'])->name('public.agricultural-services.index');
+Route::get('/agricultural-programs/{program}', [PublicAgriculturalServicesController::class, 'program'])->name('public.agricultural-programs.show');
+Route::get('/announcements/{announcement}/media/{media}', [PublicAgriculturalServicesController::class, 'media'])->name('public.announcements.media');
+Route::get('/announcements/{announcement}', [PublicAgriculturalServicesController::class, 'announcement'])->name('public.announcements.show');
 
 // Detailed configuration diagnostics require an authenticated user.
 Route::get('/setup-test', [SetupStatusController::class, 'show'])
@@ -111,6 +116,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::patch('/aasms/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('modules.aasms.announcements.update');
         Route::post('/aasms/announcements/{announcement}/publish', [AnnouncementController::class, 'publish'])->name('modules.aasms.announcements.publish');
         Route::post('/aasms/announcements/{announcement}/archive', [AnnouncementController::class, 'archive'])->name('modules.aasms.announcements.archive');
+        Route::get('/aasms/announcements/{announcement}/preview/{revision}', [AnnouncementController::class, 'preview'])->name('modules.aasms.announcements.preview');
+        Route::get('/aasms/announcements/{announcement}/revisions/{revision}/media/{media}', [AnnouncementController::class, 'staffMedia'])->name('modules.aasms.announcements.media');
         Route::post('/aasms/programs', [AASMSController::class, 'storeProgram'])->name('modules.aasms.programs.store');
         Route::patch('/aasms/programs/{program}', [AASMSController::class, 'updateProgram'])->name('modules.aasms.programs.update');
         Route::post('/aasms/programs/{program}/toggle', [AASMSController::class, 'toggleProgram'])->name('modules.aasms.programs.toggle');

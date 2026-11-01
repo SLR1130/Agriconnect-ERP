@@ -1,12 +1,59 @@
 <x-layouts.app>
-    <x-slot name="header">Official agricultural announcements</x-slot>
-    <x-slot name="description">Prepare service notices privately, then publish them for farmers when approved.</x-slot>
-    <a class="mb-5 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('modules.aasms.dashboard') }}">← Assistance workspace</a>
+    <x-slot name="header">Official agricultural publications</x-slot>
+    <x-slot name="description">Prepare accessible, photo-rich government notices and program announcements. Public changes require an explicit publisher permission.</x-slot>
+    <a class="mb-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-700 underline" href="{{ route('modules.aasms.dashboard') }}"><x-ui.icon name="back" size="sm"/>Assistance workspace</a>
     @if(session('status'))<div class="farmer-message farmer-message-success" role="status">{{ session('status') }}</div>@endif
-    @if($errors->any())<div class="farmer-message farmer-message-error" role="alert">{{ $errors->first() }}</div>@endif
-    @if($canCreate)<section class="farmer-card mb-6"><details class="farmer-disclosure" @if($errors->any()) open @endif><summary>Create an announcement draft</summary><p class="mt-2 text-sm text-slate-600">Drafts stay private until a user with publication rights publishes them.</p><form method="POST" action="{{ route('modules.aasms.announcements.store') }}" class="mt-4 grid gap-4 sm:grid-cols-2">@csrf<div class="farmer-field sm:col-span-2"><label for="notice-title">Title</label><input id="notice-title" name="title" maxlength="180" value="{{ old('title') }}" required></div><div class="farmer-field sm:col-span-2"><label for="notice-body">Announcement text</label><textarea id="notice-body" name="body" maxlength="4000" rows="5" required>{{ old('body') }}</textarea></div><div class="farmer-field"><label for="notice-program">Related published assistance program (optional)</label><select id="notice-program" name="assistance_program_id"><option value="">No related program</option>@foreach($programs as $program)<option value="{{ $program->id }}" @selected(old('assistance_program_id') == $program->id)>{{ $program->name }}</option>@endforeach</select></div><div class="farmer-field"><label for="notice-expiry">Show until (optional)</label><input id="notice-expiry" name="expires_at" type="datetime-local" value="{{ old('expires_at') }}"></div><button class="farmer-button sm:col-span-2" type="submit">Save private draft</button></form></details></section>@endif
-    <section class="grid gap-3 md:grid-cols-2">@forelse($announcements as $announcement)<article class="farmer-card"><div class="flex flex-wrap justify-between gap-2"><h2 class="font-bold">{{ $announcement->title }}</h2><span class="farmer-pill {{ $announcement->status === 'draft' ? 'farmer-pill-warn' : '' }}">{{ ucfirst($announcement->status) }}</span></div><p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{{ $announcement->body }}</p><p class="mt-3 text-xs text-slate-600">{{ $announcement->program?->name ?: 'General MAO notice' }} · {{ $announcement->published_at?->format('M d, Y h:i A') ?: 'Not published' }}@if($announcement->expires_at) · Expires {{ $announcement->expires_at->format('M d, Y h:i A') }}@endif</p>
-        @if($announcement->status === 'draft' && $canPublish)<details class="farmer-disclosure mt-4 border-t border-sage pt-4"><summary>Edit this draft</summary><form method="POST" action="{{ route('modules.aasms.announcements.update', $announcement) }}" class="mt-4 space-y-3">@csrf @method('PATCH')<div class="farmer-field"><label for="notice-title-{{ $announcement->id }}">Title</label><input id="notice-title-{{ $announcement->id }}" name="title" maxlength="180" value="{{ $announcement->title }}" required></div><div class="farmer-field"><label for="notice-body-{{ $announcement->id }}">Text</label><textarea id="notice-body-{{ $announcement->id }}" name="body" maxlength="4000" required>{{ $announcement->body }}</textarea></div><div class="farmer-field"><label for="notice-program-{{ $announcement->id }}">Related program</label><select id="notice-program-{{ $announcement->id }}" name="assistance_program_id"><option value="">No related program</option>@foreach($programs as $program)<option value="{{ $program->id }}" @selected($announcement->assistance_program_id == $program->id)>{{ $program->name }}</option>@endforeach</select></div><div class="farmer-field"><label for="notice-expiry-{{ $announcement->id }}">Show until</label><input id="notice-expiry-{{ $announcement->id }}" name="expires_at" type="datetime-local" value="{{ $announcement->expires_at?->format('Y-m-d\TH:i') }}"></div><button class="farmer-button" type="submit">Save draft</button></form></details><form method="POST" action="{{ route('modules.aasms.announcements.publish', $announcement) }}" class="mt-3">@csrf<button class="farmer-button farmer-button-gold" type="submit">Publish for farmers</button></form>@endif
-        @if($announcement->status === 'published' && $canPublish)<form method="POST" action="{{ route('modules.aasms.announcements.archive', $announcement) }}" class="mt-4">@csrf<button class="farmer-button farmer-button-light" type="submit">Archive notice</button></form>@endif
-    </article>@empty<div class="farmer-empty md:col-span-2">No official announcements have been drafted.</div>@endforelse</section><div class="mt-5">{{ $announcements->links() }}</div>
+    @if($errors->any())<div class="farmer-message farmer-message-error" role="alert"><strong>Please correct the publication form.</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+
+    <section class="publication-policy-note" aria-label="Publication review policy">
+        <x-ui.icon name="security" size="lg"/>
+        <div><strong>Authoring and publishing are separate actions.</strong><p>Editors can save and preview private revisions. Only Super Administrators or an MAO role with the exact <code>modules.aasms.publish</code> grant can publish or archive. Broad legacy grants do not imply publication authority.</p></div>
+        <a href="{{ route('public.agricultural-services.index') }}" target="_blank" rel="noopener">View public directory <x-ui.icon name="next" size="sm"/></a>
+    </section>
+
+    @if($canCreate)
+        <section class="publication-create-panel">
+            <div><p class="public-agri-eyebrow">New official notice</p><h2>Create a publication draft</h2><p>Use verified MAO information and approved photographs only.</p></div>
+            <details class="farmer-disclosure" @if($errors->any() && old('_announcement_id') === 'new') open @endif>
+                <summary><x-ui.icon name="add" size="sm"/>Start a new draft</summary>
+                <div class="publication-form-shell">@include('modules.aasms.partials.announcement-form', ['announcement' => null, 'programs' => $programs])</div>
+            </details>
+        </section>
+    @endif
+
+    <section class="publication-list-section" aria-labelledby="publication-list-heading">
+        <div class="public-agri-section-heading"><div><p class="public-agri-eyebrow">AASMS publication desk</p><h2 id="publication-list-heading">Announcements and revisions</h2><p>Drafts and revision previews remain private until an authorized publisher approves them.</p></div><span class="farmer-pill">{{ $announcements->total() }} records</span></div>
+        <div class="publication-list">
+            @forelse($announcements as $announcement)
+                @php($content = $announcement->editorContent())
+                @php($revision = $announcement->currentRevision)
+                @php($cover = $revision?->media?->first(fn ($media) => $media->is_cover) ?? $revision?->media?->first())
+                <article class="publication-record">
+                    <div class="publication-record-head">
+                        @if($cover)<img src="{{ route('modules.aasms.announcements.media', [$announcement, $revision, $cover]) }}" alt="" class="publication-record-thumb">@else<span class="publication-record-thumb-empty"><x-ui.icon name="office" size="lg"/></span>@endif
+                        <div class="publication-record-title"><p class="public-agri-eyebrow">{{ $content['category'] ?: 'Agricultural notice' }} · {{ $content['office'] ?: 'Office not specified' }}</p><h3>{{ $content['title'] }}</h3><p>{{ \Illuminate\Support\Str::limit(strip_tags((string) \Illuminate\Support\Str::markdown($content['body'], ['html_input' => 'strip', 'allow_unsafe_links' => false])), 180) }}</p></div>
+                        <span class="farmer-pill {{ $announcement->status === 'published' ? '' : 'farmer-pill-warn' }}">{{ ucfirst($announcement->status) }}</span>
+                    </div>
+                    <div class="publication-record-meta"><span>Author: {{ $announcement->creator?->name ?: 'Unknown' }}</span><span>Current revision: {{ $revision?->revision_number ?: 'Legacy' }}</span><span>{{ $announcement->program?->name ?: 'No linked program' }}</span><span>{{ $announcement->published_at ? 'Published '.$announcement->published_at->timezone('Asia/Manila')->format('M j, Y g:i A') : 'Not published' }}</span></div>
+                    <div class="publication-actions">
+                        @if($revision)<a class="farmer-button farmer-button-light" href="{{ route('modules.aasms.announcements.preview', [$announcement, $revision]) }}" target="_blank" rel="noopener">Preview revision <x-ui.icon name="next" size="sm"/></a>@endif
+                        @if($announcement->status === 'published')<a class="farmer-text-link" href="{{ route('public.announcements.show', $announcement) }}" target="_blank" rel="noopener">View public version <x-ui.icon name="next" size="sm"/></a>@endif
+                        @if($canUpdate && in_array($announcement->status, ['draft', 'published'], true))
+                            <details class="farmer-disclosure publication-edit-disclosure" @if($errors->any() && (string) old('_announcement_id') === (string) $announcement->id) open @endif>
+                                <summary>Edit content and media</summary>
+                                <p class="publication-edit-note">@if($announcement->status === 'published')Saving creates a private pending revision. The current public version stays visible until a publisher approves the revision.@elseEach save preserves the prior draft revision for review history.@endif</p>
+                                <div class="publication-form-shell">@include('modules.aasms.partials.announcement-form', ['announcement' => $announcement, 'programs' => $programs])</div>
+                            </details>
+                        @endif
+                        @if($canPublish && $revision?->state === 'draft')<form method="POST" action="{{ route('modules.aasms.announcements.publish', $announcement) }}" data-confirm-submit="Publish this official announcement revision?">@csrf<button class="farmer-button farmer-button-gold" type="submit">Publish revision</button></form>@elseif($revision?->state === 'draft')<span class="publication-permission-note">Awaiting a user with explicit publication permission.</span>@endif
+                        @if($canPublish && $announcement->status === 'published')<form method="POST" action="{{ route('modules.aasms.announcements.archive', $announcement) }}" data-confirm-submit="Archive this public announcement? Its history will be retained.">@csrf<button class="farmer-button farmer-button-light" type="submit">Archive</button></form>@endif
+                    </div>
+                    <details class="publication-history"><summary>Publication history ({{ $announcement->revisions->count() }} revisions)</summary><ol>@forelse($announcement->revisions as $history)<li><span class="farmer-pill {{ $history->state === 'published' ? '' : 'farmer-pill-warn' }}">{{ ucfirst($history->state) }}</span><strong>Revision {{ $history->revision_number }}</strong><span>Prepared by {{ $history->creator?->name ?: 'Unknown' }}</span><span>{{ $history->created_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}</span>@if($history->publisher)<span>Published by {{ $history->publisher->name }}{{ $history->published_at ? ' · '.$history->published_at->timezone('Asia/Manila')->format('M j, Y g:i A') : '' }}</span>@endif<a href="{{ route('modules.aasms.announcements.preview', [$announcement, $history]) }}" target="_blank" rel="noopener">Preview</a></li>@empty<li>No revision history is available for this legacy notice.</li>@endforelse</ol></details>
+                </article>
+            @empty
+                <div class="farmer-empty"><span class="ui-service-icon"><x-ui.icon name="office" size="lg"/></span><strong>No announcements have been created.</strong><p>Create a private draft to begin the official publication workflow. Nothing appears in public discovery until it is published.</p></div>
+            @endforelse
+        </div>
+        @if($announcements->hasPages())<div class="public-agri-pagination">{{ $announcements->links() }}</div>@endif
+    </section>
 </x-layouts.app>

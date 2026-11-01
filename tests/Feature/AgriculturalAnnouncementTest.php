@@ -28,7 +28,7 @@ class AgriculturalAnnouncementTest extends TestCase
 
     public function test_draft_publication_notification_and_archive_are_scoped(): void
     {
-        $staff = $this->account('mao_admin', ['modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update']);
+        $staff = $this->account('mao_admin', ['modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update', 'modules.aasms.publish']);
         $farmer = $this->account('farmer', []);
         $outsider = $this->account('authorized_viewer', ['modules.aasms.view']);
         $this->actingAs($staff)->post('/modules/aasms/announcements', ['title' => 'Seed service notice', 'body' => 'Applications open next week.'])->assertRedirect();
@@ -52,7 +52,7 @@ class AgriculturalAnnouncementTest extends TestCase
 
     public function test_expired_notice_is_not_visible_to_farmers(): void
     {
-        $staff = $this->account('mao_admin', ['modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update']);
+        $staff = $this->account('mao_admin', ['modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update', 'modules.aasms.publish']);
         $farmer = $this->account('farmer', []);
         $this->actingAs($staff)->post('/modules/aasms/announcements', [
             'title' => 'Time limited advisory', 'body' => 'Available this week.', 'expires_at' => now()->addDay()->toDateTimeString(),
@@ -68,7 +68,7 @@ class AgriculturalAnnouncementTest extends TestCase
 
     public function test_program_creation_is_private_until_authorized_publication(): void
     {
-        $staff = $this->account('mao_admin', ['modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update']);
+        $staff = $this->account('mao_admin', ['modules.aasms.view', 'modules.aasms.create', 'modules.aasms.update', 'modules.aasms.publish']);
         $farmer = $this->account('farmer', []);
         $this->actingAs($staff)->post('/modules/aasms/programs', ['name' => 'Private Rice Program', 'description' => 'Seed support.', 'opens_on' => '2026-10-01', 'closes_on' => '2027-10-01'])->assertRedirect();
         $program = AssistanceProgram::firstOrFail();

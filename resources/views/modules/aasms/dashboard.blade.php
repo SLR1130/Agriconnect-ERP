@@ -82,13 +82,15 @@
                     @forelse($programs as $program)
                         @php($programEditorOpen = old('_aasms_program_id') == $program->id)
                         <tr>
-                            <td><strong class="text-forest-green">{{ $program->name }}</strong><div class="mt-1 text-xs text-gray-500">{{ $program->category ?: 'General assistance' }}</div><div class="mt-1 max-w-sm text-xs text-gray-500">{{ $program->description ?: 'No description' }}</div></td>
+                            <td><strong class="text-forest-green">{{ $program->name }}</strong><div class="mt-1 text-xs text-gray-500">{{ $program->category ?: 'General assistance' }}</div><div class="mt-1 max-w-sm text-xs text-gray-500">{{ $program->description ?: 'No description' }}</div>@if($program->status === 'open')<a class="mt-1 inline-flex text-xs font-bold text-emerald-700 underline" href="{{ route('public.agricultural-programs.show', $program) }}" target="_blank" rel="noopener">View public program</a>@endif</td>
                             <td>{{ $program->opens_on?->format('M d, Y') ?: 'No start date' }}<div class="text-xs text-gray-500">through {{ $program->closes_on?->format('M d, Y') ?: 'No closing date' }}</div></td>
                             <td>{{ $program->supplyItem?->name ?: 'Assigned during review' }}<div class="mt-1 text-xs text-gray-500">{{ data_get($program->eligibility_rules, 'requires_farm') ? 'Farm required' : 'Farm optional' }} · {{ implode(', ', data_get($program->eligibility_rules, 'barangays', [])) ?: 'All barangays' }}</div></td>
-                            <td><span class="aas-status {{ $program->status === 'open' ? 'aas-open' : 'aas-closed' }}">{{ ucfirst($program->status) }}</span></td>
+                            <td><span class="aas-status {{ $program->status === 'open' ? 'aas-open' : 'aas-closed' }}">{{ $program->status === 'open' ? 'Published' : 'Private' }}</span><div class="mt-1 text-xs text-gray-500">{{ ['available' => 'Accepting applications', 'upcoming' => 'Application period upcoming', 'ended' => 'Applications ended', 'unpublished' => 'Hidden from public'][$program->availabilityStateOn($businessDate)] }}</div></td>
                             <td><div class="min-w-[12rem] space-y-2">
+                                @if($canPublish)
+                                    <form method="POST" action="{{ route('modules.aasms.programs.toggle', $program) }}" data-confirm-submit="{{ $program->status === 'open' ? 'Hide' : 'Publish' }} this assistance program?">@csrf<input type="hidden" name="_aasms_workspace" value="programs"><button class="aas-btn aas-sage w-full" type="submit">{{ $program->status === 'open' ? 'Hide from public' : 'Publish for public' }}</button></form>
+                                @endif
                                 @if($canUpdate)
-                                    <form method="POST" action="{{ route('modules.aasms.programs.toggle', $program) }}" data-confirm-submit="{{ $program->status === 'open' ? 'Close' : 'Publish' }} this assistance program?">@csrf<input type="hidden" name="_aasms_workspace" value="programs"><button class="aas-btn aas-sage w-full" type="submit">{{ $program->status === 'open' ? 'Close program' : 'Publish for farmers' }}</button></form>
                                     <details class="aas-disclosure" @if($programEditorOpen && old('_aasms_form') === 'edit-program') open @endif><summary>Edit program and eligibility</summary>
                                         <form method="POST" action="{{ route('modules.aasms.programs.update', $program) }}" class="mt-3 grid gap-2">@csrf @method('PATCH')<input type="hidden" name="_aasms_workspace" value="programs"><input type="hidden" name="_aasms_form" value="edit-program"><input type="hidden" name="_aasms_program_id" value="{{ $program->id }}">
                                             <label class="aas-inline-label">Program name<input class="aas-input mt-1" name="name" value="{{ $programEditorOpen ? old('name', $program->name) : $program->name }}" required></label>
@@ -106,7 +108,8 @@
                                             <button class="aas-btn aas-primary" type="submit">Save program</button>
                                         </form>
                                     </details>
-                                @else<span class="text-xs text-gray-500">Read-only access</span>@endif
+                                @endif
+                                @if(!$canUpdate && !$canPublish)<span class="text-xs text-gray-500">Read-only access</span>@endif
                             </div></td>
                         </tr>
                     @empty

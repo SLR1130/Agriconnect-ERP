@@ -46,14 +46,17 @@
         <section class="farmer-section farmer-card" aria-labelledby="service-notices-title">
             <div class="farmer-section-heading">
                 <div><h2 id="service-notices-title">Official MAO notices</h2><p>Published agricultural announcements and service advisories.</p></div>
-                <a class="farmer-text-link" href="{{ route('farmer.announcements') }}">All notices <x-ui.icon name="next" size="sm" /></a>
+                <a class="farmer-text-link" href="{{ route('public.agricultural-services.index') }}">Public programs and notices <x-ui.icon name="next" size="sm" /></a>
             </div>
             <div class="farmer-notice-grid">
                 @forelse($announcements as $announcement)
+                    @php($publication = $announcementPresentations[$announcement->id])
+                    @php($cover = $publication['media']->first(fn ($media) => $media->is_cover) ?? $publication['media']->first())
                     <a class="farmer-notice-card" href="{{ route('farmer.announcements.show', $announcement) }}">
+                        @if($cover)<img class="farmer-notice-image" src="{{ route('public.announcements.media', [$announcement, $cover]) }}" alt="{{ $cover->alt_text }}" loading="lazy">@endif
                         <span class="farmer-service-kicker">MAO notice</span>
-                        <strong>{{ $announcement->title }}</strong>
-                        <p>{{ $announcement->body }}</p>
+                        <strong>{{ $publication['content']['title'] }}</strong>
+                        <p>{{ \Illuminate\Support\Str::limit(strip_tags((string) \Illuminate\Support\Str::markdown($publication['content']['body'], ['html_input' => 'strip', 'allow_unsafe_links' => false])), 180) }}</p>
                     </a>
                 @empty
                     <p class="farmer-empty">No official MAO notices are currently published.</p>

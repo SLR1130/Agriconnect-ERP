@@ -8,6 +8,7 @@ use App\Models\AssistanceProgram;
 use App\Models\EquipmentRequest;
 use App\Models\Farmer;
 use App\Services\AgriculturalBusinessCalendar;
+use App\Services\AgriculturalAnnouncementPresenter;
 use App\Services\AssistanceProgramCatalogService;
 use App\Services\FarmerActivityFeedService;
 use App\Services\ProgramEligibilityService;
@@ -20,25 +21,32 @@ use Illuminate\View\View;
 
 class FarmerExperienceController extends Controller
 {
-    public function services(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility): View
+    public function services(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility, AgriculturalAnnouncementPresenter $presenter): View
     {
         $farmer = $this->farmer($request)->load('farms');
         $catalogData = $catalog->forFarmer($request, $farmer, $eligibility);
+        $announcements = Schema::hasTable('agricultural_announcements')
+            ? AgriculturalAnnouncement::query()->visibleToFarmers()->with(['program', 'publishedRevision.media'])->latest('published_at')->take(3)->get()
+            : collect();
 
         return view('farmer.services', [
             'farmer' => $farmer,
             'announcementsAvailable' => Schema::hasTable('agricultural_announcements'),
-            'announcements' => Schema::hasTable('agricultural_announcements')
-                ? AgriculturalAnnouncement::query()->visibleToFarmers()->latest('published_at')->take(3)->get()
-                : collect(),
+            'announcements' => $announcements,
+            'announcementPresentations' => $announcements->mapWithKeys(fn (AgriculturalAnnouncement $notice) => [$notice->id => $presenter->present($notice, true)]),
         ] + $catalogData);
     }
 
-    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility, AgriculturalBusinessCalendar $calendar): View
+    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter): View
     {
         $farmer = $this->farmer($request);
         abort_unless($program->status === 'open', 404);
         $businessDate = $calendar->today();
+
+        $announcement = AgriculturalAnnouncement::query()->visibleToFarmers()
+            ->where('assistance_program_id', $program->id)
+            ->with('publishedRevision.media')
+            ->latest('published_at')->first();
 
         return view('farmer.program', [
             'farmer' => $farmer,
@@ -46,6 +54,8 @@ class FarmerExperienceController extends Controller
             'businessDate' => $businessDate,
             'eligibility' => $eligibility->check($program, $farmer->load('farms'), $businessDate),
             'application' => AssistanceApplication::query()->where('farmer_id', $farmer->id)->where('program_id', $program->id)->first(),
+            'announcement' => $announcement,
+            'publication' => $announcement ? $presenter->present($announcement, true) : null,
         ]);
     }
 

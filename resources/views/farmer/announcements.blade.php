@@ -1,5 +1,23 @@
 <x-layouts.farmer>
     <x-slot name="title">Official MAO notices</x-slot>
-    <x-slot name="description">Published agricultural announcements and service advisories from the Municipal Agriculture Office.</x-slot>
-    <div class="grid gap-4 md:grid-cols-2">@forelse($announcements as $announcement)<article class="farmer-card"><span class="farmer-pill">Official notice</span><h2 class="mt-3 text-lg font-bold">{{ $announcement->title }}</h2><p class="mt-2 line-clamp-3 text-sm leading-6 text-slate-700">{{ $announcement->body }}</p><p class="mt-3 text-xs text-slate-600">Published {{ $announcement->published_at->format('M d, Y') }}@if($announcement->expires_at) · Available until {{ $announcement->expires_at->format('M d, Y') }}@endif</p><a class="farmer-button farmer-button-light mt-4" href="{{ route('farmer.announcements.show', $announcement) }}">Read notice</a></article>@empty<div class="farmer-empty md:col-span-2">No MAO announcements are currently published. You can still browse agricultural programs and service requirements.</div>@endforelse</div><div class="mt-5">{{ $announcements->links() }}</div>
+    <x-slot name="description">Official service updates and agricultural announcements relevant to your community.</x-slot>
+    <a class="farmer-back-link" href="{{ route('public.agricultural-services.index') }}"><x-ui.icon name="back" size="sm"/>Browse programs and notices</a>
+    <div class="farmer-notice-grid farmer-notice-grid-rich">
+        @forelse($announcements as $announcement)
+            @php($publication = $presentations[$announcement->id])
+            @php($cover = $publication['media']->first(fn ($media) => $media->is_cover) ?? $publication['media']->first())
+            <article class="farmer-card farmer-notice-feature">
+                @if($cover)<a href="{{ route('farmer.announcements.show', $announcement) }}"><img class="farmer-notice-image" src="{{ route('public.announcements.media', [$announcement, $cover]) }}" alt="{{ $cover->alt_text }}" loading="lazy"></a>@endif
+                <div class="farmer-notice-feature-content"><div class="farmer-section-heading"><span class="farmer-pill">{{ $publication['content']['category'] ?: 'Official notice' }}</span><time datetime="{{ $announcement->published_at?->toIso8601String() }}">{{ $announcement->published_at?->timezone('Asia/Manila')->format('M j, Y') }}</time></div>
+                    <h2>{{ $publication['content']['title'] }}</h2>
+                    @if($publication['content']['office'])<p class="farmer-notice-byline"><x-ui.icon name="office" size="sm"/>{{ $publication['content']['office'] }}</p>@endif
+                    <p>{{ \Illuminate\Support\Str::limit(strip_tags((string) \Illuminate\Support\Str::markdown($publication['content']['body'], ['html_input' => 'strip', 'allow_unsafe_links' => false])), 220) }}</p>
+                    <a class="farmer-button farmer-button-light" href="{{ route('farmer.announcements.show', $announcement) }}">Read official notice <x-ui.icon name="next" size="sm"/></a>
+                </div>
+            </article>
+        @empty
+            <div class="farmer-empty"><span class="ui-service-icon"><x-ui.icon name="office" size="lg"/></span><strong>No MAO announcements are currently published.</strong><p>You can still explore published agricultural programs and service requirements.</p><a class="farmer-button farmer-button-light" href="{{ route('public.agricultural-services.index') }}">Explore public services</a></div>
+        @endforelse
+    </div>
+    @if($announcements->hasPages())<div class="farmer-pagination">{{ $announcements->links() }}</div>@endif
 </x-layouts.farmer>

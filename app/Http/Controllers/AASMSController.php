@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProgramRequest;
+use App\Models\ActivityLog;
 use App\Models\AssistanceApplication;
 use App\Models\AssistanceDistribution;
 use App\Models\AssistanceProgram;
@@ -10,6 +11,7 @@ use App\Models\SupplyBatch;
 use App\Models\SupplyItem;
 use App\Services\AssistanceService;
 use App\Services\AssistanceProgramCatalogService;
+use App\Services\AgriculturalBusinessCalendar;
 use App\Services\InventoryService;
 use App\Services\ProgramEligibilityService;
 use Illuminate\Http\RedirectResponse;
@@ -36,7 +38,7 @@ class AASMSController extends Controller
             ->when($request->filled('to'), fn ($q) => $q->whereDate('distributed_at', '<=', $request->to));
     }
 
-    public function index(Request $request): View
+    public function index(Request $request, AgriculturalBusinessCalendar $calendar): View
     {
         $this->staff($request, 'view');
         $programs = AssistanceProgram::with(['supplyItem', 'applications'])->latest()->get();
@@ -59,6 +61,8 @@ class AASMSController extends Controller
             'pending' => (int) $applicationCounts->get('submitted', 0), 'approved' => (int) $applicationCounts->get('approved', 0), 'rejected' => (int) $applicationCounts->get('rejected', 0), 'completed' => (int) $applicationCounts->get('completed', 0),
             'canCreate' => $request->user()->canModuleAction('aasms', 'create'),
             'canUpdate' => $request->user()->canModuleAction('aasms', 'update'),
+            'canPublish' => $request->user()->canModuleAction('aasms', 'publish'),
+            'businessDate' => $calendar->today(),
             'canReview' => $request->user()->canModuleAction('aasms', 'review'),
             'canApprove' => $request->user()->canModuleAction('aasms', 'approve'),
             'canReject' => $request->user()->canModuleAction('aasms', 'reject'),
@@ -85,10 +89,21 @@ class AASMSController extends Controller
 
     public function toggleProgram(Request $request, AssistanceProgram $program): RedirectResponse
     {
-        $this->staff($request, 'update');
-        $program->update(['status' => $program->status === 'open' ? 'closed' : 'open']);
+        $this->staff($request, 'publish');
+        $oldStatus = $program->status;
+        $newStatus = $oldStatus === 'open' ? 'closed' : 'open';
+        $program->update(['status' => $newStatus]);
+        ActivityLog::log(
+            $newStatus === 'open' ? 'published' : 'unpublished',
+            'Assistance program '.$program->name.' '.($newStatus === 'open' ? 'published for public discovery.' : 'hidden from public discovery.'),
+            'assistance_program:'.$program->id,
+            $request->user()->id,
+            'aasms',
+            ['status' => $oldStatus],
+            ['status' => $newStatus],
+        );
 
-        return back()->with('status', 'Program availability updated.');
+        return back()->with('status', $newStatus === 'open' ? 'Program published. Application availability still follows its published dates.' : 'Program hidden from public discovery. Existing applications were retained.');
     }
 
     private function programData(ProgramRequest $request): array

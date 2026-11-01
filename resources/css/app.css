@@ -1295,3 +1295,247 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
     .farmer-submission-details, .farmer-equipment-details { grid-template-columns: minmax(0, 1fr); }
     .farmer-distribution-row { flex-direction: column; }
 }
+/* Phase 6B public agricultural publication experience */
+.public-agri-body { min-width: 320px; margin: 0; color: #24352c; background: #f8faf7; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.public-skip-link { position: absolute; z-index: 40; top: -5rem; left: 1rem; padding: .7rem 1rem; color: #fff; background: #153d2b; border-radius: .6rem; }
+.public-skip-link:focus { top: 1rem; }
+.public-agri-header { position: sticky; z-index: 20; top: 0; display: flex; min-height: 4.7rem; align-items: center; justify-content: space-between; gap: 1.25rem; padding: .75rem max(1rem, calc((100vw - 1200px)/2)); background: rgba(255,255,255,.97); border-bottom: 1px solid #e2e9e2; box-shadow: 0 4px 20px rgba(21,61,43,.04); }
+.public-agri-brand { display: flex; min-width: 0; align-items: center; gap: .7rem; color: #153d2b; text-decoration: none; }
+.public-agri-mark { display: grid; width: 2.6rem; height: 2.6rem; flex: 0 0 auto; place-items: center; color: #fff; background: #153d2b; border-radius: .85rem; }
+.public-agri-brand strong, .public-agri-brand small { display: block; }
+.public-agri-brand strong { font-size: 1rem; font-weight: 850; }
+.public-agri-brand small { color: #607064; font-size: .68rem; }
+.public-agri-nav { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; }
+.public-agri-nav a { display: inline-flex; min-height: 2.65rem; align-items: center; padding: .55rem .8rem; color: #254634; border-radius: .7rem; font-size: .82rem; font-weight: 700; text-decoration: none; }
+.public-agri-nav a:hover, .public-agri-nav a[aria-current="page"] { background: #e7f0e8; }
+.public-agri-nav .public-agri-nav-cta { color: #fff; background: #26865c; }
+.public-agri-main { width: min(1200px, calc(100% - 2rem)); min-height: 68vh; margin: 0 auto; padding: 1.4rem 0 4rem; }
+.public-agri-intro { padding: clamp(1.4rem,4vw,3rem) clamp(1rem,4vw,2.5rem); background: linear-gradient(120deg,#153d2b,#236846); border-radius: 1.25rem; color: #fff; }
+.public-agri-intro .public-agri-eyebrow { color: #d8e9dc; }
+.public-agri-intro h1 { max-width: 780px; margin: .65rem 0; font-size: clamp(2rem,5vw,3.45rem); font-weight: 850; line-height: 1.08; letter-spacing: -.035em; }
+.public-agri-intro > p:last-child { max-width: 720px; margin: 0; color: #e3eee5; font-size: .98rem; line-height: 1.7; }
+.public-agri-eyebrow { display: flex; align-items: center; gap: .4rem; margin: 0; color: #437557; font-size: .68rem; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+.public-agri-filters { display: grid; grid-template-columns: minmax(220px,2fr) minmax(150px,1fr) minmax(190px,1.2fr) auto; align-items: end; gap: .85rem; margin: 1.2rem 0 2.2rem; padding: 1rem; background: #fff; border: 1px solid #e4eae4; border-radius: 1rem; box-shadow: 0 8px 28px rgba(21,61,43,.04); }
+.public-agri-filters label { display: block; margin-bottom: .35rem; color: #405349; font-size: .7rem; font-weight: 750; }
+.public-agri-filters input, .public-agri-filters select { width: 100%; min-width: 0; min-height: 2.8rem; padding: .65rem .75rem; color: #21372a; background: #fff; border: 1px solid #ccd8ce; border-radius: .7rem; font: inherit; font-size: .82rem; }
+.public-agri-filters input:focus, .public-agri-filters select:focus, .publication-form input:focus, .publication-form textarea:focus, .publication-form select:focus { outline: 3px solid rgba(38,134,92,.2); border-color: #26865c; }
+.public-agri-filter-search > div { display: flex; min-width: 0; align-items: center; gap: .45rem; padding-left: .7rem; border: 1px solid #ccd8ce; border-radius: .7rem; }
+.public-agri-filter-search svg { flex: 0 0 auto; color: #567460; }
+.public-agri-filter-search input { border: 0; }
+.public-agri-clear { grid-column: 1 / -1; justify-self: start; color: #236846; font-size: .75rem; font-weight: 700; }
+.public-agri-section { margin-top: 2.2rem; }
+.public-agri-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.public-agri-section-heading h2 { margin: .25rem 0; color: #153d2b; font-size: clamp(1.35rem,3vw,1.8rem); font-weight: 830; line-height: 1.25; }
+.public-agri-section-heading p:not(.public-agri-eyebrow) { margin: 0; color: #65746a; font-size: .83rem; }
+.public-program-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; }
+.public-program-card, .public-notice-card { min-width: 0; overflow: hidden; background: #fff; border: 1px solid #e2e9e2; border-radius: 1rem; box-shadow: 0 8px 24px rgba(21,61,43,.045); }
+.public-program-image, .public-notice-image { display: block; aspect-ratio: 16 / 9; overflow: hidden; background: #e7f0e8; }
+.public-program-image img, .public-notice-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.public-program-image-empty { display: flex; align-items: center; justify-content: center; gap: .65rem; color: #477557; font-size: .76rem; font-weight: 700; }
+.public-program-card-content { display: flex; min-height: 265px; flex-direction: column; padding: 1rem; }
+.public-program-meta { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: #65746a; font-size: .68rem; font-weight: 700; }
+.public-program-card h3 { margin: .75rem 0 .4rem; color: #153d2b; font-size: 1.06rem; font-weight: 820; line-height: 1.35; }
+.public-program-card h3 a, .public-notice-copy h3 a { color: inherit; text-decoration: none; }
+.public-program-card h3 a:hover, .public-notice-copy h3 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.public-program-card-content > p { margin: 0 0 .9rem; color: #5f6e64; font-size: .79rem; line-height: 1.6; }
+.public-program-date { display: flex; align-items: flex-start; gap: .4rem; margin: auto 0 .9rem; color: #4e6556; font-size: .7rem; line-height: 1.5; }
+.public-program-date svg { margin-top: .08rem; flex: 0 0 auto; }
+.public-program-action { align-self: flex-start; }
+.public-notice-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.public-notice-card { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); }
+.public-notice-card:not(:has(.public-notice-image)) { grid-template-columns: minmax(0,1fr); }
+.public-notice-image { height: 100%; min-height: 220px; aspect-ratio: auto; }
+.public-notice-copy { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; padding: 1rem; }
+.public-notice-copy h3 { margin: .7rem 0 .35rem; color: #153d2b; font-size: 1rem; line-height: 1.35; }
+.public-notice-copy > p:not(.public-notice-office) { margin: .3rem 0 1rem; color: #5f6e64; font-size: .76rem; line-height: 1.6; }
+.public-notice-office, .public-detail-office { display: flex; align-items: center; gap: .35rem; color: #567460; font-size: .72rem; }
+.public-notice-copy .farmer-text-link { margin-top: auto; }
+.public-agri-empty { display: grid; justify-items: center; gap: .5rem; text-align: center; }
+.public-agri-empty > p { max-width: 500px; margin: 0; color: #617067; font-size: .82rem; }
+.public-agri-pagination { overflow-x: auto; margin-top: 1rem; }
+.public-agri-footer { display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.5rem; padding: 2rem max(1rem, calc((100vw - 1200px)/2)); color: #e8f0e9; background: #153d2b; }
+.public-agri-footer strong { font-size: 1.15rem; }
+.public-agri-footer p { max-width: 500px; margin: .4rem 0; color: #c7d7cb; font-size: .78rem; }
+.public-agri-footer-links { display: flex; flex-wrap: wrap; align-content: start; gap: .7rem 1rem; }
+.public-agri-footer-links a { color: #f1f5f1; font-size: .78rem; font-weight: 650; }
+.public-agri-copyright { grid-column: 1 / -1; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,.16); }
+.public-article, .public-program-detail { overflow: hidden; margin-top: 1rem; background: #fff; border: 1px solid #e1e8e1; border-radius: 1.15rem; box-shadow: 0 8px 28px rgba(21,61,43,.045); }
+.public-article-cover, .farmer-announcement-cover { margin: 0; background: #e7f0e8; }
+.public-article-cover img, .farmer-announcement-cover img { display: block; width: 100%; max-height: 520px; aspect-ratio: 16 / 8; object-fit: cover; }
+.public-article-cover figcaption, .farmer-announcement-cover figcaption, .public-gallery figcaption, .farmer-announcement-gallery figcaption { padding: .4rem .8rem; color: #52675a; background: #f2f6f2; font-size: .68rem; }
+.public-article-heading { padding: 1.4rem clamp(1rem,4vw,2.3rem) 1rem; }
+.public-article-heading h1, .public-program-detail-heading h1 { margin: .4rem 0 .7rem; color: #153d2b; font-size: clamp(1.8rem,4vw,2.8rem); font-weight: 850; line-height: 1.12; letter-spacing: -.025em; }
+.public-article-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem 1rem; color: #607064; font-size: .74rem; }
+.public-article-meta span { display: inline-flex; align-items: center; gap: .35rem; }
+.public-gallery, .farmer-announcement-gallery { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .75rem; padding: 0 clamp(1rem,4vw,2.3rem) 1.2rem; }
+.public-gallery figure, .farmer-announcement-gallery figure { min-width: 0; margin: 0; overflow: hidden; background: #f2f6f2; border: 1px solid #e2e9e2; border-radius: .8rem; }
+.public-gallery img, .farmer-announcement-gallery img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.public-article-grid { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(230px,.7fr); gap: 1.5rem; padding: 1rem clamp(1rem,4vw,2.3rem) 1.5rem; }
+.public-article-body { min-width: 0; color: #35473b; font-size: .92rem; line-height: 1.8; overflow-wrap: anywhere; }
+.public-article-body h1, .public-article-body h2, .public-article-body h3 { margin: 1.2rem 0 .5rem; color: #153d2b; line-height: 1.3; }
+.public-article-body p { margin: 0 0 .85rem; }
+.public-article-body ul, .public-article-body ol { padding-left: 1.3rem; }
+.public-article-body a { color: #17613f; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.public-article-facts { display: grid; align-content: start; gap: .85rem; padding: 1rem; background: #f4f8f3; border: 1px solid #e2eae1; border-radius: .9rem; }
+.public-article-facts strong, .public-requirement-summary strong { color: #153d2b; font-size: .78rem; }
+.public-article-facts p, .public-requirement-summary p { margin: .3rem 0 0; color: #5c6c62; font-size: .76rem; line-height: 1.65; }
+.public-article-cta { justify-content: center; }
+.public-article-schedule { margin: 0; padding: 1rem clamp(1rem,4vw,2.3rem); background: #e7f0e8; color: #314c3a; font-size: .8rem; }
+.public-program-detail-heading { padding: 1.4rem clamp(1rem,4vw,2.3rem); }
+.public-program-category { color: #3b7150; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.public-program-detail-heading > .farmer-pill { float: right; }
+.public-program-detail-heading > p { max-width: 850px; margin: 0; color: #5e6f64; font-size: .9rem; line-height: 1.7; white-space: pre-line; }
+.public-program-detail-grid { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(250px,.75fr); gap: 1.2rem; padding: 0 clamp(1rem,4vw,2.3rem) 1.5rem; }
+.public-program-detail-main h2, .public-apply-panel h2 { margin: 1rem 0 .55rem; color: #153d2b; font-size: 1.05rem; font-weight: 820; }
+.public-schedule-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .7rem; }
+.public-schedule-facts div, .public-requirement-summary { padding: .8rem; background: #f4f8f3; border: 1px solid #e3ebe2; border-radius: .75rem; }
+.public-schedule-facts dt { color: #69786d; font-size: .66rem; font-weight: 700; text-transform: uppercase; }
+.public-schedule-facts dd { margin: .2rem 0 0; color: #263e2f; font-size: .83rem; font-weight: 750; }
+.public-date-note { margin: .6rem 0; color: #65746a; font-size: .7rem; }
+.public-requirement-list { display: grid; gap: .45rem; padding: 0; list-style: none; }
+.public-requirement-list li { display: flex; align-items: flex-start; gap: .5rem; color: #405349; font-size: .8rem; line-height: 1.5; }
+.public-requirement-list svg { margin-top: .15rem; flex: 0 0 auto; color: #26865c; }
+.public-apply-panel { align-self: start; padding: 1rem; background: #f4f8f3; border: 1px solid #dfe8df; border-radius: .9rem; }
+.public-apply-panel p { color: #5d6d62; font-size: .78rem; line-height: 1.65; }
+.public-apply-panel .farmer-button { width: 100%; justify-content: center; }
+.public-apply-contact { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid #dfe8df; }
+.public-apply-contact strong { color: #153d2b; font-size: .75rem; }
+.public-apply-contact p { margin: .3rem 0 0; }
+.public-program-source { display: inline-flex; margin: 0 clamp(1rem,4vw,2.3rem) 1.4rem; }
+.public-preview-banner { display: flex; align-items: center; gap: .5rem; margin: 0 0 1rem; padding: .8rem 1rem; color: #704b07; background: #fff6df; border: 1px solid #f1dfae; border-radius: .75rem; font-size: .8rem; font-weight: 750; }
+.public-preview-banner svg { flex: 0 0 auto; }
+.publication-policy-note { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: .8rem; margin-bottom: 1rem; padding: 1rem; color: #214d35; background: #edf5ed; border: 1px solid #d8e8d8; border-radius: .9rem; }
+.publication-policy-note > svg { color: #26865c; }
+.publication-policy-note strong { font-size: .82rem; }
+.publication-policy-note p { margin: .2rem 0 0; color: #53695a; font-size: .72rem; line-height: 1.55; }
+.publication-policy-note code { padding: .05rem .25rem; color: #153d2b; background: #fff; border-radius: .25rem; }
+.publication-policy-note > a { display: inline-flex; align-items: center; gap: .3rem; color: #17613f; font-size: .72rem; font-weight: 750; white-space: nowrap; }
+.publication-create-panel { display: grid; grid-template-columns: minmax(220px,.7fr) minmax(0,1.3fr); gap: 1rem; margin-bottom: 2rem; padding: 1rem; background: #fff; border: 1px solid #e3e9e3; border-radius: 1rem; }
+.publication-create-panel h2 { margin: .2rem 0; color: #153d2b; font-size: 1.2rem; font-weight: 830; }
+.publication-create-panel > div > p:last-child { color: #647369; font-size: .78rem; }
+.publication-create-panel > .farmer-disclosure { align-self: start; }
+.publication-create-panel summary { display: flex; align-items: center; gap: .45rem; }
+.publication-form-shell { margin-top: .9rem; padding: 1rem; background: #f8faf7; border: 1px solid #e5ebe5; border-radius: .85rem; }
+.publication-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .9rem; margin-bottom: 1rem; }
+.publication-form-wide { grid-column: 1 / -1; }
+.publication-form .farmer-field label, .publication-media-fieldset label { display: block; margin-bottom: .3rem; color: #31473a; font-size: .72rem; font-weight: 750; }
+.publication-form .farmer-field input, .publication-form .farmer-field textarea, .publication-form .farmer-field select, .publication-form .publication-media-fieldset > input:not([type=file]), .publication-media-controls > input:not([type=checkbox]):not([type=radio]) { width: 100%; min-height: 2.55rem; padding: .6rem .7rem; color: #26382d; background: #fff; border: 1px solid #cfdacf; border-radius: .65rem; font: inherit; font-size: .78rem; }
+.publication-form .farmer-field textarea { min-height: 5rem; resize: vertical; }
+.publication-form small, .publication-media-fieldset > p { display: block; margin-top: .3rem; color: #65746a; font-size: .67rem; line-height: 1.5; }
+.publication-media-fieldset { min-width: 0; padding: .85rem; border: 1px solid #dbe5db; border-radius: .8rem; }
+.publication-media-fieldset legend { padding: 0 .3rem; color: #153d2b; font-size: .78rem; font-weight: 800; }
+.publication-media-fieldset input[type=file] { display: block; max-width: 100%; margin: .55rem 0; color: #4c5e52; font-size: .72rem; }
+.publication-gallery-alt { margin-top: .55rem; }
+.publication-gallery-alt input { width: 100%; min-height: 2.4rem; padding: .55rem .65rem; background: #fff; border: 1px solid #cfdacf; border-radius: .6rem; font-size: .75rem; }
+.publication-current-cover { display: flex; align-items: center; gap: .65rem; margin: .45rem 0; color: #596b5e; font-size: .72rem; }
+.publication-current-cover img { width: 5rem; height: 3.4rem; object-fit: cover; border-radius: .5rem; }
+.publication-media-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .7rem; margin-top: .75rem; }
+.publication-media-item { display: grid; grid-template-columns: 6rem minmax(0,1fr); gap: .6rem; min-width: 0; padding: .55rem; background: #fff; border: 1px solid #e1e8e1; border-radius: .7rem; }
+.publication-media-item > img { width: 6rem; height: 5rem; object-fit: cover; border-radius: .45rem; }
+.publication-media-controls { display: grid; min-width: 0; grid-template-columns: 1fr 1fr; gap: .25rem .45rem; }
+.publication-media-controls .publication-keep, .publication-media-controls .publication-cover { display: flex; align-items: center; gap: .25rem; font-size: .64rem; }
+.publication-media-controls > label[for] { grid-column: 1 / -1; margin: 0; font-size: .63rem; }
+.publication-media-controls > input:not([type=checkbox]):not([type=radio]) { grid-column: 1 / -1; min-height: 2rem; padding: .4rem; font-size: .68rem; }
+.publication-media-controls input[type=checkbox], .publication-media-controls input[type=radio] { accent-color: #26865c; }
+.publication-order-actions { grid-column: 1 / -1; display: flex; gap: .35rem; }
+.publication-order-actions button { padding: .25rem .45rem; color: #286344; background: #edf5ed; border: 1px solid #d7e6d8; border-radius: .4rem; font-size: .61rem; font-weight: 700; }
+.publication-order-actions button:disabled { cursor: not-allowed; opacity: .45; }
+.publication-form button:disabled { cursor: wait; opacity: .65; }
+.publication-list-section { margin-top: 2rem; }
+.publication-list { display: grid; gap: .85rem; }
+.publication-record { min-width: 0; padding: 1rem; background: #fff; border: 1px solid #e1e8e1; border-radius: .95rem; }
+.publication-record-head { display: grid; grid-template-columns: 5.2rem minmax(0,1fr) auto; align-items: start; gap: .8rem; }
+.publication-record-thumb, .publication-record-thumb-empty { display: grid; width: 5.2rem; height: 4.2rem; place-items: center; object-fit: cover; color: #36724e; background: #e7f0e8; border-radius: .65rem; }
+.publication-record-title { min-width: 0; }
+.publication-record-title h3 { margin: .2rem 0; color: #153d2b; font-size: .98rem; font-weight: 820; }
+.publication-record-title > p:last-child { margin: .2rem 0; color: #617067; font-size: .73rem; line-height: 1.55; }
+.publication-record-meta { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin: .8rem 0; padding-top: .7rem; border-top: 1px solid #edf0ed; color: #68766c; font-size: .67rem; }
+.publication-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; }
+.publication-actions .farmer-button { min-height: 2.35rem; font-size: .7rem; }
+.publication-edit-disclosure { flex: 1 1 100%; margin-top: .35rem; padding: .7rem; background: #f7faf7; border: 1px solid #e2eae2; border-radius: .7rem; }
+.publication-edit-disclosure > summary { color: #236846; font-size: .73rem; font-weight: 750; }
+.publication-edit-note, .publication-permission-note { color: #77612a; font-size: .68rem; }
+.publication-history { margin-top: .8rem; padding-top: .7rem; border-top: 1px solid #edf0ed; }
+.publication-history > summary { color: #3b6850; font-size: .72rem; font-weight: 750; }
+.publication-history ol { display: grid; gap: .4rem; margin: .6rem 0 0; padding: 0; list-style: none; }
+.publication-history li { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .75rem; padding: .55rem; background: #f8faf7; border-radius: .55rem; color: #596b5e; font-size: .66rem; }
+.publication-history li strong { color: #243d2e; }
+.publication-history li a { color: #17613f; font-weight: 750; }
+.farmer-feature-image { width: calc(100% + 2.5rem); max-width: none; height: auto; max-height: 190px; aspect-ratio: 16 / 8; margin: -1.25rem -1.25rem 1rem; object-fit: cover; border-radius: .9rem .9rem 0 0; }
+.farmer-home-notice { display: flex; align-items: center; gap: .7rem; padding: .65rem 0; border-top: 1px solid #edf0ed; color: #153d2b; text-decoration: none; }
+.farmer-home-notice img { width: 4.4rem; height: 3.1rem; flex: 0 0 auto; object-fit: cover; border-radius: .5rem; }
+.farmer-home-notice strong, .farmer-home-notice small { display: block; }
+.farmer-home-notice strong { font-size: .78rem; }
+.farmer-home-notice small { margin-top: .2rem; color: #65746a; font-size: .65rem; }
+.farmer-notice-grid-rich { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.farmer-notice-feature { min-width: 0; overflow: hidden; padding: 0; }
+.farmer-notice-feature-content { padding: 1rem; }
+.farmer-notice-feature-content h2 { margin: .6rem 0 .4rem; color: #153d2b; font-size: 1.12rem; }
+.farmer-notice-feature-content > p { color: #596b5e; font-size: .8rem; line-height: 1.65; }
+.farmer-notice-feature-content time { color: #647369; font-size: .68rem; }
+.farmer-notice-image { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: .7rem; }
+.farmer-notice-feature > a .farmer-notice-image { border-radius: 0; }
+.farmer-notice-byline { display: flex; align-items: center; gap: .35rem; color: #567460; font-size: .72rem; }
+.farmer-announcement-detail { padding: 0; overflow: hidden; }
+.farmer-announcement-heading, .farmer-announcement-content, .farmer-announcement-facts, .farmer-announcement-detail > .farmer-button, .farmer-announcement-detail > .farmer-date-guidance { margin-right: clamp(1rem,4vw,2rem); margin-left: clamp(1rem,4vw,2rem); }
+.farmer-announcement-heading { padding-top: 1.2rem; }
+.farmer-announcement-heading h2 { margin: .6rem 0 .35rem; color: #153d2b; font-size: clamp(1.35rem,3vw,2rem); line-height: 1.2; }
+.farmer-announcement-heading p { display: flex; align-items: center; gap: .35rem; color: #637368; font-size: .73rem; }
+.farmer-announcement-content { margin-top: 1rem; color: #35473b; font-size: .9rem; line-height: 1.8; overflow-wrap: anywhere; }
+.farmer-announcement-content h1, .farmer-announcement-content h2, .farmer-announcement-content h3 { color: #153d2b; }
+.farmer-announcement-content a { color: #17613f; font-weight: 700; text-decoration: underline; }
+.farmer-announcement-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .7rem; margin-top: 1rem; }
+.farmer-announcement-facts section { padding: .8rem; background: #f4f8f3; border-radius: .7rem; }
+.farmer-announcement-facts h3 { margin: 0; color: #153d2b; font-size: .75rem; }
+.farmer-announcement-facts p { margin: .3rem 0 0; color: #596b5e; font-size: .76rem; line-height: 1.6; }
+.farmer-announcement-detail > .farmer-button { display: inline-flex; width: max-content; max-width: calc(100% - 2rem); margin-top: 1rem; }
+.farmer-announcement-detail > .farmer-date-guidance { padding-bottom: 1.2rem; }
+.farmer-program-published-cover { margin: -1.25rem -1.25rem 1rem; overflow: hidden; border-radius: .9rem .9rem 0 0; }
+.farmer-program-published-cover img { max-height: 300px; }
+@media (max-width: 900px) {
+    .public-agri-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .public-program-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .public-notice-grid { grid-template-columns: minmax(0,1fr); }
+    .publication-create-panel { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 600px) {
+    .public-agri-header { position: static; align-items: flex-start; flex-direction: column; gap: .55rem; padding: .7rem 1rem; }
+    .public-agri-nav { width: 100%; flex-wrap: wrap; justify-content: flex-start; gap: .2rem; }
+    .public-agri-nav a { min-height: 2.45rem; padding: .45rem .55rem; font-size: .72rem; }
+    .public-agri-main { width: min(100% - 1rem, 1200px); padding-top: .6rem; }
+    .public-agri-intro { padding: 1.25rem 1rem; border-radius: .9rem; }
+    .public-agri-filters { grid-template-columns: minmax(0,1fr); gap: .65rem; margin: .7rem 0 1.5rem; padding: .75rem; }
+    .public-agri-filters .farmer-button { width: 100%; justify-content: center; }
+    .public-program-grid, .public-notice-grid { grid-template-columns: minmax(0,1fr); }
+    .public-program-card-content { min-height: 0; }
+    .public-notice-card { grid-template-columns: minmax(0,1fr); }
+    .public-notice-image { min-height: 0; aspect-ratio: 16 / 9; }
+    .public-agri-section-heading { align-items: flex-start; flex-direction: column; }
+    .public-agri-footer { grid-template-columns: minmax(0,1fr); gap: .8rem; }
+    .public-agri-copyright { grid-column: auto; }
+    .public-gallery, .farmer-announcement-gallery { grid-template-columns: repeat(2,minmax(0,1fr)); gap: .45rem; padding-right: .8rem; padding-left: .8rem; }
+    .public-article-grid, .public-program-detail-grid { grid-template-columns: minmax(0,1fr); gap: .8rem; }
+    .public-article-heading, .public-program-detail-heading { padding: 1rem .85rem .75rem; }
+    .public-article-heading h1, .public-program-detail-heading h1 { font-size: 1.7rem; }
+    .public-program-detail-heading > .farmer-pill { float: none; display: inline-flex; margin-left: .4rem; }
+    .public-schedule-facts { gap: .45rem; }
+    .public-article-cover img, .farmer-announcement-cover img { aspect-ratio: 4 / 3; }
+    .publication-policy-note { grid-template-columns: auto minmax(0,1fr); }
+    .publication-policy-note > a { grid-column: 2; white-space: normal; }
+    .publication-create-panel { padding: .8rem; }
+    .publication-form-shell { padding: .65rem; }
+    .publication-form-grid { grid-template-columns: minmax(0,1fr); gap: .65rem; }
+    .publication-form-wide { grid-column: auto; }
+    .publication-media-list { grid-template-columns: minmax(0,1fr); }
+    .publication-record { padding: .75rem; }
+    .publication-record-head { grid-template-columns: 3.8rem minmax(0,1fr); gap: .55rem; }
+    .publication-record-head > .farmer-pill { grid-column: 2; justify-self: start; }
+    .publication-record-thumb, .publication-record-thumb-empty { width: 3.8rem; height: 3.4rem; }
+    .publication-record-title h3 { font-size: .85rem; }
+    .publication-record-meta { gap: .3rem .6rem; font-size: .62rem; }
+    .publication-actions { align-items: stretch; }
+    .publication-actions .farmer-button { justify-content: center; }
+    .farmer-notice-grid-rich, .farmer-announcement-facts { grid-template-columns: minmax(0,1fr); }
+    .farmer-home-notice img { width: 3.6rem; height: 2.8rem; }
+    .farmer-feature-image { width: calc(100% + 1.8rem); margin: -.9rem -.9rem .8rem; }
+}

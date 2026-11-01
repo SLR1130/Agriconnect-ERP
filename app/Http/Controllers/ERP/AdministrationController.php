@@ -590,6 +590,7 @@ class AdministrationController extends Controller
     {
         return $modules->map(function (Module $module) use ($user) {
             $actions = collect($this->moduleActionLabels())
+                ->reject(fn (string $label, string $action) => $action === 'publish' && $module->slug !== 'aasms')
                 ->filter(fn (string $label, string $action) => $this->authorization->canModule($user, $module->slug, $action))
                 ->map(fn (string $label, string $action) => ['action' => $action, 'label' => $label])
                 ->values()
@@ -603,6 +604,7 @@ class AdministrationController extends Controller
     {
         return $modules->map(function (Module $module) use ($role) {
             $actions = collect($this->moduleActionLabels())
+                ->reject(fn (string $label, string $action) => $action === 'publish' && $module->slug !== 'aasms')
                 ->filter(fn (string $label, string $action) => $this->authorization->roleAllows($role, 'modules.'.$module->slug.'.'.$action))
                 ->map(fn (string $label, string $action) => ['action' => $action, 'label' => $label])
                 ->values()
@@ -646,6 +648,7 @@ class AdministrationController extends Controller
             'update' => 'Update',
             'delete' => 'Delete',
             'review' => 'Review',
+            'publish' => 'Publish official AASMS content',
             'approve' => 'Approve',
             'reject' => 'Reject',
             'receive' => 'Receive',
