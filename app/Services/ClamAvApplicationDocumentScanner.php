@@ -20,7 +20,7 @@ class ClamAvApplicationDocumentScanner implements PrivateApplicationDocumentScan
      * Full health check. It returns safe status values only; configured paths and
      * subprocess output are intentionally never returned to callers.
      *
-     * @return array{ready:bool,checks:array<string,string>,signature_age_hours:?int,signature_max_age_hours:int,engine_version:?string}
+     * @return array{ready:bool,checks:array<string,string>,signature_age_hours:?int,signature_max_age_hours:int,signature_freshness_source:string,engine_version:?string}
      */
     public function health(): array
     {
@@ -43,6 +43,7 @@ class ClamAvApplicationDocumentScanner implements PrivateApplicationDocumentScan
             'checks' => $checks,
             'signature_age_hours' => $preflight['signature_age_hours'],
             'signature_max_age_hours' => $preflight['signature_max_age_hours'],
+            'signature_freshness_source' => $preflight['signature_freshness_source'],
             'engine_version' => $version,
         ];
     }
@@ -57,6 +58,12 @@ class ClamAvApplicationDocumentScanner implements PrivateApplicationDocumentScan
         $binary = (string) config('agricultural_documents.scanner_binary');
         $databaseDirectory = (string) config('agricultural_documents.scanner_database_directory');
         $maximumBytes = $this->uploadPolicy->maximumBytes();
+
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $binary = str_replace('/', '\\', $binary);
+            $databaseDirectory = str_replace('/', '\\', $databaseDirectory);
+            $absolutePath = str_replace('/', '\\', $absolutePath);
+        }
 
         try {
             $process = new Process([
@@ -80,7 +87,7 @@ class ClamAvApplicationDocumentScanner implements PrivateApplicationDocumentScan
         }
     }
 
-    /** @return array{ready:bool,checks:array<string,string>,signature_age_hours:?int,signature_max_age_hours:int} */
+    /** @return array{ready:bool,checks:array<string,string>,signature_age_hours:?int,signature_max_age_hours:int,signature_freshness_source:string} */
     private function preflight(): array
     {
         $binary = config('agricultural_documents.scanner_binary');
@@ -97,33 +104,52 @@ class ClamAvApplicationDocumentScanner implements PrivateApplicationDocumentScan
             || $databaseDirectory === ''
             || ! is_dir($databaseDirectory)
             || ! is_readable($databaseDirectory)) {
-            return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge];
+            $checks['signature_freshness_source'] = 'unknown';
+
+            return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge, 'signature_freshness_source' => 'unknown'];
         }
 
         $requiredDatabases = config('agricultural_documents.required_signature_databases', ['main', 'daily', 'bytecode']);
         if (! is_array($requiredDatabases) || $requiredDatabases === []) {
-            return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge];
+            $checks['signature_freshness_source'] = 'unknown';
+
+            return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge, 'signature_freshness_source' => 'unknown'];
         }
 
         foreach ($requiredDatabases as $database) {
             if (! is_string($database) || ! preg_match('/^[a-z0-9_-]+$/i', $database)) {
-                return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge];
+                $checks['signature_freshness_source'] = 'unknown';
+
+                return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge, 'signature_freshness_source' => 'unknown'];
             }
             $files = $this->databaseFiles($databaseDirectory, $database);
             if ($files === []) {
-                return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge];
+                $checks['signature_freshness_source'] = 'unknown';
+
+                return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge, 'signature_freshness_source' => 'unknown'];
             }
         }
         $checks['signature_databases'] = 'ready';
 
         $dailyFiles = $this->databaseFiles($databaseDirectory, 'daily');
-        $modifiedTimes = array_filter(array_map(static fn (string $file): int|false => @filemtime($file), $dailyFiles), static fn ($time): bool => $time !== false);
-        if ($modifiedTimes === [] || $maxAge < 1) {
-            $checks['signature_freshness'] = 'unknown';
-            return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge];
+        $binary = is_string($binary) ? $binary : '';
+        $metadata = $this->signatureBuildTimestamp($binary, $dailyFiles);
+        $freshnessSource = $metadata['source'];
+        $buildTimestamp = $metadata['timestamp'];
+
+        if ($freshnessSource === 'file_modified_time') {
+            $modifiedTimes = array_filter(array_map(static fn (string $file): int|false => @filemtime($file), $dailyFiles), static fn ($time): bool => $time !== false);
+            $buildTimestamp = $modifiedTimes === [] ? null : max($modifiedTimes);
         }
 
-        $ageSeconds = time() - max($modifiedTimes);
+        $checks['signature_freshness_source'] = $freshnessSource;
+
+        if ($buildTimestamp === null || $maxAge < 1) {
+            $checks['signature_freshness'] = 'unknown';
+            return ['ready' => false, 'checks' => $checks, 'signature_age_hours' => null, 'signature_max_age_hours' => $maxAge, 'signature_freshness_source' => $freshnessSource];
+        }
+
+        $ageSeconds = time() - $buildTimestamp;
         $ageHours = (int) floor(max(0, $ageSeconds) / 3600);
         $fresh = $ageSeconds >= 0 && $ageSeconds <= $maxAge * 3600;
         $checks['signature_freshness'] = $fresh ? 'fresh' : 'stale';
@@ -135,7 +161,60 @@ class ClamAvApplicationDocumentScanner implements PrivateApplicationDocumentScan
             'checks' => $checks,
             'signature_age_hours' => $ageHours,
             'signature_max_age_hours' => $maxAge,
+            'signature_freshness_source' => $freshnessSource,
         ];
+    }
+
+    /**
+     * Read the build time embedded in ClamAV's signed database metadata.
+     * Modification time is a clearly labeled fallback for installations
+     * without sigtool; it can reflect a copy time instead of signature age.
+     *
+     * @param list<string> $dailyFiles
+     * @return array{source:string,timestamp:?int}
+     */
+    private function signatureBuildTimestamp(string $scannerBinary, array $dailyFiles): array
+    {
+        $configuredTool = config('agricultural_documents.scanner_signature_tool');
+        $tool = is_string($configuredTool) && $configuredTool !== ''
+            ? $configuredTool
+            : dirname($scannerBinary).DIRECTORY_SEPARATOR.(DIRECTORY_SEPARATOR === '\\' ? 'sigtool.exe' : 'sigtool');
+
+        if (! is_file($tool) || ! is_executable($tool)) {
+            return ['source' => 'file_modified_time', 'timestamp' => null];
+        }
+
+        $dailyFile = $dailyFiles[0] ?? null;
+        if ($dailyFile === null) {
+            return ['source' => 'database_build_time', 'timestamp' => null];
+        }
+
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $tool = str_replace('/', '\\', $tool);
+            $dailyFile = str_replace('/', '\\', $dailyFile);
+        }
+
+        try {
+            $process = new Process([$tool, '--info', $dailyFile]);
+            $process->setTimeout(10);
+            $process->run();
+
+            if ($process->getExitCode() !== 0
+                || preg_match('/^Build time:\\s*(\\d{1,2}\\s+[A-Za-z]{3}\\s+\\d{4}\\s+\\d{2}:\\d{2}\\s+[+-]\\d{4})\\s*$/m', $process->getOutput(), $matches) !== 1) {
+                return ['source' => 'database_build_time', 'timestamp' => null];
+            }
+
+            $buildTime = \DateTimeImmutable::createFromFormat('!j M Y H:i O', $matches[1]);
+            $parseErrors = \DateTimeImmutable::getLastErrors();
+
+            if ($buildTime === false || ($parseErrors !== false && ($parseErrors['warning_count'] > 0 || $parseErrors['error_count'] > 0))) {
+                return ['source' => 'database_build_time', 'timestamp' => null];
+            }
+
+            return ['source' => 'database_build_time', 'timestamp' => $buildTime->getTimestamp()];
+        } catch (Throwable) {
+            return ['source' => 'database_build_time', 'timestamp' => null];
+        }
     }
 
     /** @return list<string> */

@@ -15,6 +15,7 @@ Artisan::command('agricultural-documents:scanner-health', function (ClamAvApplic
         collect($health['checks'])->map(fn (string $result, string $check): array => [str($check)->replace('_', ' ')->headline(), $result])->values()->all(),
     );
     $this->line('Signature age: '.($health['signature_age_hours'] === null ? 'unknown' : $health['signature_age_hours'].' hours'));
+    $this->line('Signature age basis: '.str($health['signature_freshness_source'])->replace('_', ' ')->headline());
     $this->line('Allowed signature age: '.$health['signature_max_age_hours'].' hours');
     $this->line('ClamAV engine: '.($health['engine_version'] ?? 'unavailable'));
 

@@ -6,6 +6,7 @@ use App\Contracts\PrivateApplicationDocumentScanner;
 use App\Models\AssistanceApplication;
 use App\Models\AssistanceApplicationDocument;
 use App\Models\AssistanceApplicationSubmissionSnapshot;
+use App\Models\AssistanceStatusHistory;
 use App\Models\AssistanceProgram;
 use App\Models\AssistanceProgramRequirementVersion;
 use App\Models\Farm;
@@ -157,6 +158,7 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         mkdir($directory);
         config([
             'agricultural_documents.scanner_binary' => PHP_BINARY,
+            'agricultural_documents.scanner_signature_tool' => null,
             'agricultural_documents.scanner_database_directory' => $directory,
             'agricultural_documents.signature_max_age_hours' => 36,
         ]);
@@ -176,6 +178,7 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
             $this->assertFalse($stale['ready']);
             $this->assertSame('ready', $stale['checks']['signature_databases']);
             $this->assertSame('stale', $stale['checks']['signature_freshness']);
+            $this->assertSame('file_modified_time', $stale['signature_freshness_source']);
             $this->assertSame('not_checked', $stale['checks']['engine_compatibility']);
             $this->assertStringNotContainsString($directory, json_encode($stale, JSON_THROW_ON_ERROR));
         } finally {
@@ -195,6 +198,7 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         }
         config([
             'agricultural_documents.scanner_binary' => PHP_BINARY,
+            'agricultural_documents.scanner_signature_tool' => null,
             'agricultural_documents.scanner_database_directory' => $directory,
             'agricultural_documents.signature_max_age_hours' => 36,
         ]);
@@ -381,6 +385,133 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         ]);
         $this->actingAs($farmer['user'])->get(route('farmer.applications.documents.file', [$data['application'], $document]))->assertStatus(423);
         $this->assertDatabaseCount('assistance_application_document_access_logs', 0);
+    }
+
+    public function test_real_clamav_scans_farmer_upload_before_mao_document_and_application_approval(): void
+    {
+        if (! filter_var(env('AGRICULTURAL_DOCUMENT_REAL_SCANNER_QA', false), FILTER_VALIDATE_BOOL)) {
+            $this->markTestSkipped('Set AGRICULTURAL_DOCUMENT_REAL_SCANNER_QA=true to opt into the local real-ClamAV integration test.');
+        }
+
+        $binary = env('AGRICULTURAL_DOCUMENT_SCANNER_BINARY');
+        $databaseDirectory = env('AGRICULTURAL_DOCUMENT_SCANNER_DATABASE_DIRECTORY');
+
+        if (blank($binary) || blank($databaseDirectory)) {
+            $this->markTestSkipped('Set the local ClamAV binary and signature directory environment variables to run this opt-in integration test.');
+        }
+
+        config([
+            'agricultural_documents.enabled' => true,
+            'agricultural_documents.scanner_binary' => $binary,
+            'agricultural_documents.scanner_database_directory' => $databaseDirectory,
+            'agricultural_documents.signature_max_age_hours' => 36,
+            'agricultural_documents.scan_timeout_seconds' => 120,
+        ]);
+
+        Storage::fake('application-documents');
+        $scanner = app(ClamAvApplicationDocumentScanner::class);
+        $this->assertTrue($scanner->available(), 'Real ClamAV preflight must find fresh signature files.');
+        $health = $scanner->health();
+        $this->assertTrue($health['ready'], 'Real ClamAV must load the configured signatures and pass its scan probe.');
+        $this->assertSame('database_build_time', $health['signature_freshness_source']);
+        app()->instance(PrivateApplicationDocumentScanner::class, $scanner);
+
+        $farmer = $this->farmer('REAL-CLAMAV-QA-001');
+        $data = $this->applicationWithRequiredPdf($farmer);
+        $application = $data['application']->fresh(['acknowledgment']);
+        $reference = $application->application_reference;
+        $acknowledgmentSnapshot = $application->acknowledgment->snapshot;
+
+        $this->actingAs($farmer['user'])
+            ->post(route('farmer.applications.documents.upload', [$data['application'], $data['requirement']]), [
+                'document' => $this->pdf('synthetic-real-clamav-proof-v1.pdf'),
+            ])
+            ->assertRedirect();
+
+        $first = AssistanceApplicationDocument::query()->firstOrFail();
+        $this->assertSame('clean', $first->scan_status);
+        $this->assertSame('pending', $first->review_status);
+        Storage::disk('application-documents')->assertExists($first->storage_path);
+        $this->assertDatabaseHas('assistance_application_document_events', [
+            'document_id' => $first->id,
+            'event_type' => 'security_scan_result',
+            'to_scan_status' => 'clean',
+        ]);
+
+        $this->actingAs($farmer['user'])
+            ->get(route('farmer.applications.documents.file', [$application, $first]))
+            ->assertOk();
+
+        $otherFarmer = $this->farmer('REAL-CLAMAV-QA-002');
+        $this->actingAs($otherFarmer['user'])
+            ->get(route('farmer.applications.documents.file', [$application, $first]))
+            ->assertNotFound();
+
+        $this->actingAs($data['staff'])
+            ->patch(route('modules.aasms.applications.documents.review', [$application, $first]), [
+                'review_status' => 'correction_requested',
+                'farmer_correction_notes' => 'Synthetic QA: upload a clearer generated document.',
+                'internal_review_notes' => 'Synthetic private MAO note for ClamAV acceptance.',
+            ])
+            ->assertRedirect();
+        $this->actingAs($data['staff'])
+            ->post(route('modules.aasms.review', $application), [
+                'status' => 'returned',
+                'review_notes' => 'Synthetic QA: replace the supporting document and resubmit.',
+            ])
+            ->assertRedirect();
+        $this->assertSame('returned', $application->fresh()->status);
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $farmer['user']->id]);
+        $this->actingAs($farmer['user'])->get(route('farmer.applications.show', $application))
+            ->assertOk()->assertSee('upload a clearer generated document')->assertDontSee('private MAO note');
+
+        $this->actingAs($farmer['user'])
+            ->post(route('farmer.applications.documents.upload', [$application, $data['requirement']]), [
+                'document' => $this->pdf('synthetic-real-clamav-proof-v2.pdf'),
+            ])
+            ->assertRedirect();
+        $replacement = AssistanceApplicationDocument::query()->where('version_number', 2)->firstOrFail();
+        $this->assertSame('clean', $replacement->scan_status);
+        $this->assertSame($first->id, $replacement->supersedes_document_id);
+        $this->assertDatabaseHas('assistance_application_document_events', [
+            'document_id' => $replacement->id,
+            'event_type' => 'security_scan_result',
+            'to_scan_status' => 'clean',
+        ]);
+
+        $this->actingAs($data['staff'])
+            ->patch(route('modules.aasms.applications.documents.review', [$application, $replacement]), [
+                'review_status' => 'verified',
+                'farmer_correction_notes' => '',
+                'internal_review_notes' => 'Synthetic local ClamAV acceptance only.',
+            ])
+            ->assertRedirect();
+        $this->assertSame('verified', $replacement->fresh()->review_status);
+        $this->actingAs($farmer['user'])
+            ->get(route('farmer.applications.documents.file', [$application, $replacement]))
+            ->assertOk();
+
+        $this->actingAs($farmer['user'])
+            ->post(route('farmer.assistance.resubmit', $application), ['purpose' => 'Synthetic ClamAV document replacement.'])
+            ->assertRedirect();
+        $this->assertSame('submitted', $application->fresh()->status);
+        $this->assertSame($reference, $application->fresh()->application_reference);
+        $this->assertSame($acknowledgmentSnapshot, $application->fresh('acknowledgment')->acknowledgment->snapshot);
+        $this->assertSame(2, AssistanceApplicationSubmissionSnapshot::query()->where('application_id', $application->id)->count());
+
+        $this->actingAs($data['staff'])
+            ->post(route('modules.aasms.review', $application), [
+                'status' => 'approved',
+                'review_notes' => 'Synthetic local ClamAV acceptance only.',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('approved', $application->fresh()->status);
+        $this->assertDatabaseHas('assistance_status_histories', [
+            'application_id' => $application->id,
+            'to_status' => 'approved',
+        ]);
+        $this->assertSame(4, AssistanceStatusHistory::query()->where('application_id', $application->id)->count());
     }
 
     public function test_document_review_permissions_correction_replacement_resubmission_and_acknowledgment_integrity(): void
