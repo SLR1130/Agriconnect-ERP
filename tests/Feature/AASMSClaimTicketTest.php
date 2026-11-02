@@ -12,6 +12,7 @@ use App\Models\SupplyItem;
 use App\Models\UnitOfMeasurement;
 use App\Models\User;
 use App\Services\AssistanceClaimTicketService;
+use App\Services\ClaimTicketFeatureGate;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -23,6 +24,26 @@ class AASMSClaimTicketTest extends TestCase
     use RefreshDatabase;
 
     private array $data;
+
+    public function test_resolved_windows_sqlite_qa_paths_keep_forward_slashes_for_the_allowlist(): void
+    {
+        $directory = storage_path('app/qa');
+        if (! is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+
+        $path = tempnam($directory, 'claim-ticket-path-');
+        $this->assertNotFalse($path);
+
+        try {
+            $normalized = ClaimTicketFeatureGate::normalizedPath($path);
+
+            $this->assertStringContainsString('/storage/app/qa/', $normalized);
+            $this->assertStringNotContainsString('\\', $normalized);
+        } finally {
+            @unlink($path);
+        }
+    }
 
     protected function setUp(): void
     {

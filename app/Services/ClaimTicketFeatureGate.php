@@ -89,6 +89,9 @@ class ClaimTicketFeatureGate
             $normalized = (string) (realpath($normalized) ?: $normalized);
         }
 
-        return strtolower(rtrim($normalized, '/'));
+        // realpath() returns native Windows separators even when given a
+        // forward-slash path. Normalize again after resolving so QA path
+        // allowlists behave identically on Windows and Unix.
+        return strtolower(rtrim(str_replace('\\', '/', $normalized), '/'));
     }
 }
