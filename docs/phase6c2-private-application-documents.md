@@ -18,9 +18,11 @@ With uploads disabled, farmer and staff pages continue to show existing applicat
 ## Dependencies before operational activation
 
 1. Approve actual program checklists, accepted types, size limits, retention and correction procedures with the MAO. Current automated requirements are synthetic QA data only.
-2. Install and configure an approved ClamAV-compatible scanner and confirm it is reachable by the PHP process. Set `AGRICULTURAL_DOCUMENT_SCANNER_BINARY` to its executable path, retain the timeout, and verify clean, infected, timeout, and unavailable outcomes in a controlled test.
+2. Install and configure a currently supported ClamAV scanner and confirm it is reachable by the PHP process. This adapter invokes a local `clamscan` executable; a remote/container-only service needs a separately reviewed adapter. Configure the official FreshClam updater and monitor successful signature updates and database freshness. A missing database, update failure, timeout, unavailable scanner, or scan error must remain non-clean. Set `AGRICULTURAL_DOCUMENT_SCANNER_BINARY` only after the executable, database path, and permissions are verified, then test clean, infected, timeout, and unavailable outcomes in a controlled QA environment.
 3. Review and separately approve activation of the pending Phase 6C.1 migrations and `2026_11_02_000100_create_aasms_application_document_workflow_tables.php` on the operational database. They have not been applied by this phase.
 4. Grant the two exact permissions only to authorized personnel, and verify farmer ownership, staff scope and Auditor denial before setting `AGRICULTURAL_APPLICATION_DOCUMENTS_ENABLED=true`.
+
+The application adapter currently fails closed on scanner absence, scanner exceptions/timeouts, and non-clean results, but it does not independently enforce a maximum signature age. Operational activation therefore also requires monitored FreshClam updates and an approved health check or code change that prevents a stale signature database from being treated as a clean scan.
 
 ## Migration failure and restoration procedure
 

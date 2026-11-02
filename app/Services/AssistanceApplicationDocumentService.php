@@ -32,7 +32,11 @@ class AssistanceApplicationDocumentService
 
     public function scannerAvailable(): bool
     {
-        return $this->scanner->available();
+        try {
+            return $this->scanner->available();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     public function assertUploadEnabled(): void
@@ -144,7 +148,20 @@ class AssistanceApplicationDocumentService
             throw $exception;
         }
 
-        $scan = $this->scanner->scan(Storage::disk($disk)->path($document->storage_path));
+        try {
+            if (! $this->scanner->available()) {
+                $scan = ['status' => 'unavailable', 'engine' => null];
+            } else {
+                $result = $this->scanner->scan(Storage::disk($disk)->path($document->storage_path));
+                $status = $result['status'] ?? null;
+                $scan = in_array($status, ['clean', 'infected', 'unavailable', 'failed', 'pending'], true)
+                    ? ['status' => $status, 'engine' => is_string($result['engine'] ?? null) ? $result['engine'] : null]
+                    : ['status' => 'failed', 'engine' => null];
+            }
+        } catch (Throwable) {
+            // Scanner errors and timeouts are quarantine outcomes, never clean results.
+            $scan = ['status' => 'failed', 'engine' => null];
+        }
         $from = $document->scan_status;
         $document->forceFill([
             'scan_status' => $scan['status'],

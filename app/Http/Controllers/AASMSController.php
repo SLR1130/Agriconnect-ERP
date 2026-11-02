@@ -201,7 +201,7 @@ class AASMSController extends Controller
     public function showApplication(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents): View
     {
         $this->staff($request, 'view');
-        $relations = ['program', 'farmer.user', 'history', 'approvedSupplyItem', 'distributions.batch.item'];
+        $relations = ['program', 'farmer.user', 'farmer.farms', 'history', 'approvedSupplyItem', 'distributions.batch.item'];
         if ($schema->requirementVersionsReady()) {
             $relations[] = 'requirementVersion.documentRequirements';
             $relations[] = 'requirementVersion.publisher';

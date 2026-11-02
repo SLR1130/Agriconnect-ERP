@@ -25,6 +25,14 @@
         <section class="rounded-2xl border border-[#dfe9e1] bg-white p-5 shadow-sm md:p-7">
             <h2 class="text-lg font-bold text-[#153d2b]">Applicant and submission</h2>
             <dl class="mt-3 grid gap-3 sm:grid-cols-2"><div><dt class="text-xs font-bold uppercase text-gray-500">Farmer reference</dt><dd>{{ $application->farmer->farmer_code }}</dd></div><div><dt class="text-xs font-bold uppercase text-gray-500">Barangay</dt><dd>{{ $application->farmer->barangay ?: 'Not recorded' }}</dd></div><div><dt class="text-xs font-bold uppercase text-gray-500">Submission channel</dt><dd>{{ $application->submission_channel ? str($application->submission_channel)->replace('_', ' ')->headline() : 'Historical channel unknown' }}</dd></div><div><dt class="text-xs font-bold uppercase text-gray-500">Purpose</dt><dd>{{ $application->purpose ?: 'No purpose note provided' }}</dd></div></dl>
+            <div class="mt-4 rounded-xl border border-[#e5ece6] bg-[#f8faf7] p-4">
+                <h3 class="text-sm font-bold text-[#153d2b]">Associated farms</h3>
+                @forelse($application->farmer->farms as $farm)
+                    <p class="mt-2 text-sm"><strong>{{ $farm->name }}</strong> · {{ $farm->barangay ?: 'Barangay not recorded' }} · @if($farm->area){{ number_format((float) $farm->area, 2) }} {{ $farm->area_unit }}@else Area not recorded @endif · {{ str($farm->status)->replace('_', ' ')->headline() }}</p>
+                @empty
+                    <p class="mt-2 text-sm text-gray-600">No farm is currently linked to this farmer record.</p>
+                @endforelse
+            </div>
             @if($application->review_notes)<p class="mt-4 rounded-lg bg-[#f8faf7] p-3 text-sm"><strong>Current review feedback:</strong> {{ $application->review_notes }}</p>@endif
         </section>
 

@@ -8,18 +8,22 @@ use App\Models\AssistanceApplicationDocument;
 use App\Models\AssistanceApplicationSubmissionSnapshot;
 use App\Models\AssistanceProgram;
 use App\Models\AssistanceProgramRequirementVersion;
+use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\Module;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserModuleAccess;
 use App\Services\ErpAuthorizationService;
+use App\Services\ClamAvApplicationDocumentScanner;
 use App\Services\ProgramRequirementVersionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use LogicException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class AASMSApplicationDocumentWorkflowTest extends TestCase
@@ -32,6 +36,7 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach($role);
         $farmer = Farmer::create(['user_id' => $user->id, 'farmer_code' => $code, 'barangay' => 'Synthetic Test Barangay', 'registration_status' => 'verified']);
+        Farm::create(['farmer_id' => $farmer->id, 'name' => 'Synthetic QA farm', 'barangay' => 'Synthetic Test Barangay', 'area' => 2.5, 'area_unit' => 'hectare', 'status' => 'active']);
 
         return compact('user', 'farmer');
     }
@@ -72,6 +77,10 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         app(ProgramRequirementVersionService::class)->publish($version, $staff->id);
         $program->update(['status' => 'open']);
 
+        $this->actingAs($farmer['user'])->get(route('farmer.programs.show', $program))
+            ->assertOk()->assertSee('Program document checklist')->assertSee('Synthetic test proof')
+            ->assertSee('Required')->assertSee('Submit application');
+
         $this->actingAs($farmer['user'])->post(route('farmer.assistance.apply', $program), [
             'purpose' => 'Synthetic test purpose.',
             'submission_key' => (string) Str::uuid(),
@@ -97,16 +106,55 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         };
     }
 
+    private function timedOutScanner(): PrivateApplicationDocumentScanner
+    {
+        return new class implements PrivateApplicationDocumentScanner {
+            public function available(): bool { return true; }
+            public function scan(string $absolutePath): array
+            {
+                $process = new Process([PHP_BINARY, '-v']);
+                $process->setTimeout(1);
+                throw new ProcessTimedOutException($process, ProcessTimedOutException::TYPE_GENERAL);
+            }
+        };
+    }
+
     private function pdf(string $name = 'proof.pdf', string $content = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF"): UploadedFile
     {
         return UploadedFile::fake()->createWithContent($name, $content);
+    }
+
+    public function test_document_uploads_are_disabled_by_default_and_reject_direct_posts(): void
+    {
+        config(['agricultural_documents.enabled' => false]);
+        Storage::fake('application-documents');
+        $farmer = $this->farmer();
+        $data = $this->applicationWithRequiredPdf($farmer);
+        $documents = app(\App\Services\AssistanceApplicationDocumentService::class);
+
+        $this->assertFalse($documents->uploadEnabled());
+        $this->actingAs($farmer['user'])->post(route('farmer.applications.documents.upload', [$data['application'], $data['requirement']]), [
+            'document' => $this->pdf(),
+        ])->assertStatus(503);
+        $this->assertDatabaseCount('assistance_application_documents', 0);
+        $this->assertSame([], Storage::disk('application-documents')->allFiles());
+    }
+
+    public function test_production_clamav_adapter_reports_missing_binary_as_unavailable(): void
+    {
+        config(['agricultural_documents.scanner_binary' => null]);
+        $scanner = app(ClamAvApplicationDocumentScanner::class);
+
+        $this->assertFalse($scanner->available());
+        $this->assertSame(['status' => 'unavailable', 'engine' => null], $scanner->scan('not-opened-while-scanner-is-missing'));
     }
 
     public function test_upload_is_private_opaque_and_stays_quarantined_when_scanner_is_unavailable(): void
     {
         config(['agricultural_documents.enabled' => true]);
         Storage::fake('application-documents');
-        app()->instance(PrivateApplicationDocumentScanner::class, $this->scanner('unavailable', false));
+        // A misbehaving adapter must not turn unavailable into a clean result.
+        app()->instance(PrivateApplicationDocumentScanner::class, $this->scanner('clean', false));
         $farmer = $this->farmer();
         $data = $this->applicationWithRequiredPdf($farmer);
 
@@ -117,6 +165,10 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
 
         $document = AssistanceApplicationDocument::query()->firstOrFail();
         $this->assertSame('unavailable', $document->scan_status);
+        $privateRoot = strtolower(str_replace('\\', '/', config('filesystems.disks.application-documents.root')));
+        $publicRoot = strtolower(str_replace('\\', '/', public_path())).'/';
+        $this->assertStringContainsString('/storage/app/private/', $privateRoot);
+        $this->assertFalse(str_starts_with($privateRoot, $publicRoot));
         $this->assertStringNotContainsString('/', $document->original_filename);
         $this->assertStringNotContainsString('\\', $document->original_filename);
         $this->assertDoesNotMatchRegularExpression('/[\x00-\x1F\x7F]/', $document->original_filename);
@@ -132,7 +184,12 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
             ->assertOk()->assertSee('Quarantined')->assertDontSee('Download private file')
             ->assertSee('data-private-document-upload', false)
             ->assertSee('data-document-upload-progress', false)
-            ->assertSee('Uploading to private quarantine. Keep this page open');
+            ->assertSee('Uploading to private quarantine. Keep this page open')
+            ->assertDontSee($document->storage_path);
+        $this->actingAs(User::factory()->create())->post(route('farmer.applications.documents.upload', [$data['application'], $data['requirement']]), [
+            'document' => $this->pdf(),
+        ])->assertForbidden();
+        $this->assertDatabaseCount('assistance_application_documents', 1);
         $other = $this->farmer('DOC-QA-002');
         $this->actingAs($other['user'])->get(route('farmer.applications.documents.file', [$data['application'], $document]))->assertNotFound();
         $this->assertDatabaseCount('assistance_application_document_access_logs', 0);
@@ -193,6 +250,30 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         $this->assertDatabaseCount('assistance_application_document_access_logs', 0);
     }
 
+    public function test_scanner_timeout_is_recorded_as_failed_and_remains_quarantined(): void
+    {
+        config(['agricultural_documents.enabled' => true]);
+        Storage::fake('application-documents');
+        app()->instance(PrivateApplicationDocumentScanner::class, $this->timedOutScanner());
+        $farmer = $this->farmer();
+        $data = $this->applicationWithRequiredPdf($farmer);
+
+        $this->actingAs($farmer['user'])->post(route('farmer.applications.documents.upload', [$data['application'], $data['requirement']]), [
+            'document' => $this->pdf(),
+        ])->assertRedirect();
+
+        $document = AssistanceApplicationDocument::query()->firstOrFail();
+        $this->assertSame('failed', $document->scan_status);
+        $this->assertNotNull($document->scan_completed_at);
+        $this->assertDatabaseHas('assistance_application_document_events', [
+            'document_id' => $document->id,
+            'event_type' => 'security_scan_result',
+            'to_scan_status' => 'failed',
+        ]);
+        $this->actingAs($farmer['user'])->get(route('farmer.applications.documents.file', [$data['application'], $document]))->assertStatus(423);
+        $this->assertDatabaseCount('assistance_application_document_access_logs', 0);
+    }
+
     public function test_document_review_permissions_correction_replacement_resubmission_and_acknowledgment_integrity(): void
     {
         config(['agricultural_documents.enabled' => true]);
@@ -212,6 +293,11 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         $this->actingAs($farmer['user'])->post(route('farmer.applications.documents.upload', [$application, $data['requirement']]), ['document' => $this->pdf()])->assertRedirect();
         $first = AssistanceApplicationDocument::query()->firstOrFail();
         $this->assertSame('clean', $first->scan_status);
+        $this->actingAs($data['staff'])->get(route('modules.aasms.applications.show', $application))
+            ->assertOk()->assertSee('Synthetic test proof')->assertSee('Required')
+            ->assertSee('Associated farms')->assertSee('Synthetic QA farm')
+            ->assertSee($first->original_filename)->assertSee('Security scan passed')
+            ->assertSee('Document decision')->assertSee('Record document review');
 
         $viewerRole = Role::create(['name' => 'Synthetic Document Viewer', 'slug' => 'municipal_agriculturist', 'permissions' => ['modules.aasms.view'], 'is_active' => true]);
         $viewer = User::factory()->create();
@@ -268,6 +354,12 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
         $this->assertSame(2, data_get($snapshots[1]->snapshot, 'documents.0.document_version'));
         $this->assertTrue(data_get($snapshots[1]->snapshot, 'original_acknowledgment_unchanged'));
         $this->assertDatabaseCount('assistance_status_histories', 3);
+
+        $this->actingAs($data['staff'])->post(route('modules.aasms.review', $application), [
+            'status' => 'approved', 'review_notes' => '',
+        ])->assertRedirect();
+        $this->assertSame('approved', $application->fresh()->status);
+        $this->assertDatabaseCount('assistance_status_histories', 4);
 
         $this->expectException(LogicException::class);
         $second->delete();
