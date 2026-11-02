@@ -140,6 +140,28 @@
                     @endif
                 </section>
 
+                @if($application->status === 'approved' || $claimTickets->isNotEmpty())
+                    <section class="farmer-card" aria-labelledby="claim-ticket-heading">
+                        <div class="farmer-section-heading">
+                            <div><h2 id="claim-ticket-heading">Assistance claim ticket</h2><p>A ticket records your approved allocation. It is not proof that supplies were released.</p></div>
+                            <x-ui.icon name="ticket" size="lg" />
+                        </div>
+                        <div class="farmer-message farmer-message-warning mt-4" role="note">Claim tickets in this QA phase cannot be redeemed. They do not reserve supplies or guarantee stock availability. AISMS availability is checked separately at an authorized physical handover.</div>
+                        @forelse($claimTickets as $claimTicket)
+                            <article class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Ticket reference</p>
+                                    <h3 class="mt-1 text-lg font-bold text-forest-green">{{ $claimTicket->ticket_reference }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">{{ str($claimTicket->effectiveStatus())->headline() }} · issued {{ $claimTicket->issued_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y g:i A') }}</p>
+                                </div>
+                                <a class="farmer-button" href="{{ route('farmer.claim-tickets.show', $claimTicket) }}">View ticket and history <x-ui.icon name="next" size="sm" /></a>
+                            </article>
+                        @empty
+                            <p class="farmer-timeline-empty mt-4">The MAO has not issued a ticket for this approved allocation yet. Your application remains approved; no supply release is recorded here.</p>
+                        @endforelse
+                    </section>
+                @endif
+
                 @if($application->status === 'returned')
                     @if($outstandingRequiredDocuments === [])
                     <form id="application-resubmit" class="farmer-tracking-form" method="POST" action="{{ route('farmer.assistance.resubmit', $application) }}">

@@ -14,6 +14,7 @@ use App\Services\FarmerActivityFeedService;
 use App\Services\ProgramEligibilityService;
 use App\Services\AgriculturalSchemaCapabilities;
 use App\Services\AssistanceApplicationDocumentService;
+use App\Services\ClaimTicketFeatureGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,7 +82,7 @@ class FarmerExperienceController extends Controller
         ]);
     }
 
-    public function application(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents): View
+    public function application(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents, ClaimTicketFeatureGate $claimTicketFeature): View
     {
         $farmer = $this->farmer($request);
         abort_unless((int) $application->farmer_id === (int) $farmer->id, 404);
@@ -117,6 +118,9 @@ class FarmerExperienceController extends Controller
             ->sortByDesc('version_number')
             ->unique('requirement_id')
             ->keyBy('requirement_id');
+        $claimTickets = $claimTicketFeature->enabled()
+            ? $application->claimTickets()->with('approvedSupplyItem')->get()
+            : collect();
 
         return view('farmer.application', [
             'farmer' => $farmer,
@@ -127,6 +131,7 @@ class FarmerExperienceController extends Controller
             'scannerAvailable' => $documents->scannerAvailable(),
             'maximumDocumentUploadBytes' => $documents->maximumUploadBytes(),
             'outstandingRequiredDocuments' => $documents->outstandingRequiredDocuments($application),
+            'claimTickets' => $claimTickets,
         ]);
     }
 

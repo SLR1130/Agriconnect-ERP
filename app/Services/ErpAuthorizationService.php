@@ -85,6 +85,10 @@ class ErpAuthorizationService
             return $this->hasExactAasmsIntakeGrant($user);
         }
 
+        if ($this->isAasmsClaimTicketPermission($permission)) {
+            return $this->hasExactAasmsClaimTicketGrant($user, $permission);
+        }
+
         if (in_array($permission, ['modules.aasms.documents_view_sensitive', 'modules.aasms.documents_review'], true)) {
             return $this->hasExactAasmsDocumentGrant($user, $permission);
         }
@@ -182,6 +186,16 @@ class ErpAuthorizationService
                 && $this->roleHasExactAasmsIntakeGrant($role);
         }
 
+        if ($this->isAasmsClaimTicketPermission($permission)) {
+            if (in_array($role->slug, ['farmer', 'authorized_viewer'], true)) {
+                return $role->slug === 'authorized_viewer'
+                    && in_array($permission, ['modules.aasms.claim_ticket_view', 'modules.aasms.claim_ticket_history'], true)
+                    && $this->roleHasExactClaimTicketGrant($role, $permission);
+            }
+
+            return $this->roleHasExactClaimTicketGrant($role, $permission);
+        }
+
         if ($permission === 'modules.aasms.publish') {
             // Publishing is a separate, explicit MAO role grant. Broad legacy
             // wildcards and delegated Module Personnel assignments do not imply it.
@@ -222,7 +236,7 @@ class ErpAuthorizationService
             'ffrms' => ['view', 'create', 'update', 'review', 'export'],
             'apms' => ['view', 'create', 'update', 'export'],
             'aisms' => ['view', 'create', 'update', 'receive', 'release', 'adjust', 'export'],
-            'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review', 'intake_assist'],
+            'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review', 'intake_assist', 'claim_ticket_view', 'claim_ticket_issue', 'claim_ticket_verify', 'claim_ticket_revoke', 'claim_ticket_reissue', 'claim_ticket_history'],
             'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
             'abpms' => ['view', 'create', 'update', 'review', 'export'],
         ];
@@ -366,6 +380,66 @@ class ErpAuthorizationService
         }
 
         return false;
+    }
+
+    private function isAasmsClaimTicketPermission(string $permission): bool
+    {
+        return in_array($permission, [
+            'modules.aasms.claim_ticket_view',
+            'modules.aasms.claim_ticket_issue',
+            'modules.aasms.claim_ticket_verify',
+            'modules.aasms.claim_ticket_revoke',
+            'modules.aasms.claim_ticket_reissue',
+            'modules.aasms.claim_ticket_history',
+        ], true);
+    }
+
+    /** Exact, default-deny ticket grants; wildcard AASMS permissions never imply these actions. */
+    private function hasExactAasmsClaimTicketGrant(User $user, string $permission): bool
+    {
+        if ($user->hasRole('farmer')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        $action = substr($permission, strlen('modules.aasms.'));
+        $viewOnly = in_array($permission, ['modules.aasms.claim_ticket_view', 'modules.aasms.claim_ticket_history'], true);
+        $roles = $user->roles()->with(['moduleAccess.module'])->get();
+        $assignments = $user->moduleAssignments()->with('module')->get();
+
+        foreach ($roles as $role) {
+            if (! $role->is_active || $role->slug === 'farmer') {
+                continue;
+            }
+            if ($role->slug === 'authorized_viewer' && ! $viewOnly) {
+                continue;
+            }
+            if (in_array($permission, $role->permissions ?? [], true)) {
+                return true;
+            }
+            if ($role->moduleAccess->contains(fn ($grant) => $grant->module?->slug === 'aasms'
+                && in_array($action, $grant->permissions ?? [], true))) {
+                return true;
+            }
+            if ($role->slug === 'module_personnel' && $assignments->contains(fn ($grant) => $grant->module?->slug === 'aasms'
+                && in_array($action, $grant->permissions ?? [], true))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function roleHasExactClaimTicketGrant(Role $role, string $permission): bool
+    {
+        $action = substr($permission, strlen('modules.aasms.'));
+
+        return in_array($permission, $role->permissions ?? [], true)
+            || $role->moduleAccess->contains(fn ($grant) => $grant->module?->slug === 'aasms'
+                && in_array($action, $grant->permissions ?? [], true));
     }
 
     private function roleHasExactAasmsIntakeGrant(Role $role): bool

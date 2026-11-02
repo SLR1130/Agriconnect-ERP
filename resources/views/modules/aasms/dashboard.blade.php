@@ -3,6 +3,9 @@
     <x-slot name="header">Assistance &amp; Subsidy Management</x-slot>
     <x-slot name="description">Coordinate farmer assistance programs, application review, and authorized supply distribution.</x-slot>
     <div class="mb-5 flex flex-wrap items-center gap-3">
+        @if($claimTicketsAvailable)
+            <a class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" href="{{ route('modules.aasms.claim-tickets.index') }}"><x-ui.icon name="ticket" size="sm"/>Assistance claim tickets</a>
+        @endif
         @if(\Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements') && auth()->user()->canModuleAction('aasms', 'view'))
             <a class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" href="{{ route('modules.aasms.announcements') }}"><x-ui.icon name="notifications" size="sm"/>Manage official MAO notices</a>
         @endif

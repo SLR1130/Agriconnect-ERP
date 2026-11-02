@@ -19,6 +19,7 @@ use App\Services\ProgramRequirementVersionService;
 use App\Services\ProgramEligibilityService;
 use App\Services\AgriculturalSchemaCapabilities;
 use App\Services\AssistanceApplicationDocumentService;
+use App\Services\ClaimTicketFeatureGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +44,7 @@ class AASMSController extends Controller
             ->when($request->filled('to'), fn ($q) => $q->whereDate('distributed_at', '<=', $request->to));
     }
 
-    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema, \App\Services\StaffAssistedIntakePolicy $intakePolicy): View
+    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema, \App\Services\StaffAssistedIntakePolicy $intakePolicy, ClaimTicketFeatureGate $claimTickets): View
     {
         $this->staff($request, 'view');
         $requirementsReady = $schema->requirementVersionsReady();
@@ -113,6 +114,9 @@ class AASMSController extends Controller
             'acknowledgmentsSchemaReady' => $acknowledgmentsReady,
             'canManagePrograms' => $requirementsReady && $request->user()->canModuleAction('aasms', 'create'),
             'canEditPrograms' => $requirementsReady && $request->user()->canModuleAction('aasms', 'update'),
+            'claimTicketsAvailable' => $claimTickets->enabled()
+                && $request->user()->canModuleAction('aasms', 'view')
+                && $request->user()->canErp('modules.aasms.claim_ticket_view'),
         ]);
     }
 

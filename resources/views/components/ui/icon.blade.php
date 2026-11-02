@@ -10,7 +10,7 @@
         'users' => 'user-group', 'chart' => 'chart-bar', 'inventory' => 'archive-box', 'finance' => 'banknotes',
         'reports' => 'document-chart-bar', 'security' => 'shield-check', 'modules' => 'squares-plus',
         'settings' => 'cog-6-tooth', 'sign-out' => 'arrow-left-start-on-rectangle', 'menu' => 'bars-3',
-        'collapse' => 'rectangle-group', 'action' => 'inbox-stack',
+        'collapse' => 'rectangle-group', 'action' => 'inbox-stack', 'ticket' => 'ticket', 'qr' => 'qr-code',
     ];
     $component = 'heroicon-o-'.($icons[$name] ?? 'question-mark-circle');
     $dimensions = ['xs' => 'h-3.5 w-3.5', 'sm' => 'h-4 w-4', 'md' => 'h-5 w-5', 'lg' => 'h-6 w-6', 'xl' => 'h-8 w-8'];

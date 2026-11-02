@@ -17,4 +17,5 @@ class AssistanceApplication extends Model
     public function acknowledgment(){ return $this->hasOne(AssistanceApplicationAcknowledgment::class, 'application_id'); }
     public function documents(){ return $this->hasMany(AssistanceApplicationDocument::class, 'application_id')->orderBy('requirement_id')->orderByDesc('version_number'); }
     public function submissionSnapshots(){ return $this->hasMany(AssistanceApplicationSubmissionSnapshot::class, 'application_id')->orderBy('attempt_number'); }
+    public function claimTickets(){ return $this->hasMany(AssistanceClaimTicket::class, 'application_id')->orderByDesc('issued_at'); }
 }

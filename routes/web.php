@@ -14,6 +14,8 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ERP\AdministrationController;
 use App\Http\Controllers\ERP\DashboardController;
 use App\Http\Controllers\FarmerExperienceController;
+use App\Http\Controllers\FarmerClaimTicketController;
+use App\Http\Controllers\AASMSClaimTicketController;
 use App\Http\Controllers\FarmerPortalController;
 use App\Http\Controllers\FarmerProductionController;
 use App\Http\Controllers\FFRMSController;
@@ -60,6 +62,9 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/announcements/{announcement}', [AnnouncementController::class, 'farmerShow'])->name('farmer.announcements.show');
         Route::get('/programs/{program}', [FarmerExperienceController::class, 'program'])->name('farmer.programs.show');
         Route::get('/applications/{application}', [FarmerExperienceController::class, 'application'])->name('farmer.applications.show');
+        Route::get('/claim-tickets/{ticket}', [FarmerClaimTicketController::class, 'show'])->name('farmer.claim-tickets.show');
+        Route::get('/claim-tickets/{ticket}/print', [FarmerClaimTicketController::class, 'print'])->name('farmer.claim-tickets.print');
+        Route::get('/claim-tickets/{ticket}/qr', [FarmerClaimTicketController::class, 'qr'])->name('farmer.claim-tickets.qr');
         Route::get('/applications/{application}/acknowledgment', [ApplicationAcknowledgmentController::class, 'farmer'])->name('farmer.applications.acknowledgment');
         Route::post('/applications/{application}/requirements/{requirement}/documents', [AssistanceApplicationDocumentController::class, 'farmerUpload'])->name('farmer.applications.documents.upload');
         Route::get('/applications/{application}/documents/{document}', [AssistanceApplicationDocumentController::class, 'farmerFile'])->name('farmer.applications.documents.file');
@@ -117,6 +122,12 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/aisms/export', [AISMSController::class, 'export'])->name('modules.aisms.export');
 
         Route::get('/aasms', [AASMSController::class, 'index'])->name('modules.aasms.dashboard');
+        Route::get('/aasms/claim-tickets', [AASMSClaimTicketController::class, 'index'])->name('modules.aasms.claim-tickets.index');
+        Route::post('/aasms/claim-tickets/verify', [AASMSClaimTicketController::class, 'verify'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.verify');
+        Route::get('/aasms/claim-tickets/{ticket}', [AASMSClaimTicketController::class, 'show'])->name('modules.aasms.claim-tickets.show');
+        Route::post('/aasms/applications/{application}/claim-tickets', [AASMSClaimTicketController::class, 'issue'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.issue');
+        Route::post('/aasms/applications/{application}/claim-tickets/{ticket}/reissue', [AASMSClaimTicketController::class, 'reissue'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.reissue');
+        Route::post('/aasms/claim-tickets/{ticket}/revoke', [AASMSClaimTicketController::class, 'revoke'])->name('modules.aasms.claim-tickets.revoke');
         Route::get('/aasms/intake', [AASMSIntakeController::class, 'index'])->name('modules.aasms.intake');
         Route::post('/aasms/intake', [AASMSIntakeController::class, 'store'])->middleware('throttle:10,1')->name('modules.aasms.intake.store');
         Route::get('/aasms/intake/applications/{application}', [AASMSIntakeController::class, 'showApplication'])->name('modules.aasms.intake.applications.show');
