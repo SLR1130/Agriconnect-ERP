@@ -43,7 +43,7 @@ class AASMSController extends Controller
             ->when($request->filled('to'), fn ($q) => $q->whereDate('distributed_at', '<=', $request->to));
     }
 
-    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema): View
+    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema, \App\Services\StaffAssistedIntakePolicy $intakePolicy): View
     {
         $this->staff($request, 'view');
         $requirementsReady = $schema->requirementVersionsReady();
@@ -107,6 +107,8 @@ class AASMSController extends Controller
             'canReject' => $request->user()->canModuleAction('aasms', 'reject'),
             'canDistribute' => $request->user()->canModuleAction('aasms', 'distribute'),
             'canExport' => $request->user()->canModuleAction('aasms', 'export'),
+            'canIntakeAssist' => $request->user()->canModuleAction('aasms', 'intake_assist'),
+            'staffAssistedIntakeEnabled' => $intakePolicy->enabledForIsolatedQa(),
             'requirementsSchemaReady' => $requirementsReady,
             'acknowledgmentsSchemaReady' => $acknowledgmentsReady,
             'canManagePrograms' => $requirementsReady && $request->user()->canModuleAction('aasms', 'create'),

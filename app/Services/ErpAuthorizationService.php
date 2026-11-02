@@ -78,6 +78,13 @@ class ErpAuthorizationService
             return false;
         }
 
+        // Assisted intake is intentionally a literal grant. AASMS view/create,
+        // module wildcards, and legacy broad permissions never imply that a
+        // staff member may submit an application on a farmer's behalf.
+        if ($permission === 'modules.aasms.intake_assist') {
+            return $this->hasExactAasmsIntakeGrant($user);
+        }
+
         if (in_array($permission, ['modules.aasms.documents_view_sensitive', 'modules.aasms.documents_review'], true)) {
             return $this->hasExactAasmsDocumentGrant($user, $permission);
         }
@@ -170,6 +177,11 @@ class ErpAuthorizationService
             return true;
         }
 
+        if ($permission === 'modules.aasms.intake_assist') {
+            return ! in_array($role->slug, ['farmer', 'authorized_viewer'], true)
+                && $this->roleHasExactAasmsIntakeGrant($role);
+        }
+
         if ($permission === 'modules.aasms.publish') {
             // Publishing is a separate, explicit MAO role grant. Broad legacy
             // wildcards and delegated Module Personnel assignments do not imply it.
@@ -210,7 +222,7 @@ class ErpAuthorizationService
             'ffrms' => ['view', 'create', 'update', 'review', 'export'],
             'apms' => ['view', 'create', 'update', 'export'],
             'aisms' => ['view', 'create', 'update', 'receive', 'release', 'adjust', 'export'],
-            'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review'],
+            'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review', 'intake_assist'],
             'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
             'abpms' => ['view', 'create', 'update', 'review', 'export'],
         ];
@@ -318,6 +330,54 @@ class ErpAuthorizationService
 
         return $role->moduleAccess
             ->first(fn ($access) => $access->module?->slug === $module && $access->hasPermission($action)) !== null;
+    }
+
+    private function hasExactAasmsIntakeGrant(User $user): bool
+    {
+        // A farmer portal identity never doubles as the staff actor for this
+        // workflow, even if someone accidentally attaches another role.
+        if ($user->hasRole('farmer')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        $roles = $user->roles()->with(['moduleAccess.module'])->get();
+        foreach ($roles as $role) {
+            if (! $role->is_active || in_array($role->slug, ['farmer', 'authorized_viewer'], true)) {
+                continue;
+            }
+
+            if ($this->roleHasExactAasmsIntakeGrant($role)) {
+                return true;
+            }
+
+            if ($role->slug === 'module_personnel') {
+                $explicitAssignments = $user->moduleAssignments()->with('module')->get();
+                if ($explicitAssignments->contains(fn ($assignment) =>
+                    $assignment->module?->slug === 'aasms'
+                    && in_array('intake_assist', $assignment->permissions ?? [], true)
+                )) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function roleHasExactAasmsIntakeGrant(Role $role): bool
+    {
+        if (in_array('modules.aasms.intake_assist', $role->permissions ?? [], true)) {
+            return true;
+        }
+
+        return $role->moduleAccess->contains(fn ($grant) =>
+            $grant->module?->slug === 'aasms'
+            && in_array('intake_assist', $grant->permissions ?? [], true)
+        );
     }
 
     private function rawRoleGrant(Role $role, string $permission): bool

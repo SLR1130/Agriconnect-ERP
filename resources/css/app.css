@@ -605,6 +605,7 @@ body.erp-body { margin: 0; min-width: 320px; color: var(--ink); background: var(
 .farmer-message { margin-bottom: 1.25rem; padding: .9rem 1rem; border-radius: .8rem; font-size: .84rem; line-height: 1.55; }
 .farmer-message-success { color: #145b39; background: #e7f6eb; border: 1px solid #b8dfc4; }.farmer-message-error { color: #8f332e; background: #fff1ee; border: 1px solid #ecc2bb; }
 .farmer-message-warning { color: #76580f; background: #fff7df; border: 1px solid #e7cf86; }
+.farmer-message-info { color: #254d63; background: #edf6fa; border: 1px solid #c6dfe9; }
 .farmer-message ul { margin: .35rem 0 0 1.2rem; list-style: disc; }
 .farmer-empty { padding: 1.5rem; color: #5e7164; background: #f0f5ef; border: 1px dashed #c4d5c6; border-radius: .9rem; font-size: .86rem; line-height: 1.6; }
 .farmer-subnav { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .35rem; scrollbar-width: thin; }

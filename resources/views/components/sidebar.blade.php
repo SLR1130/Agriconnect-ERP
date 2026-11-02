@@ -9,6 +9,8 @@
     $canReports = $currentUser?->canErp('reports.view') || $currentUser?->canErp('reports.generate') || $authorization->visibleModules($currentUser) !== [];
     $canActivity = $currentUser?->canErp('activity_logs.view');
     $canFarmerServices = $isFarmer && $currentUser?->farmer?->isVerified();
+    $canAasmsIntake = !$isFarmer && $currentUser?->canModuleAction('aasms', 'intake_assist')
+        && app(\App\Services\StaffAssistedIntakePolicy::class)->enabledForIsolatedQa();
     $dashboardRoute = $isFarmer
         ? 'farmer.portal'
         : ($isSuperAdmin ? 'admin.dashboard' : ($currentUser?->hasRole('mao_admin') || $currentUser?->hasRole('municipal_agriculturist') || $currentUser?->hasRole('module_personnel') ? 'mao.dashboard' : 'dashboard'));
@@ -76,6 +78,15 @@
                     </section>
                 @endif
             @endforeach
+
+            @if($canAasmsIntake)
+                <section class="erp-nav-section">
+                    <p class="erp-nav-label">AASMS intake</p>
+                    <ul class="erp-nav-list">
+                        <li><a class="erp-nav-link {{ request()->routeIs('modules.aasms.intake*') ? 'is-active' : '' }}" href="{{ route('modules.aasms.intake') }}" title="Staff-assisted farmer intake" @if(request()->routeIs('modules.aasms.intake*')) aria-current="page" @endif><span class="erp-nav-icon"><x-ui.icon name="users" size="sm" /></span><span>Staff-assisted intake</span></a></li>
+                    </ul>
+                </section>
+            @endif
 
             @if($canReports || $canActivity)
                 <section class="erp-nav-section">

@@ -2,7 +2,14 @@
     <x-slot name="title">AASMS Assistance</x-slot>
     <x-slot name="header">Assistance &amp; Subsidy Management</x-slot>
     <x-slot name="description">Coordinate farmer assistance programs, application review, and authorized supply distribution.</x-slot>
-    @if(\Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements') && auth()->user()->canModuleAction('aasms', 'view'))<a class="mb-4 inline-block text-sm font-bold text-emerald-700 underline" href="{{ route('modules.aasms.announcements') }}">Manage official MAO notices →</a>@endif
+    <div class="mb-5 flex flex-wrap items-center gap-3">
+        @if(\Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements') && auth()->user()->canModuleAction('aasms', 'view'))
+            <a class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" href="{{ route('modules.aasms.announcements') }}"><x-ui.icon name="notifications" size="sm"/>Manage official MAO notices</a>
+        @endif
+        @if($canIntakeAssist && $staffAssistedIntakeEnabled)
+            <a class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-forest-green px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-green" href="{{ route('modules.aasms.intake') }}"><x-ui.icon name="users" size="sm"/>Start staff-assisted intake</a>
+        @endif
+    </div>
 
     <style>
         .aas-card{background:#fff;border:1px solid #dfe9e1;border-radius:16px;box-shadow:0 5px 18px #153d2b0a}

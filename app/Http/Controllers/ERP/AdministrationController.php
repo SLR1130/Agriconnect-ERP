@@ -655,6 +655,7 @@ class AdministrationController extends Controller
             'release' => 'Release',
             'adjust' => 'Adjust',
             'distribute' => 'Distribute',
+            'intake_assist' => 'Assist farmer application intake (isolated QA only)',
             'issue' => 'Issue',
             'return' => 'Return',
             'maintenance' => 'Maintenance',

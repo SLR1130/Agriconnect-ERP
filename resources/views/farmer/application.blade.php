@@ -61,6 +61,11 @@
                 @else
                     <p class="farmer-message farmer-message-warning">This legacy application predates acknowledgments. Its original reference and submission evidence were not recorded, so no receipt is being reconstructed.</p>
                 @endif
+                @if($application->submission_channel === 'mao_staff_assisted')
+                    <div class="farmer-message farmer-message-info mt-4"><strong>MAO-assisted submission.</strong> This application was entered by {{ data_get($ackSnapshot, 'intake.actor_name', 'an authorized MAO staff member') }} on your FFRMS record. The acknowledgment identifies the staff intake actor; the MAO review decision is recorded separately below.</div>
+                @else
+                    <p class="mt-3 text-xs text-slate-500">Submission channel: Farmer Portal</p>
+                @endif
                 @if($application->purpose)<p class="farmer-tracking-purpose">{{ $application->purpose }}</p>@else<p class="text-sm text-slate-600">No additional purpose was provided.</p>@endif
                 @if($application->review_notes)<div class="farmer-message {{ $application->status === 'rejected' ? 'farmer-message-error' : 'farmer-message-warning' }} mt-4"><strong>MAO feedback:</strong> {{ $application->review_notes }}</div>@endif
                 @if($application->approved_quantity)<p class="mt-4 text-sm"><strong>Approved allocation:</strong> {{ $application->approved_quantity }} {{ $application->approvedSupplyItem?->name }}</p>@endif

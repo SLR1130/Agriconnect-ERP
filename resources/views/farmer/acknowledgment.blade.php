@@ -52,6 +52,10 @@
             <div class="fact"><dt>Submission channel</dt><dd>{{ str(data_get($snapshot, 'application.channel', 'farmer_portal'))->replace('_', ' ')->headline() }}</dd></div>
         </dl>
 
+        @if(data_get($snapshot, 'application.channel') === 'mao_staff_assisted')
+            <div class="notice"><strong>MAO staff-assisted intake:</strong> The information was entered by {{ data_get($snapshot, 'intake.actor_name', 'the recorded staff user') }} (staff account {{ data_get($snapshot, 'intake.actor_user_id', 'not recorded') }}). The identity and attestation fields are marked synthetic QA evidence only. They are not a farmer signature, proof of identity, or legal consent.</div>
+        @endif
+
         <section aria-labelledby="requirements-heading">
             <h3 id="requirements-heading">Requirements in the applicable version</h3>
             @if(count($documentRequirements))

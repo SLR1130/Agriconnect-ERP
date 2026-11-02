@@ -20,10 +20,53 @@ class AssistanceApplicationSubmissionService
         private readonly ProgramEligibilityService $eligibility,
         private readonly ProgramRequirementVersionService $versions,
         private readonly AssistanceApplicationDocumentService $documents,
+        private readonly StaffAssistedIntakePolicy $staffAssistedPolicy,
     ) {}
 
     public function submit(AssistanceProgram $program, Farmer $farmer, string $purpose, string $submissionKey, int $actorId): AssistanceApplication
     {
+        return $this->submitUsingActor($program, $farmer, $purpose, $submissionKey, User::findOrFail($actorId));
+    }
+
+    public function submitStaffAssisted(
+        AssistanceProgram $program,
+        Farmer $farmer,
+        string $purpose,
+        string $submissionKey,
+        User $actor,
+        string $identityConfirmationMethod,
+        bool $syntheticQaAttested,
+    ): AssistanceApplication {
+        abort_unless($actor->canModuleAction('aasms', 'intake_assist'), 403);
+        $this->staffAssistedPolicy->assertEnabledForIsolatedQa();
+
+        if (! in_array($identityConfirmationMethod, $this->staffAssistedPolicy->identityConfirmationMethods(), true)) {
+            throw ValidationException::withMessages(['identity_confirmation_method' => 'The configured isolated QA identity-attestation method is not available.']);
+        }
+        if (! $syntheticQaAttested) {
+            throw ValidationException::withMessages(['synthetic_qa_attestation' => 'Confirm the clearly labelled synthetic QA attestation to continue.']);
+        }
+
+        $application = $this->submitUsingActor($program, $farmer, $purpose, $submissionKey, $actor, [
+            'identity_confirmation_method' => $identityConfirmationMethod,
+        ]);
+
+        if ($application->submission_channel !== 'mao_staff_assisted') {
+            throw ValidationException::withMessages(['program' => 'An application already exists through another submission channel. Open the existing AASMS application instead of creating a staff-assisted duplicate.']);
+        }
+
+        return $application;
+    }
+
+    /** @param array{identity_confirmation_method:string}|null $intake */
+    private function submitUsingActor(
+        AssistanceProgram $program,
+        Farmer $farmer,
+        string $purpose,
+        string $submissionKey,
+        User $actor,
+        ?array $intake = null,
+    ): AssistanceApplication {
         if ($existing = $this->existingApplication($program, $farmer, $submissionKey)) {
             return $existing;
         }
@@ -31,7 +74,7 @@ class AssistanceApplicationSubmissionService
         $businessDate = $this->calendar->today();
 
         try {
-            return DB::transaction(function () use ($program, $farmer, $purpose, $submissionKey, $actorId, $businessDate): AssistanceApplication {
+            return DB::transaction(function () use ($program, $farmer, $purpose, $submissionKey, $actor, $businessDate, $intake): AssistanceApplication {
                 $lockedFarmer = Farmer::query()->with(['farms', 'user'])->lockForUpdate()->findOrFail($farmer->id);
                 $lockedProgram = AssistanceProgram::query()->lockForUpdate()->findOrFail($program->id);
 
@@ -44,6 +87,23 @@ class AssistanceApplicationSubmissionService
                 $eligibility = $this->eligibility->requireEligible($lockedProgram, $lockedFarmer, $businessDate);
                 $submittedAt = CarbonImmutable::now('UTC');
                 $reference = $this->newReference($businessDate);
+                $channel = $intake ? 'mao_staff_assisted' : 'farmer_portal';
+                $intakeEvidence = $intake ? [
+                    'actor_user_id' => $actor->id,
+                    'actor_name' => $actor->name,
+                    'identity_confirmation' => [
+                        'method' => $intake['identity_confirmation_method'],
+                        'recorded_at_utc' => $submittedAt->toIso8601String(),
+                        'evidence_type' => 'synthetic_qa_staff_attestation',
+                    ],
+                    'consent_attestation' => [
+                        'recorded_by_user_id' => $actor->id,
+                        'recorded_at_utc' => $submittedAt->toIso8601String(),
+                        'policy_version' => $this->staffAssistedPolicy->attestationPolicyVersion(),
+                        'evidence_type' => 'synthetic_qa_only',
+                        'statement' => 'No farmer signature or legal consent is asserted; this record exists only for isolated QA.',
+                    ],
+                ] : null;
 
                 $application = AssistanceApplication::create([
                     'program_id' => $lockedProgram->id,
@@ -57,18 +117,20 @@ class AssistanceApplicationSubmissionService
                     'requirement_version_id' => $version->id,
                     'submitted_at' => $submittedAt,
                     'submitted_business_date' => $businessDate->toDateString(),
-                    'submission_channel' => 'farmer_portal',
+                    'submission_channel' => $channel,
                 ]);
 
                 AssistanceStatusHistory::create([
                     'application_id' => $application->id,
                     'from_status' => null,
                     'to_status' => 'submitted',
-                    'changed_by' => $actorId,
-                    'notes' => 'Farmer submitted application.',
+                    'changed_by' => $actor->id,
+                    'notes' => $intake
+                        ? 'Application recorded through MAO staff-assisted intake; synthetic QA attestation only.'
+                        : 'Farmer submitted application.',
                 ]);
 
-                $snapshot = $this->snapshot($application, $lockedFarmer, $lockedProgram, $version, $eligibility, $businessDate, $submittedAt);
+                $snapshot = $this->snapshot($application, $lockedFarmer, $lockedProgram, $version, $eligibility, $businessDate, $submittedAt, $intakeEvidence);
                 $snapshotJson = json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
                 $application->acknowledgment()->create([
                     'application_reference' => $reference,
@@ -76,7 +138,7 @@ class AssistanceApplicationSubmissionService
                     'snapshot_sha256' => hash('sha256', $snapshotJson),
                     'generated_at' => $submittedAt,
                 ]);
-                $this->documents->recordInitialSubmissionSnapshot($application, User::findOrFail($actorId), $submittedAt);
+                $this->documents->recordInitialSubmissionSnapshot($application, $actor, $submittedAt);
 
                 return $application->fresh(['program', 'requirementVersion', 'acknowledgment']);
             }, 3);
@@ -128,6 +190,7 @@ class AssistanceApplicationSubmissionService
         array $eligibility,
         CarbonImmutable $businessDate,
         CarbonImmutable $submittedAt,
+        ?array $intakeEvidence,
     ): array {
         $documents = $version->documentRequirements->map(fn ($requirement): array => [
             'key' => $requirement->requirement_key,
@@ -145,7 +208,7 @@ class AssistanceApplicationSubmissionService
                 'id' => $application->id,
                 'reference' => $application->application_reference,
                 'status_at_submission' => 'submitted',
-                'channel' => 'farmer_portal',
+                'channel' => $application->submission_channel,
             ],
             'applicant' => [
                 'farmer_id' => $farmer->id,
@@ -193,6 +256,7 @@ class AssistanceApplicationSubmissionService
                 'received' => [],
                 'missing' => null,
             ],
+            ...($intakeEvidence ? ['intake' => $intakeEvidence] : []),
         ];
     }
 

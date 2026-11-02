@@ -27,6 +27,15 @@ class ApplicationAcknowledgmentController extends Controller
         return $this->render($request, $application);
     }
 
+    public function staffIntake(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema): Response
+    {
+        abort_unless($request->user()->canModuleAction('aasms', 'intake_assist'), 403);
+        abort_unless($application->submission_channel === 'mao_staff_assisted', 404);
+        abort_unless($schema->acknowledgmentsReady(), 404);
+
+        return $this->render($request, $application);
+    }
+
     private function render(Request $request, AssistanceApplication $application): Response
     {
         $acknowledgment = $application->acknowledgment()->firstOrFail();

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AASMSController;
+use App\Http\Controllers\AASMSIntakeController;
 use App\Http\Controllers\ABPMSController;
 use App\Http\Controllers\AEAMSController;
 use App\Http\Controllers\AISMSController;
@@ -116,6 +117,11 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/aisms/export', [AISMSController::class, 'export'])->name('modules.aisms.export');
 
         Route::get('/aasms', [AASMSController::class, 'index'])->name('modules.aasms.dashboard');
+        Route::get('/aasms/intake', [AASMSIntakeController::class, 'index'])->name('modules.aasms.intake');
+        Route::post('/aasms/intake', [AASMSIntakeController::class, 'store'])->middleware('throttle:10,1')->name('modules.aasms.intake.store');
+        Route::get('/aasms/intake/applications/{application}', [AASMSIntakeController::class, 'showApplication'])->name('modules.aasms.intake.applications.show');
+        Route::post('/aasms/intake/applications/{application}/documents/{requirement}', [AASMSIntakeController::class, 'uploadDocument'])->name('modules.aasms.intake.documents.store');
+        Route::get('/aasms/intake/applications/{application}/acknowledgment', [ApplicationAcknowledgmentController::class, 'staffIntake'])->name('modules.aasms.intake.acknowledgment');
         Route::get('/aasms/announcements', [AnnouncementController::class, 'staffIndex'])->name('modules.aasms.announcements');
         Route::post('/aasms/announcements', [AnnouncementController::class, 'store'])->name('modules.aasms.announcements.store');
         Route::patch('/aasms/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('modules.aasms.announcements.update');
