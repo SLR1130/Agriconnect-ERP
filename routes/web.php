@@ -124,6 +124,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/aasms', [AASMSController::class, 'index'])->name('modules.aasms.dashboard');
         Route::get('/aasms/claim-tickets', [AASMSClaimTicketController::class, 'index'])->name('modules.aasms.claim-tickets.index');
         Route::post('/aasms/claim-tickets/verify', [AASMSClaimTicketController::class, 'verify'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.verify');
+        Route::get('/aasms/claim-tickets/verify', [AASMSClaimTicketController::class, 'verifyForm'])->name('modules.aasms.claim-tickets.verify-form');
         Route::get('/aasms/claim-tickets/{ticket}', [AASMSClaimTicketController::class, 'show'])->name('modules.aasms.claim-tickets.show');
         Route::post('/aasms/applications/{application}/claim-tickets', [AASMSClaimTicketController::class, 'issue'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.issue');
         Route::post('/aasms/applications/{application}/claim-tickets/{ticket}/reissue', [AASMSClaimTicketController::class, 'reissue'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.reissue');

@@ -28,6 +28,19 @@
                 </dl>
             </section>
 
+            @if($ticket->successor || $ticket->supersedes)
+                <section class="farmer-card" aria-labelledby="ticket-reissue-heading">
+                    <div class="farmer-section-heading"><div><h2 id="ticket-reissue-heading">Replacement history</h2><p>Reissued tickets have a new private QR. The prior ticket cannot be used.</p></div></div>
+                    @if($ticket->successor)
+                        <p class="mt-3 text-sm text-slate-700">This ticket was superseded. Its token is no longer valid.</p>
+                        <a class="farmer-button mt-3" href="{{ route('farmer.claim-tickets.show', $ticket->successor) }}">View replacement {{ $ticket->successor->ticket_reference }}</a>
+                    @endif
+                    @if($ticket->supersedes)
+                        <p class="mt-3 text-sm text-slate-700">This ticket replaced {{ $ticket->supersedes->ticket_reference }}. The earlier ticket remains in the history and cannot be used.</p>
+                    @endif
+                </section>
+            @endif
+
             <section class="farmer-card">
                 <div class="farmer-section-heading"><div><h2>Ticket QR</h2><p>Keep this private and show it only to authorized MAO staff.</p></div></div>
                 @if($effectiveStatus === 'issued' && $qrAvailable)
@@ -48,6 +61,11 @@
             </section>
 
             <div class="farmer-message farmer-message-warning" role="note"><strong>QA ticket only — not redeemable.</strong> Issuance does not reserve or guarantee inventory. No supplies have been released by issuing or displaying this ticket. Physical handover and stock deduction remain a separate future Phase 6E workflow.</div>
+
+            <section class="farmer-card" aria-labelledby="lost-ticket-heading">
+                <div class="farmer-section-heading"><div><h2 id="lost-ticket-heading">Lost or damaged ticket?</h2><p>Protect your ticket token and QR as you would a private credential.</p></div></div>
+                <p class="mt-3 text-sm leading-6 text-slate-700">Contact the Municipal Agriculture Office through its existing official channels. Staff must confirm your farmer record separately. If authorized, they can revoke the old ticket and issue a replacement. A ticket reference alone is not proof of identity.</p>
+            </section>
 
             <section class="farmer-card"><div class="farmer-section-heading"><div><h2>Ticket history</h2><p>Recorded ticket events are separate from your application and distribution history.</p></div></div>
                 <ol class="mt-4 space-y-3">@forelse($events as $event)<li class="border-l-2 border-emerald-600 pl-4"><p class="font-semibold text-slate-800">{{ str($event->event_type)->replace('_', ' ')->headline() }} @if($event->outcome && $event->outcome !== 'valid')<span class="text-sm font-normal text-slate-500">· {{ str($event->outcome)->replace('_', ' ')->headline() }}</span>@endif</p><time class="text-xs text-slate-500">{{ $event->occurred_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y g:i A') }}</time></li>@empty<li class="text-sm text-slate-500">No ticket history is available.</li>@endforelse</ol><div class="mt-4">{{ $events->links() }}</div>

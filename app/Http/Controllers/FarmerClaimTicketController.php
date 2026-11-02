@@ -31,7 +31,7 @@ class FarmerClaimTicketController extends Controller
     public function print(Request $request, AssistanceClaimTicket $ticket, ClaimTicketFeatureGate $feature): Response
     {
         $this->assertOwner($request, $ticket, $feature);
-        $ticket->load(['application.program', 'application.farmer', 'approvedSupplyItem']);
+        $ticket->load(['application.program', 'application.farmer', 'approvedSupplyItem', 'supersedes', 'successor']);
         $active = $ticket->isEffectivelyIssued()
             && app(AssistanceClaimTicketService::class)->qrPayload($ticket) !== null;
 

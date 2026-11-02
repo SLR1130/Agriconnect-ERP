@@ -17,33 +17,11 @@
     <div class="mb-5 flex flex-wrap gap-3">
         <a class="ct-button ct-light" href="{{ route('modules.aasms.dashboard') }}"><x-ui.icon name="back" size="sm"/>Back to AASMS</a>
         <a class="ct-button ct-light" href="#ticket-records">Ticket records</a>
-        @if($canVerify)<a class="ct-button ct-primary" href="#verify-ticket"><x-ui.icon name="qr" size="sm"/>Verify a ticket</a>@endif
+        @if($canVerify)<a class="ct-button ct-primary" href="{{ route('modules.aasms.claim-tickets.verify-form') }}"><x-ui.icon name="qr" size="sm"/>Validate a ticket</a>@endif
     </div>
 
     @if(session('status'))<div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" role="status">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert"><p class="font-bold">Please review the following:</p><ul class="mt-2 list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-
-    @if(is_array($verification))
-        @php($verificationTone = in_array($verification['outcome'] ?? '', ['valid','reference_only'], true) ? 'border-emerald-300 bg-emerald-50 text-emerald-950' : 'border-amber-300 bg-amber-50 text-amber-950')
-        <section class="mb-5 rounded-xl border p-4 {{ $verificationTone }}" aria-live="polite">
-            <p class="font-bold">{{ str($verification['outcome'] ?? 'unknown')->replace('_', ' ')->headline() }} · {{ str($verification['method'] ?? '')->headline() }} check</p>
-            <p class="mt-1 text-sm">{{ $verification['message'] ?? 'Ticket check recorded.' }}</p>
-            @if($verificationTicket)<a class="mt-2 inline-flex font-semibold underline" href="{{ route('modules.aasms.claim-tickets.show', $verificationTicket) }}">Open ticket details</a>@endif
-            @if(in_array($verification['method'] ?? '', ['reference'], true))<p class="mt-2 text-xs font-semibold">Manual reference lookup does not establish that the presenter is the beneficiary.</p>@endif
-        </section>
-    @endif
-
-    @if($canVerify)
-        <section id="verify-ticket" class="ct-card mb-6 p-5" aria-labelledby="verify-heading">
-            <div class="max-w-3xl"><h2 id="verify-heading" class="text-lg font-bold text-[#153d2b]">Read-only ticket verification</h2><p class="mt-1 text-sm text-slate-600">Scan with an approved local reader and paste the QR payload, or enter a ticket reference for a manual lookup. Camera access is not required.</p></div>
-            <form class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" method="POST" action="{{ route('modules.aasms.claim-tickets.verify') }}" autocomplete="off">
-                @csrf
-                <div><label class="mb-1 block text-sm font-semibold text-slate-700" for="claim-ticket-input">QR payload, token, or reference</label><input id="claim-ticket-input" class="ct-input font-mono" name="ticket_input" maxlength="256" autocapitalize="off" spellcheck="false" autocomplete="off" required aria-describedby="claim-ticket-verify-note"></div>
-                <button class="ct-button ct-primary self-end" type="submit"><x-ui.icon name="security" size="sm"/>Check ticket</button>
-            </form>
-            <p id="claim-ticket-verify-note" class="mt-2 text-xs text-slate-500">A successful token check confirms the ticket token only. Staff must separately confirm beneficiary identity in person under a future approved handover policy. This form never releases stock.</p>
-        </section>
-    @endif
 
     @if($canIssue)
         <section class="ct-card mb-6 p-5" aria-labelledby="eligible-heading">

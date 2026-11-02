@@ -241,10 +241,13 @@ class AASMSClaimTicketTest extends TestCase
         $secretLikeInput = bin2hex(random_bytes(32));
         $response = $this->actingAs($this->data['staff'])
             ->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => $secretLikeInput])
-            ->assertRedirect(route('modules.aasms.claim-tickets.index', ['workspace' => 'verify']))
+            ->assertRedirect(route('modules.aasms.claim-tickets.verify-form'))
             ->assertSessionHas('claim_ticket_verification.outcome', 'invalid');
 
         $response->assertSessionMissingInput('ticket_input');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))
+            ->assertOk()
+            ->assertSee('Token invalid');
         $event = DB::table('assistance_claim_ticket_events')->where('reason_code', 'invalid_token')->first();
         $this->assertNotNull($event);
         $this->assertNull($event->ticket_id);
@@ -298,14 +301,34 @@ class AASMSClaimTicketTest extends TestCase
         $distributionCount = DB::table('assistance_distributions')->count();
 
         $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => 'AGC1:'.$token])
-            ->assertRedirect(route('modules.aasms.claim-tickets.index', ['workspace' => 'verify']))
+            ->assertRedirect(route('modules.aasms.claim-tickets.verify-form'))
             ->assertSessionHas('claim_ticket_verification.outcome', 'valid');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))
+            ->assertOk()
+            ->assertSee('Token valid')
+            ->assertSee('identity not confirmed')
+            ->assertSee($this->data['program']->name)
+            ->assertSee($this->data['item']->name)
+            ->assertSee('12.00')
+            ->assertSee('not authorization to hand over supplies');
         $this->assertDatabaseHas('assistance_claim_ticket_events', ['ticket_id' => $ticket->id, 'event_type' => 'verification_attempt', 'outcome' => 'valid']);
 
         $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => $ticket->ticket_reference])
             ->assertSessionHas('claim_ticket_verification.outcome', 'reference_only')
             ->assertSessionHas('claim_ticket_verification.method', 'reference');
-        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify'))->assertNotFound();
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))
+            ->assertOk()
+            ->assertSee('Reference located')
+            ->assertSee('token not checked')
+            ->assertSee('A reference is not a secret credential')
+            ->assertSee($this->data['item']->name);
+        $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => 'AGC-NOT-A-REAL-REF'])
+            ->assertSessionHas('claim_ticket_verification.outcome', 'not_found');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))
+            ->assertOk()
+            ->assertSee('Reference not found')
+            ->assertSee('A reference is not a secret credential');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify'))->assertOk()->assertSee('Validate a ticket credential');
 
         $this->assertSame('issued', $ticket->fresh()->status);
         $this->assertDatabaseCount('assistance_distributions', $distributionCount);
@@ -348,8 +371,22 @@ class AASMSClaimTicketTest extends TestCase
         $this->assertDatabaseHas('assistance_claim_ticket_events', ['ticket_id' => $ticket->id, 'event_type' => 'revoked']);
         $this->assertDatabaseHas('assistance_claim_ticket_events', ['ticket_id' => $ticket->id, 'event_type' => 'superseded']);
         $this->assertDatabaseHas('assistance_claim_ticket_events', ['ticket_id' => $replacement->id, 'event_type' => 'reissued']);
+        $this->actingAs($this->data['farmerUser'])->get(route('farmer.claim-tickets.show', $ticket))
+            ->assertOk()
+            ->assertSee('Replacement history')
+            ->assertSee($replacement->ticket_reference)
+            ->assertSee('cannot be used');
+        $this->actingAs($this->data['farmerUser'])->get(route('farmer.claim-tickets.print', $replacement))
+            ->assertOk()
+            ->assertSee('Expires')
+            ->assertSee('No expiry configured')
+            ->assertSee('Lost or damaged ticket?')
+            ->assertSee('NOT REDEEMABLE');
         $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => 'AGC1:'.$oldToken])
             ->assertSessionHas('claim_ticket_verification.outcome', 'revoked');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))
+            ->assertOk()
+            ->assertSee('Ticket revoked or superseded');
         $this->assertSame(2, AssistanceClaimTicket::where('application_id', $this->data['application']->id)->count());
         $this->assertSame(1, AssistanceClaimTicket::where('application_id', $this->data['application']->id)->where('active_slot', 1)->count());
     }
@@ -363,6 +400,9 @@ class AASMSClaimTicketTest extends TestCase
 
         $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => 'AGC1:'.$token])
             ->assertSessionHas('claim_ticket_verification.outcome', 'expired');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))
+            ->assertOk()
+            ->assertSee('Ticket expired');
         $this->assertSame('expired', $ticket->fresh()->status);
         $this->assertNull($ticket->fresh()->active_slot);
         $this->assertNull($ticket->fresh()->token_ciphertext);
@@ -392,18 +432,52 @@ class AASMSClaimTicketTest extends TestCase
         config(['agricultural_claim_tickets.enabled' => false]);
         $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.index'))->assertNotFound();
         config(['agricultural_claim_tickets.enabled' => true]);
-        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify'))->assertNotFound();
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))->assertOk()->assertSee('Validate a ticket credential');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.show', 999).'/redeem')->assertNotFound();
         $this->assertDatabaseCount('assistance_claim_tickets', 0);
         $this->assertDatabaseCount('assistance_claim_ticket_events', 0);
+    }
+
+    public function test_validation_route_is_permission_gated_and_rate_limited(): void
+    {
+        $verifyOnlyRole = Role::create([
+            'name' => 'Ticket Verify Only QA',
+            'slug' => 'ticket_verify_only_qa',
+            'permissions' => ['modules.aasms.view', 'modules.aasms.claim_ticket_verify'],
+            'is_active' => true,
+        ]);
+        $verifyOnly = User::factory()->create();
+        $verifyOnly->roles()->attach($verifyOnlyRole);
+        $this->actingAs($verifyOnly)->get(route('modules.aasms.claim-tickets.verify-form'))->assertOk();
+
+        $viewerRole = Role::create([
+            'name' => 'Ticket View Only QA',
+            'slug' => 'ticket_view_only_qa',
+            'permissions' => ['modules.aasms.view', 'modules.aasms.claim_ticket_view'],
+            'is_active' => true,
+        ]);
+        $viewer = User::factory()->create();
+        $viewer->roles()->attach($viewerRole);
+        $this->actingAs($viewer)->get(route('modules.aasms.claim-tickets.verify-form'))->assertForbidden();
+
+        $this->actingAs($this->data['staff']);
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
+            $this->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => 'not-a-valid-token-'.$attempt])->assertRedirect();
+        }
+        $this->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => 'eleventh-attempt'])
+            ->assertTooManyRequests();
     }
 
     public function test_staff_dashboard_link_and_ticket_views_use_real_authenticated_records(): void
     {
         $this->actingAs($this->data['staff'])->get(route('modules.aasms.dashboard'))->assertOk()->assertSee(route('modules.aasms.claim-tickets.index'), false);
         $ticket = $this->issueTicket();
-        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.index'))->assertOk()->assertSee($ticket->ticket_reference)->assertSee('Read-only ticket verification');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.index'))->assertOk()->assertSee($ticket->ticket_reference)->assertSee(route('modules.aasms.claim-tickets.verify-form'), false);
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.verify-form'))->assertOk()->assertSee('no camera scanner');
         $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.show', $ticket))->assertOk()->assertSee('Immutable ticket history')->assertDontSee($ticket->token_hash);
         $this->actingAs($this->data['farmerUser'])->get(route('farmer.applications.show', $this->data['application']))->assertOk()->assertSee($ticket->ticket_reference);
+        $this->actingAs($this->data['farmerUser'])->get(route('farmer.claim-tickets.print', $ticket))->assertOk()->assertSee('No expiry configured')->assertSee('Lost or damaged ticket?');
+        $this->actingAs($this->data['staff'])->get(route('modules.aasms.claim-tickets.show', $ticket).'/redeem')->assertNotFound();
     }
 
     private function issueTicket(): AssistanceClaimTicket

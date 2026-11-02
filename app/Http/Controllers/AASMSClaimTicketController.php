@@ -39,11 +39,6 @@ class AASMSClaimTicketController extends Controller
             ->paginate(15, ['*'], 'ticket_page')
             ->withQueryString();
 
-        $verification = $request->session()->get('claim_ticket_verification');
-        $verificationTicket = is_array($verification) && isset($verification['ticket_id'])
-            ? AssistanceClaimTicket::query()->with(['application.program', 'application.farmer.user', 'approvedSupplyItem'])->find($verification['ticket_id'])
-            : null;
-
         return view('modules.aasms.claim-tickets.index', [
             'eligibleApplications' => $eligibleApplications,
             'tickets' => $tickets,
@@ -52,6 +47,18 @@ class AASMSClaimTicketController extends Controller
             'canRevoke' => $user->canErp('modules.aasms.claim_ticket_revoke'),
             'canReissue' => $user->canErp('modules.aasms.claim_ticket_reissue'),
             'canHistory' => $user->canErp('modules.aasms.claim_ticket_history'),
+        ]);
+    }
+
+    public function verifyForm(Request $request, ClaimTicketFeatureGate $feature): View
+    {
+        $this->authorizeTicketAccess($request, $feature, 'modules.aasms.claim_ticket_verify');
+        $verification = $request->session()->get('claim_ticket_verification');
+        $verificationTicket = is_array($verification) && isset($verification['ticket_id'])
+            ? AssistanceClaimTicket::query()->with(['application.program', 'application.farmer.user', 'approvedSupplyItem'])->find($verification['ticket_id'])
+            : null;
+
+        return view('modules.aasms.claim-tickets.verify', [
             'verification' => $verification,
             'verificationTicket' => $verificationTicket,
         ]);
@@ -115,7 +122,7 @@ class AASMSClaimTicketController extends Controller
         ]);
         $request->session()->flash('status', $result['message']);
 
-        return redirect()->route('modules.aasms.claim-tickets.index', ['workspace' => 'verify']);
+        return redirect()->route('modules.aasms.claim-tickets.verify-form');
     }
 
     public function revoke(Request $request, AssistanceClaimTicket $ticket, ClaimTicketFeatureGate $feature, AssistanceClaimTicketService $tickets): RedirectResponse
