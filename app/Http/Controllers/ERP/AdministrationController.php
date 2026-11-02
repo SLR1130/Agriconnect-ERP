@@ -662,6 +662,8 @@ class AdministrationController extends Controller
             'claim_ticket_revoke' => 'Revoke assistance claim tickets',
             'claim_ticket_reissue' => 'Reissue assistance claim tickets',
             'claim_ticket_history' => 'View assistance claim-ticket history',
+            'identity_confirm' => 'Record identity confirmation (synthetic QA only; no real identification)',
+            'handover_distribute' => 'Authorize ticket-governed assistance handover (QA only; requires AASMS distribute and AISMS release)',
             'issue' => 'Issue',
             'return' => 'Return',
             'maintenance' => 'Maintenance',

@@ -41,13 +41,39 @@ class ClaimTicketFeatureGate
         }
 
         $expectedDatabase = (string) config('agricultural_claim_tickets.qa_mysql_database');
-        $prefix = 'agriconnect_erp_claimtickets_qa_';
+        $expectedHost = (string) config('agricultural_claim_tickets.qa_mysql_host');
+        $expectedPort = (string) config('agricultural_claim_tickets.qa_mysql_port');
+        $expectedUuid = (string) config('agricultural_claim_tickets.qa_mysql_server_uuid');
+        $expectedBackup = (string) config('agricultural_claim_tickets.qa_mysql_backup_sha256');
+        if ($database === 'agriconnect_erp' || $database === '' || $database !== $expectedDatabase
+            || ! str_starts_with($database, 'agriconnect_erp_claimtickets_qa_')
+            || $expectedHost === '' || $expectedPort === '' || $expectedUuid === ''
+            || ! preg_match('/\A[a-f0-9]{64}\z/i', $expectedBackup)
+            || ! Schema::connection($connectionName)->hasTable('assistance_claim_tickets')
+            || ! Schema::connection($connectionName)->hasTable('agricultural_qa_environment_attestations')) {
+            return false;
+        }
 
-        return $database !== 'agriconnect_erp'
-            && $database !== ''
-            && $database === $expectedDatabase
-            && str_starts_with($database, $prefix)
-            && Schema::connection($connectionName)->hasTable('assistance_claim_tickets');
+        try {
+            $identity = (array) $connection->selectOne(
+                'SELECT DATABASE() AS database_name, @@hostname AS hostname, @@port AS port, @@server_uuid AS server_uuid'
+            );
+
+            return $identity['database_name'] === $expectedDatabase
+                && strcasecmp((string) $identity['hostname'], $expectedHost) === 0
+                && (string) $identity['port'] === $expectedPort
+                && hash_equals($expectedUuid, (string) $identity['server_uuid'])
+                && DB::connection($connectionName)->table('agricultural_qa_environment_attestations')
+                    ->where('driver', 'mysql')
+                    ->where('database_name', $expectedDatabase)
+                    ->where('server_hostname', $expectedHost)
+                    ->where('server_port', (int) $expectedPort)
+                    ->where('server_uuid', $expectedUuid)
+                    ->where('source_backup_sha256', strtolower($expectedBackup))
+                    ->exists();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function requireEnabled(): void

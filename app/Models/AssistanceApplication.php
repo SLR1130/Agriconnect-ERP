@@ -18,4 +18,7 @@ class AssistanceApplication extends Model
     public function documents(){ return $this->hasMany(AssistanceApplicationDocument::class, 'application_id')->orderBy('requirement_id')->orderByDesc('version_number'); }
     public function submissionSnapshots(){ return $this->hasMany(AssistanceApplicationSubmissionSnapshot::class, 'application_id')->orderBy('attempt_number'); }
     public function claimTickets(){ return $this->hasMany(AssistanceClaimTicket::class, 'application_id')->orderByDesc('issued_at'); }
+    public function handoverEnrollment(){ return $this->hasOne(AssistanceHandoverEnrollment::class, 'application_id'); }
+    public function identityConfirmations(){ return $this->hasMany(AssistanceIdentityConfirmation::class, 'application_id'); }
+    public function handoverAcknowledgment(){ return $this->hasOne(AssistanceHandoverAcknowledgment::class, 'application_id'); }
 }

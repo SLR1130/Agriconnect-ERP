@@ -61,6 +61,14 @@ class AASMSClaimTicketController extends Controller
         return view('modules.aasms.claim-tickets.verify', [
             'verification' => $verification,
             'verificationTicket' => $verificationTicket,
+            'handoverEnabled' => app(\App\Services\AssistanceHandoverFeatureGate::class)->enabled(),
+            'canConfirmIdentity' => $request->user()->canErp('modules.aasms.identity_confirm'),
+            'canHandover' => $request->user()->canModuleAction('aasms', 'distribute')
+                && $request->user()->canModuleAction('aisms', 'release')
+                && $request->user()->canErp('modules.aasms.handover_distribute'),
+            'identityConfirmation' => is_array($verification) && isset($verification['identity_confirmation_id'])
+                ? \App\Models\AssistanceIdentityConfirmation::query()->find($verification['identity_confirmation_id'])
+                : null,
         ]);
     }
 
@@ -118,6 +126,7 @@ class AASMSClaimTicketController extends Controller
             'outcome' => $result['outcome'],
             'method' => $result['method'],
             'ticket_id' => $result['ticket']?->id,
+            'verification_event_id' => $result['verification_event_id'] ?? null,
             'message' => $result['message'],
         ]);
         $request->session()->flash('status', $result['message']);

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AssistanceApplication;
 use App\Models\AssistanceClaimTicket;
 use App\Models\AssistanceClaimTicketEvent;
+use App\Models\AssistanceHandoverEnrollment;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -52,6 +53,15 @@ class AssistanceClaimTicketService
 
                 $ticket = $this->createTicket($locked, $actor, null);
                 $this->event($ticket, 'issued', null, AssistanceClaimTicket::STATUS_ISSUED, $actor, 'staff', 'success');
+                AssistanceHandoverEnrollment::query()->firstOrCreate(
+                    ['application_id' => $locked->id],
+                    [
+                        'first_ticket_id' => $ticket->id,
+                        'enrolled_by' => $actor->id,
+                        'enrolled_at' => CarbonImmutable::now('UTC'),
+                        'enrollment_reason' => 'ticket_issued_in_qa',
+                    ],
+                );
 
                 return $ticket->load(['application.program', 'approvedSupplyItem']);
             }, 3);
@@ -114,15 +124,17 @@ class AssistanceClaimTicketService
                     return $this->result($ticket->status, $isQrPayload ? 'qr' : 'token', $ticket, 'This ticket is not currently valid.');
                 }
 
-                if (! $this->ticketMatchesCurrentApproval($ticket)) {
+                if (! $this->matchesCurrentApproval($ticket)) {
                     $this->event($ticket, 'verification_attempt', $ticket->status, $ticket->status, $actor, $isQrPayload ? 'qr' : 'token', 'denied', 'approval_or_allocation_changed');
 
                     return $this->result('approval_changed', $isQrPayload ? 'qr' : 'token', $ticket, 'The approved application or allocation has changed. Refer this case to the MAO.');
                 }
 
-                $this->event($ticket, 'verification_attempt', $ticket->status, $ticket->status, $actor, $isQrPayload ? 'qr' : 'token', 'valid');
+                $verificationEvent = $this->event($ticket, 'verification_attempt', $ticket->status, $ticket->status, $actor, $isQrPayload ? 'qr' : 'token', 'valid');
+                $result = $this->result('valid', $isQrPayload ? 'qr' : 'token', $ticket->load(['application.farmer.user', 'application.program', 'approvedSupplyItem']), 'Ticket token is valid. Verify the beneficiary in person separately. No inventory has been released.');
+                $result['verification_event_id'] = $verificationEvent->id;
 
-                return $this->result('valid', $isQrPayload ? 'qr' : 'token', $ticket->load(['application.farmer.user', 'application.program', 'approvedSupplyItem']), 'Ticket token is valid. Verify the beneficiary in person separately. No inventory has been released.');
+                return $result;
             }
 
             $reference = strtoupper($value);
@@ -145,7 +157,7 @@ class AssistanceClaimTicketService
                 return $this->result('expired', 'reference', $ticket->fresh(), 'This ticket has expired. A reference alone does not prove beneficiary identity.');
             }
 
-            if (! $ticket->isEffectivelyIssued() || ! $this->ticketMatchesCurrentApproval($ticket)) {
+            if (! $ticket->isEffectivelyIssued() || ! $this->matchesCurrentApproval($ticket)) {
                 $outcome = $ticket->isEffectivelyIssued() ? 'approval_changed' : $ticket->status;
                 $this->event($ticket, 'verification_attempt', $ticket->status, $ticket->status, $actor, 'reference', 'denied', $outcome);
 
@@ -261,7 +273,7 @@ class AssistanceClaimTicketService
     /** Return an owner-only, short-lived-in-memory QR payload; never put it in a URL. */
     public function qrPayload(AssistanceClaimTicket $ticket): ?string
     {
-        if (! $ticket->isEffectivelyIssued() || ! $this->ticketMatchesCurrentApproval($ticket) || blank($ticket->token_ciphertext)) {
+        if (! $ticket->isEffectivelyIssued() || ! $this->matchesCurrentApproval($ticket) || blank($ticket->token_ciphertext)) {
             return null;
         }
 
@@ -333,7 +345,7 @@ class AssistanceClaimTicketService
         }
     }
 
-    private function ticketMatchesCurrentApproval(AssistanceClaimTicket $ticket): bool
+    public function matchesCurrentApproval(AssistanceClaimTicket $ticket): bool
     {
         $application = $ticket->application()->with(['farmer.user', 'program', 'approvedSupplyItem'])->first();
 
@@ -390,8 +402,8 @@ class AssistanceClaimTicketService
         ?string $outcome,
         ?string $reasonCode = null,
         ?array $metadata = null,
-    ): void {
-        AssistanceClaimTicketEvent::query()->create([
+    ): AssistanceClaimTicketEvent {
+        return AssistanceClaimTicketEvent::query()->create([
             'ticket_id' => $ticket?->id,
             'event_type' => $type,
             'from_status' => $from,

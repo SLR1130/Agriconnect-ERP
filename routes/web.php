@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AASMSController;
+use App\Http\Controllers\AASMSHandoverController;
 use App\Http\Controllers\AASMSIntakeController;
 use App\Http\Controllers\ABPMSController;
 use App\Http\Controllers\AEAMSController;
@@ -65,6 +66,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/claim-tickets/{ticket}', [FarmerClaimTicketController::class, 'show'])->name('farmer.claim-tickets.show');
         Route::get('/claim-tickets/{ticket}/print', [FarmerClaimTicketController::class, 'print'])->name('farmer.claim-tickets.print');
         Route::get('/claim-tickets/{ticket}/qr', [FarmerClaimTicketController::class, 'qr'])->name('farmer.claim-tickets.qr');
+        Route::get('/handover-acknowledgments/{acknowledgment}', [AASMSHandoverController::class, 'farmerAcknowledgment'])->name('farmer.handovers.acknowledgment');
         Route::get('/applications/{application}/acknowledgment', [ApplicationAcknowledgmentController::class, 'farmer'])->name('farmer.applications.acknowledgment');
         Route::post('/applications/{application}/requirements/{requirement}/documents', [AssistanceApplicationDocumentController::class, 'farmerUpload'])->name('farmer.applications.documents.upload');
         Route::get('/applications/{application}/documents/{document}', [AssistanceApplicationDocumentController::class, 'farmerFile'])->name('farmer.applications.documents.file');
@@ -124,6 +126,10 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/aasms', [AASMSController::class, 'index'])->name('modules.aasms.dashboard');
         Route::get('/aasms/claim-tickets', [AASMSClaimTicketController::class, 'index'])->name('modules.aasms.claim-tickets.index');
         Route::post('/aasms/claim-tickets/verify', [AASMSClaimTicketController::class, 'verify'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.verify');
+        Route::post('/aasms/claim-tickets/{ticket}/identity-confirmation', [AASMSHandoverController::class, 'confirmIdentity'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.identity-confirm');
+        Route::get('/aasms/claim-tickets/{ticket}/handover', [AASMSHandoverController::class, 'review'])->name('modules.aasms.handovers.review');
+        Route::post('/aasms/applications/{application}/claim-tickets/{ticket}/handover', [AASMSHandoverController::class, 'distribute'])->middleware('throttle:10,1')->name('modules.aasms.handovers.distribute');
+        Route::get('/aasms/handovers/{acknowledgment}', [AASMSHandoverController::class, 'staffAcknowledgment'])->name('modules.aasms.handovers.acknowledgment');
         Route::get('/aasms/claim-tickets/verify', [AASMSClaimTicketController::class, 'verifyForm'])->name('modules.aasms.claim-tickets.verify-form');
         Route::get('/aasms/claim-tickets/{ticket}', [AASMSClaimTicketController::class, 'show'])->name('modules.aasms.claim-tickets.show');
         Route::post('/aasms/applications/{application}/claim-tickets', [AASMSClaimTicketController::class, 'issue'])->middleware('throttle:10,1')->name('modules.aasms.claim-tickets.issue');

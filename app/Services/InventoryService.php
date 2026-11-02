@@ -97,6 +97,10 @@ class InventoryService
                 }
 
                 $batch = SupplyBatch::query()->lockForUpdate()->findOrFail($data['supply_batch_id']);
+                if (isset($data['expected_supply_item_id'])
+                    && (int) $batch->supply_item_id !== (int) $data['expected_supply_item_id']) {
+                    throw ValidationException::withMessages(['supply_batch_id' => 'The selected batch does not match the approved supply item.']);
+                }
                 if ($batch->status !== 'available') {
                     throw ValidationException::withMessages(['supply_batch_id' => 'This inventory batch is not available for release.']);
                 }

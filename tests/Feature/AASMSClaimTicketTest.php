@@ -262,7 +262,7 @@ class AASMSClaimTicketTest extends TestCase
             ->get(route('farmer.claim-tickets.show', $ticket))
             ->assertOk()
             ->assertSee($ticket->ticket_reference)
-            ->assertSee('not redeemable');
+            ->assertSee('Ticket credential only');
 
         $this->assertStringNotContainsString($ticket->token_hash, $ownerResponse->getContent());
         $this->assertStringNotContainsString($ticket->token_ciphertext, $ownerResponse->getContent());

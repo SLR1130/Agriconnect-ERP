@@ -85,6 +85,10 @@ class ErpAuthorizationService
             return $this->hasExactAasmsIntakeGrant($user);
         }
 
+        if ($this->isExactAasmsHandoverPermission($permission)) {
+            return $this->hasExactAasmsHandoverGrant($user, $permission);
+        }
+
         if ($this->isAasmsClaimTicketPermission($permission)) {
             return $this->hasExactAasmsClaimTicketGrant($user, $permission);
         }
@@ -236,7 +240,7 @@ class ErpAuthorizationService
             'ffrms' => ['view', 'create', 'update', 'review', 'export'],
             'apms' => ['view', 'create', 'update', 'export'],
             'aisms' => ['view', 'create', 'update', 'receive', 'release', 'adjust', 'export'],
-            'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review', 'intake_assist', 'claim_ticket_view', 'claim_ticket_issue', 'claim_ticket_verify', 'claim_ticket_revoke', 'claim_ticket_reissue', 'claim_ticket_history'],
+            'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review', 'intake_assist', 'claim_ticket_view', 'claim_ticket_issue', 'claim_ticket_verify', 'claim_ticket_revoke', 'claim_ticket_reissue', 'claim_ticket_history', 'identity_confirm', 'handover_distribute'],
             'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
             'abpms' => ['view', 'create', 'update', 'review', 'export'],
         ];
@@ -392,6 +396,41 @@ class ErpAuthorizationService
             'modules.aasms.claim_ticket_reissue',
             'modules.aasms.claim_ticket_history',
         ], true);
+    }
+
+    private function isExactAasmsHandoverPermission(string $permission): bool
+    {
+        return in_array($permission, [
+            'modules.aasms.identity_confirm',
+            'modules.aasms.handover_distribute',
+        ], true);
+    }
+
+    /** These grants are literal and default-deny; module wildcards never imply them. */
+    private function hasExactAasmsHandoverGrant(User $user, string $permission): bool
+    {
+        if ($user->hasRole('farmer') || $user->hasRole('authorized_viewer')) {
+            return false;
+        }
+
+        $action = substr($permission, strlen('modules.aasms.'));
+        $roles = $user->roles()->with(['moduleAccess.module'])->get();
+        $assignments = $user->moduleAssignments()->with('module')->get();
+
+        foreach ($roles as $role) {
+            if (! $role->is_active || in_array($role->slug, ['farmer', 'authorized_viewer'], true)) {
+                continue;
+            }
+            if (in_array($permission, $role->permissions ?? [], true)
+                || $role->moduleAccess->contains(fn ($grant) => $grant->module?->slug === 'aasms'
+                    && in_array($action, $grant->permissions ?? [], true))
+                || ($role->slug === 'module_personnel' && $assignments->contains(fn ($grant) => $grant->module?->slug === 'aasms'
+                    && in_array($action, $grant->permissions ?? [], true)))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Exact, default-deny ticket grants; wildcard AASMS permissions never imply these actions. */

@@ -90,7 +90,7 @@ class FarmerExperienceController extends Controller
         $relations = [
             'program.supplyItem', 'approvedSupplyItem',
             'history' => fn ($query) => $query->orderBy('created_at')->orderBy('id'),
-            'distributions.batch.item',
+            'distributions.batch.item', 'distributions.acknowledgment',
         ];
         if ($schema->requirementVersionsReady()) {
             $relations[] = 'requirementVersion.documentRequirements';
@@ -119,7 +119,7 @@ class FarmerExperienceController extends Controller
             ->unique('requirement_id')
             ->keyBy('requirement_id');
         $claimTickets = $claimTicketFeature->enabled()
-            ? $application->claimTickets()->with('approvedSupplyItem')->get()
+              ? $application->claimTickets()->with(['approvedSupplyItem', 'handoverAcknowledgment'])->get()
             : collect();
 
         return view('farmer.application', [

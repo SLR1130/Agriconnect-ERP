@@ -154,7 +154,7 @@
                                     <h3 class="mt-1 text-lg font-bold text-forest-green">{{ $claimTicket->ticket_reference }}</h3>
                                     <p class="mt-1 text-sm text-slate-600">{{ str($claimTicket->effectiveStatus())->headline() }} · issued {{ $claimTicket->issued_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y g:i A') }}</p>
                                 </div>
-                                <a class="farmer-button" href="{{ route('farmer.claim-tickets.show', $claimTicket) }}">View ticket and history <x-ui.icon name="next" size="sm" /></a>
+                                <div class="flex flex-wrap gap-2"><a class="farmer-button" href="{{ route('farmer.claim-tickets.show', $claimTicket) }}">View ticket and history <x-ui.icon name="next" size="sm" /></a>@if($claimTicket->handoverAcknowledgment)<a class="farmer-button farmer-button-light" href="{{ route('farmer.handovers.acknowledgment', $claimTicket->handoverAcknowledgment) }}">Distribution acknowledgment</a>@endif</div>
                             </article>
                         @empty
                             <p class="farmer-timeline-empty mt-4">The MAO has not issued a ticket for this approved allocation yet. Your application remains approved; no supply release is recorded here.</p>
@@ -186,7 +186,7 @@
             <section class="farmer-card">
                 <div class="farmer-section-heading"><div><h2>Distributions received</h2><p>Physical distributions recorded for this application.</p></div></div>
                 @forelse($application->distributions as $distribution)
-                    <article class="farmer-distribution-row"><div><h3>{{ $distribution->batch->item->name }}</h3><p>{{ $distribution->quantity }} distributed {{ $distribution->distributed_at?->format('M d, Y · h:i A') }}</p></div><p>Reference {{ $distribution->reference }}</p></article>
+                    <article class="farmer-distribution-row"><div><h3>{{ $distribution->batch->item->name }}</h3><p>{{ $distribution->quantity }} distributed {{ $distribution->distributed_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y · h:i A') }}</p></div><div><p>Reference {{ $distribution->reference }}</p>@if($distribution->acknowledgment)<a class="farmer-text-link mt-2 inline-flex" href="{{ route('farmer.handovers.acknowledgment', $distribution->acknowledgment) }}">View handover acknowledgment</a>@endif</div></article>
                 @empty
                     <p class="farmer-timeline-empty">No assistance supplies have been distributed for this application yet.</p>
                 @endforelse

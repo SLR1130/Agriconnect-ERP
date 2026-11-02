@@ -51,14 +51,14 @@
             <p class="mt-1 text-sm text-slate-700">Checks token status, expiry, revocation, and whether the approved allocation still matches.</p>
         </article>
         <article class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p class="text-xs font-bold uppercase tracking-wide text-amber-900">Policy pending</p>
-            <h3 class="mt-1 font-bold text-[#153d2b]">2. Identity confirmation</h3>
-            <p class="mt-1 text-sm text-slate-700">Must be confirmed in person under an approved MAO procedure. A QR token or reference alone is not identity evidence.</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-amber-900">{{ $handoverEnabled ? 'Synthetic QA only' : 'Policy pending' }}</p>
+            <h3 class="mt-1 font-bold text-[#153d2b]">2. Beneficiary identity confirmation</h3>
+            <p class="mt-1 text-sm text-slate-700">A QR token or reference alone is not identity evidence. Real-world verification method and evidence rules require MAO policy approval.</p>
         </article>
         <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p class="text-xs font-bold uppercase tracking-wide text-slate-600">Phase 6E not implemented</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-600">{{ $handoverEnabled ? 'Isolated QA only' : 'Not enabled' }}</p>
             <h3 class="mt-1 font-bold text-[#153d2b]">3. Physical distribution</h3>
-            <p class="mt-1 text-sm text-slate-700">No supply release, inventory deduction, or completed application is performed from this screen.</p>
+            <p class="mt-1 text-sm text-slate-700">A separate review and final confirmation are required. No operation occurs automatically after ticket validation.</p>
         </article>
     </section>
 
@@ -101,6 +101,32 @@
                 <div class="mt-4 flex flex-wrap gap-3">
                     <a class="ct-button ct-light" href="{{ route('modules.aasms.claim-tickets.show', $verificationTicket) }}">Open ticket history</a>
                     <a class="ct-button ct-light" href="{{ route('modules.aasms.applications.show', $verificationTicket->application) }}">Open approved application</a>
+                </div>
+            @if($isTokenValid && $handoverEnabled && $canConfirmIdentity && !$identityConfirmation && !empty($verification['verification_event_id']))
+                    <form class="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4" method="POST" action="{{ route('modules.aasms.claim-tickets.identity-confirm', $verificationTicket) }}">
+                        @csrf
+                        <input type="hidden" name="verification_event_id" value="{{ $verification['verification_event_id'] }}">
+                        <p class="font-bold text-amber-950">Synthetic QA identity-confirmation foundation</p>
+                        <p class="mt-1 text-sm leading-6 text-amber-950">This records only a synthetic QA match/no-match scenario. It does not verify legal identity, constitute consent, use biometrics, or capture a signature. Do not use this action for real beneficiaries.</p>
+                        <fieldset class="mt-3 flex flex-wrap gap-4 text-sm text-slate-800">
+                            <legend class="sr-only">Synthetic identity scenario</legend>
+                            <label class="inline-flex min-h-11 items-center gap-2"><input type="radio" name="outcome" value="confirmed" required> Synthetic QA match</label>
+                            <label class="inline-flex min-h-11 items-center gap-2"><input type="radio" name="outcome" value="not_confirmed" required> Synthetic QA no match</label>
+                        </fieldset>
+                        <button class="ct-button ct-primary mt-3" type="submit">Record QA identity result</button>
+                    </form>
+                @endif
+            @endif
+
+            @if($identityConfirmation && $identityConfirmation->outcome === 'confirmed')
+                <div class="mt-5 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950" role="status">
+                    <p class="font-bold">Synthetic QA confirmation recorded for this ticket.</p>
+                    <p class="mt-1">It is recent, ticket-specific QA evidence only. No stock has changed yet.</p>
+                    @if($canHandover)
+                        <a class="ct-button ct-primary mt-3" href="{{ route('modules.aasms.handovers.review', ['ticket' => $verificationTicket, 'confirmation' => $identityConfirmation->id]) }}">Continue to authorized handover review</a>
+                    @else
+                        <p class="mt-2">A staff member with both distribution permissions and the exact handover grant must continue.</p>
+                    @endif
                 </div>
             @endif
         </section>

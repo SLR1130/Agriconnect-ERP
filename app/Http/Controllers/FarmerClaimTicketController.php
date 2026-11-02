@@ -18,7 +18,7 @@ class FarmerClaimTicketController extends Controller
     public function show(Request $request, AssistanceClaimTicket $ticket, ClaimTicketFeatureGate $feature): Response
     {
         $this->assertOwner($request, $ticket, $feature);
-        $ticket->load(['application.program', 'application.farmer', 'approvedSupplyItem', 'issuer', 'supersedes', 'successor']);
+        $ticket->load(['application.program', 'application.farmer', 'approvedSupplyItem', 'issuer', 'supersedes', 'successor', 'redemptionDistribution.batch.item', 'handoverAcknowledgment']);
         $events = $ticket->events()->paginate(25);
 
         return response()->view('farmer.claim-ticket', [

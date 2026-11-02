@@ -60,7 +60,21 @@
                 @if(config('agricultural_claim_tickets.office_address'))<p class="text-sm text-slate-600">{{ config('agricultural_claim_tickets.office_address') }}</p>@endif
             </section>
 
-            <div class="farmer-message farmer-message-warning" role="note"><strong>QA ticket only — not redeemable.</strong> Issuance does not reserve or guarantee inventory. No supplies have been released by issuing or displaying this ticket. Physical handover and stock deduction remain a separate future Phase 6E workflow.</div>
+            @if($effectiveStatus === 'redeemed' && $ticket->redemptionDistribution && $ticket->handoverAcknowledgment)
+                <section class="farmer-card" aria-labelledby="ticket-distribution-heading">
+                    <div class="farmer-section-heading"><div><h2 id="ticket-distribution-heading">Distribution recorded</h2><p>The ticket was redeemed as part of an authorized QA handover transaction.</p></div><x-ui.icon name="success" size="lg" /></div>
+                    <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Item</dt><dd class="mt-1 font-semibold">{{ $ticket->redemptionDistribution->batch?->item?->name }}</dd></div>
+                        <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Quantity</dt><dd class="mt-1 font-semibold">{{ number_format((float) $ticket->redemptionDistribution->quantity, 2) }}</dd></div>
+                        <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Handover date</dt><dd class="mt-1">{{ $ticket->redemptionDistribution->distributed_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y g:i A') }}</dd></div>
+                        <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Distribution reference</dt><dd class="mt-1 font-mono font-semibold">{{ $ticket->redemptionDistribution->reference }}</dd></div>
+                    </dl>
+                    <div class="farmer-message farmer-message-warning mt-4">{{ $ticket->handoverAcknowledgment->environment_label }}. The synthetic QA record does not prove real-world physical receipt.</div>
+                    <a class="farmer-button mt-4" href="{{ route('farmer.handovers.acknowledgment', $ticket->handoverAcknowledgment) }}">View / print distribution acknowledgment</a>
+                </section>
+            @else
+                <div class="farmer-message farmer-message-warning" role="note"><strong>Ticket credential only.</strong> Issuance does not reserve or deduct inventory. A separate authorized handover transaction is required before a distribution is recorded.</div>
+            @endif
 
             <section class="farmer-card" aria-labelledby="lost-ticket-heading">
                 <div class="farmer-section-heading"><div><h2 id="lost-ticket-heading">Lost or damaged ticket?</h2><p>Protect your ticket token and QR as you would a private credential.</p></div></div>

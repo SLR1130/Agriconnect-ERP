@@ -8,6 +8,7 @@ use App\Models\AssistanceStatusHistory;
 use App\Models\SupplyBatch;
 use App\Notifications\AssistanceStatusNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AssistanceService
@@ -52,6 +53,12 @@ class AssistanceService
             $lockedApplication = AssistanceApplication::query()
                 ->lockForUpdate()
                 ->findOrFail($application->id);
+            if (Schema::hasTable('assistance_handover_enrollments')
+                && DB::table('assistance_handover_enrollments')->where('application_id', $lockedApplication->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'application_id' => 'This application is enrolled in ticket-governed physical handover. Use the authorized claim-ticket handover workflow.',
+                ]);
+            }
             $key = $data['idempotency_key'] ?? ('aasms-'.$application->id.'-'.$data['supply_batch_id']);
             if ($existing = AssistanceDistribution::where('operation_key', $key)->first()) {
                 if ((int) $existing->application_id !== (int) $lockedApplication->id

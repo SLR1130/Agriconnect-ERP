@@ -12,6 +12,10 @@ return [
     // A MySQL preview must set the exact disposable schema name as well as use
     // the required prefix. The live agric onnect_erp schema is never accepted.
     'qa_mysql_database' => env('AGRICULTURAL_CLAIM_TICKETS_QA_MYSQL_DATABASE'),
+    'qa_mysql_host' => env('AGRICULTURAL_CLAIM_TICKETS_QA_MYSQL_HOST'),
+    'qa_mysql_port' => env('AGRICULTURAL_CLAIM_TICKETS_QA_MYSQL_PORT'),
+    'qa_mysql_server_uuid' => env('AGRICULTURAL_CLAIM_TICKETS_QA_MYSQL_SERVER_UUID'),
+    'qa_mysql_backup_sha256' => env('AGRICULTURAL_CLAIM_TICKETS_QA_BACKUP_SHA256'),
 
     // No validity period is assumed until MAO adopts one.
     'validity_days' => env('AGRICULTURAL_CLAIM_TICKETS_VALIDITY_DAYS') !== null
