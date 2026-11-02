@@ -25,7 +25,7 @@ use App\Http\Controllers\PublicAgriculturalServicesController;
 use App\Http\Controllers\SetupStatusController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [SetupStatusController::class, 'home'])->name('home');
+Route::get('/', [PublicAgriculturalServicesController::class, 'home'])->name('home');
 Route::get('/agricultural-services', [PublicAgriculturalServicesController::class, 'index'])->name('public.agricultural-services.index');
 Route::get('/agricultural-programs/{program}', [PublicAgriculturalServicesController::class, 'program'])->name('public.agricultural-programs.show');
 Route::get('/announcements/{announcement}/media/{media}', [PublicAgriculturalServicesController::class, 'media'])->name('public.announcements.media');

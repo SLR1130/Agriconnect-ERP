@@ -1,1 +1,84 @@
-<!doctype html><html lang='en'><head><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='csrf-token' content='{{ csrf_token() }}'><title>AgriConnect Login</title><style>:root{--forest:#153d2b;--emerald:#26865c;--sage:#e7f0e8;--off:#f8faf7}*{box-sizing:border-box}html{overflow-x:hidden}body{width:100%;margin:0;min-width:0;min-height:100vh;display:grid;place-items:center;padding:16px;overflow-x:hidden;font:16px/1.5 system-ui,sans-serif;background:linear-gradient(120deg,var(--forest),var(--emerald))}main{width:min(420px,calc(100vw - 32px));max-width:100%;min-width:0;background:#fff;padding:clamp(24px,6vw,36px);border-radius:18px;box-shadow:0 25px 60px #0005}h1{color:var(--forest);margin-bottom:8px}label{display:block;margin:15px 0 6px;font-weight:700}input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding:12px;border:1px solid #ccd8cf;border-radius:8px}.check{width:auto;vertical-align:middle}.btn{width:100%;min-width:0;margin-top:20px;padding:13px;border:0;border-radius:8px;background:var(--emerald);color:#fff;font-weight:800;cursor:pointer}.error{background:#fff0f0;color:#a11;padding:10px;border-radius:8px}a{color:var(--emerald)}@media(max-width:600px){body{padding:8px}main{width:min(420px,calc(100vw - 16px));border-radius:16px}}</style></head><body><main><b>AGRICONNECT | Bongabong MAO</b><h1>Welcome back</h1><p>Sign in to your authorized portal.</p><?php if($errors->any()): ?><div class=error role=alert>{{ $errors->first() }}</div><?php endif; ?><form method='POST' action='{{ route('login.store') }}'>{{ csrf_field() }}<label for=email>Email address</label><input id=email name=email type=email value='{{ old('email') }}' autocomplete='username' required autofocus><label for=password>Password</label><input id=password name=password type=password autocomplete='current-password' required><label><input class=check id=toggle type=checkbox> <span>Show password</span></label><label><input class=check name=remember type=checkbox value=1> <span>Remember me</span></label><button class=btn type=submit>Sign in securely</button></form><p><a href='{{ route('farmer.register') }}'>Create a farmer account</a> | <a href='{{ route('home') }}'>Home</a></p></main><script>const toggle=document.querySelector('#toggle');const password=document.querySelector('#password');toggle.addEventListener('change',()=>{password.type=toggle.checked?'text':'password'});</script></body></html>
+<x-layouts.public-auth
+    title="Sign in to the Farmer Portal"
+    description="Sign in to AgriConnect, the farmer services portal of Bongabong Municipal Agriculture Office."
+>
+    <section class="public-auth-shell" aria-labelledby="login-title">
+        <aside class="public-auth-visual">
+            <img
+                src="{{ asset('images/philippine-rice-field-farmer-960.jpg') }}"
+                srcset="{{ asset('images/philippine-rice-field-farmer-960.jpg') }} 960w, {{ asset('images/philippine-rice-field-farmer.jpg') }} 1280w"
+                sizes="(max-width: 800px) 100vw, 48vw"
+                width="960"
+                height="640"
+                alt="A farmer standing in a rice field in Bohol, Philippines; an illustrative photograph, not an MAO event photo."
+                fetchpriority="high"
+            >
+            <div class="public-auth-visual-copy">
+                <p class="public-auth-visual-eyebrow"><x-ui.icon name="office" size="sm" /> Bongabong Municipal Agriculture Office</p>
+                <h2>Serbisyong pang-agrikultura, mas madaling maabot.</h2>
+                <p>Access your farmer services, review program requirements, and follow your applications and official updates.</p>
+                <p class="public-photo-credit">Illustrative rice-field photo by &Oslash;yvind Holmstad, Wikimedia Commons | CC BY-SA 4.0</p>
+            </div>
+        </aside>
+
+        <div class="public-auth-panel">
+            <nav class="public-auth-switch" aria-label="Account access">
+                <a href="{{ route('login') }}" aria-current="page">Login</a>
+                <a href="{{ route('farmer.register') }}">Register</a>
+            </nav>
+
+            <div class="public-auth-heading">
+                <p class="public-agri-eyebrow"><x-ui.icon name="security" size="sm" /> Farmer Portal</p>
+                <h1 id="login-title">Welcome back</h1>
+                <p>Sign in to continue to your AgriConnect services.</p>
+            </div>
+
+            @if($errors->any())
+                <div id="login-errors" class="public-form-errors" role="alert" tabindex="-1">
+                    <strong>We could not sign you in.</strong>
+                    <ul>
+                        @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <form class="public-auth-form" method="POST" action="{{ route('login.store') }}" data-public-loading>
+                @csrf
+                <div class="public-field">
+                    <label for="email">Email address <span>Required</span></label>
+                    <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value="{{ old('email') }}"
+                        autocomplete="username"
+                        inputmode="email"
+                        autocapitalize="none"
+                        required
+                        @error('email') aria-invalid="true" aria-describedby="email-error" @enderror
+                    >
+                    @error('email')<p class="public-field-error" id="email-error">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="public-field">
+                    <label for="password">Password <span>Required</span></label>
+                    <div class="public-password-input">
+                        <input id="password" name="password" type="password" autocomplete="current-password" required @error('password') aria-invalid="true" aria-describedby="password-error" @enderror>
+                        <button type="button" class="public-password-toggle" aria-controls="password" aria-label="Show password" aria-pressed="false" data-password-toggle>Show password</button>
+                    </div>
+                    @error('password')<p class="public-field-error" id="password-error">{{ $message }}</p>@enderror
+                </div>
+
+                <label class="public-checkbox-field" for="remember">
+                    <input id="remember" name="remember" type="checkbox" value="1" @checked(old('remember'))>
+                    <span>Remember me on this device</span>
+                </label>
+
+                <button class="public-button public-button-primary public-auth-submit" type="submit" data-loading-label="Signing in...">Sign in securely</button>
+            </form>
+
+            <p class="public-auth-switch-copy">New to AgriConnect? <a href="{{ route('farmer.register') }}">Create a farmer account</a></p>
+            <a class="public-back-home" href="{{ route('home') }}"><x-ui.icon name="back" size="sm" /> Back to homepage</a>
+        </div>
+    </section>
+</x-layouts.public-auth>

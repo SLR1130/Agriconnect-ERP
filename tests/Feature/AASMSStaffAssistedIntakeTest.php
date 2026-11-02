@@ -14,6 +14,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\UserModuleAccess;
 use App\Services\ErpAuthorizationService;
+use App\Services\AgriculturalBusinessCalendar;
 use App\Services\ClamAvApplicationDocumentScanner;
 use App\Services\ProgramRequirementVersionService;
 use App\Services\StaffAssistedIntakePolicy;
@@ -284,7 +285,8 @@ class AASMSStaffAssistedIntakeTest extends TestCase
     {
         $staff = $this->staff();
         $farmer = $this->farmer();
-        $upcoming = $this->program(['name' => 'Synthetic upcoming program', 'opens_on' => now()->addDay()->toDateString()]);
+        $businessTomorrow = app(AgriculturalBusinessCalendar::class)->today()->addDay()->toDateString();
+        $upcoming = $this->program(['name' => 'Synthetic upcoming program', 'opens_on' => $businessTomorrow]);
         $this->actingAs($staff)->get($this->intakeUrl($farmer, $upcoming))
             ->assertOk()->assertSee('This program is not accepting applications')->assertDontSee('Submit through AASMS');
         $this->actingAs($staff)->post(route('modules.aasms.intake.store'), $this->submissionPayload($farmer, $upcoming))

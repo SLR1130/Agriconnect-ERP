@@ -15,6 +15,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Notifications\EquipmentRequestStatusChanged;
 use App\Notifications\AssistanceStatusNotification;
+use App\Services\AgriculturalBusinessCalendar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -60,18 +61,19 @@ class FarmerExperienceTest extends TestCase
     public function test_service_discovery_filters_programs_by_application_dates_and_shows_profile_eligibility(): void
     {
         $data = $this->farmer('pending');
+        $businessDate = app(AgriculturalBusinessCalendar::class)->today();
         $available = AssistanceProgram::create(['name' => 'Current Seed Support', 'status' => 'open', 'category' => 'Seeds']);
         $upcoming = AssistanceProgram::create([
             'name' => 'Upcoming Farm Grant', 'status' => 'open', 'category' => 'Grants',
-            'opens_on' => today()->addDays(5), 'closes_on' => today()->addDays(15),
+            'opens_on' => $businessDate->addDays(5), 'closes_on' => $businessDate->addDays(15),
         ]);
         $ended = AssistanceProgram::create([
             'name' => 'Past Harvest Support', 'status' => 'open', 'category' => 'Harvest',
-            'opens_on' => today()->subDays(20), 'closes_on' => today()->subDay(),
+            'opens_on' => $businessDate->subDays(20), 'closes_on' => $businessDate->subDay(),
         ]);
         $closesToday = AssistanceProgram::create([
             'name' => 'Closing Today Support', 'status' => 'open', 'category' => 'Boundary',
-            'opens_on' => today(), 'closes_on' => today(),
+            'opens_on' => $businessDate, 'closes_on' => $businessDate,
         ]);
         $closed = AssistanceProgram::create(['name' => 'Closed Support', 'status' => 'closed', 'category' => 'Boundary']);
 
@@ -93,14 +95,15 @@ class FarmerExperienceTest extends TestCase
     public function test_explore_services_and_assistance_share_the_same_search_category_and_date_filtered_catalog(): void
     {
         $data = $this->farmer();
+        $businessDate = app(AgriculturalBusinessCalendar::class)->today();
         $available = AssistanceProgram::create(['name' => 'Shared Rice Seed Program', 'status' => 'open', 'category' => 'Seeds']);
         AssistanceProgram::create([
             'name' => 'Shared Upcoming Grant', 'status' => 'open', 'category' => 'Grants',
-            'opens_on' => today()->addDays(3), 'closes_on' => today()->addDays(13),
+            'opens_on' => $businessDate->addDays(3), 'closes_on' => $businessDate->addDays(13),
         ]);
         AssistanceProgram::create([
             'name' => 'Shared Ended Seed Program', 'status' => 'open', 'category' => 'Seeds',
-            'opens_on' => today()->subDays(15), 'closes_on' => today()->subDay(),
+            'opens_on' => $businessDate->subDays(15), 'closes_on' => $businessDate->subDay(),
         ]);
         AssistanceProgram::create(['name' => 'Shared Private Draft', 'status' => 'draft', 'category' => 'Seeds']);
 
@@ -129,11 +132,12 @@ class FarmerExperienceTest extends TestCase
     public function test_upcoming_and_ended_program_details_explain_unavailable_applications_without_wrong_registration_action(): void
     {
         $data = $this->farmer();
+        $businessDate = app(AgriculturalBusinessCalendar::class)->today();
         $upcoming = AssistanceProgram::create([
-            'name' => 'Upcoming Application Window', 'status' => 'open', 'opens_on' => today()->addDay(), 'closes_on' => today()->addDays(8),
+            'name' => 'Upcoming Application Window', 'status' => 'open', 'opens_on' => $businessDate->addDay(), 'closes_on' => $businessDate->addDays(8),
         ]);
         $ended = AssistanceProgram::create([
-            'name' => 'Ended Application Window', 'status' => 'open', 'opens_on' => today()->subDays(10), 'closes_on' => today()->subDay(),
+            'name' => 'Ended Application Window', 'status' => 'open', 'opens_on' => $businessDate->subDays(10), 'closes_on' => $businessDate->subDay(),
         ]);
 
         $this->actingAs($data['user'])->get('/farmer/programs/'.$upcoming->id)

@@ -17,6 +17,57 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicAgriculturalServicesController extends Controller
 {
+    public function home(AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema): View
+    {
+        $businessDate = $calendar->today();
+        $date = $businessDate->toDateString();
+
+        $programQuery = AssistanceProgram::query()
+            ->where('status', 'open')
+            ->with('supplyItem');
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements')) {
+            $programQuery->with(['announcements' => fn ($query) => $query->visibleToFarmers()
+                ->with($schema->announcementRevisionsReady() ? 'publishedRevision.media' : [])
+                ->latest('published_at')]);
+        }
+
+        if ($schema->requirementVersionsReady()) {
+            $programQuery->with('currentRequirementVersion');
+        }
+
+        $programs = \Illuminate\Support\Facades\Schema::hasTable('assistance_programs')
+            ? $programQuery
+                ->orderByRaw('CASE WHEN (opens_on IS NULL OR opens_on <= ?) AND (closes_on IS NULL OR closes_on >= ?) THEN 0 WHEN opens_on IS NOT NULL AND opens_on > ? THEN 1 ELSE 2 END', [$date, $date, $date])
+                ->orderBy('closes_on')
+                ->orderByDesc('created_at')
+                ->limit(3)
+                ->get()
+            : collect();
+
+        $announcements = \Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements')
+            ? AgriculturalAnnouncement::query()->visibleToFarmers()
+                ->with($schema->announcementRevisionsReady() ? ['program', 'publishedRevision.media'] : ['program'])
+                ->latest('published_at')
+                ->limit(3)
+                ->get()
+            : collect();
+
+        if (! $schema->announcementRevisionsReady()) {
+            $announcements->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+            $programs->each(function (AssistanceProgram $program): void {
+                if (! \Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements')) {
+                    $program->setRelation('announcements', collect());
+                    return;
+                }
+
+                $program->announcements?->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+            });
+        }
+
+        return view('home', compact('businessDate', 'programs', 'announcements'));
+    }
+
     public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema): View
     {
         $filters = $request->validate([

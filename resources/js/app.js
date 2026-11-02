@@ -606,6 +606,65 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    const header = document.querySelector('.public-agri-header');
+    const toggle = header?.querySelector('[data-public-nav-toggle]');
+    const navigation = header?.querySelector('[data-public-navigation]');
+
+    if (header && toggle && navigation) {
+        document.documentElement.classList.add('public-agri-js');
+        const setMenuOpen = (open, restoreFocus = false) => {
+            header.dataset.menuOpen = String(open);
+            toggle.setAttribute('aria-expanded', String(open));
+            toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+            if (!open && restoreFocus) toggle.focus();
+        };
+
+        toggle.addEventListener('click', () => {
+            const open = toggle.getAttribute('aria-expanded') !== 'true';
+            setMenuOpen(open);
+            if (open) navigation.querySelector('a')?.focus();
+        });
+        navigation.addEventListener('click', (event) => {
+            if (event.target.closest('a')) setMenuOpen(false);
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && header.dataset.menuOpen === 'true') setMenuOpen(false, true);
+        });
+        document.addEventListener('click', (event) => {
+            if (header.dataset.menuOpen === 'true' && !header.contains(event.target)) setMenuOpen(false);
+        });
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 800) setMenuOpen(false);
+        }, { passive: true });
+    }
+
+    document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+        const input = document.getElementById(button.getAttribute('aria-controls'));
+        if (!input) return;
+        button.addEventListener('click', () => {
+            const reveal = input.type === 'password';
+            input.type = reveal ? 'text' : 'password';
+            button.setAttribute('aria-pressed', String(reveal));
+            button.textContent = reveal ? 'Hide password' : 'Show password';
+            button.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+        });
+    });
+
+    document.querySelectorAll('form[data-public-loading]').forEach((form) => {
+        let submitting = false;
+        form.addEventListener('submit', () => {
+            if (submitting) return;
+            submitting = true;
+            const submit = form.querySelector('button[type="submit"]');
+            if (!submit) return;
+            submit.disabled = true;
+            submit.setAttribute('aria-busy', 'true');
+            if (submit.dataset.loadingLabel) submit.textContent = submit.dataset.loadingLabel;
+        });
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-farm-wizard]').forEach((wizard) => {
         const form = wizard.querySelector('[data-farm-wizard-form]');
         const panels = [...wizard.querySelectorAll('[data-farm-step-panel]')];
