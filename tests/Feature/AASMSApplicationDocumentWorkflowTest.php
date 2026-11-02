@@ -16,7 +16,9 @@ use App\Models\User;
 use App\Models\UserModuleAccess;
 use App\Services\ErpAuthorizationService;
 use App\Services\ClamAvApplicationDocumentScanner;
+use App\Services\ApplicationDocumentUploadPolicy;
 use App\Services\ProgramRequirementVersionService;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -147,6 +149,113 @@ class AASMSApplicationDocumentWorkflowTest extends TestCase
 
         $this->assertFalse($scanner->available());
         $this->assertSame(['status' => 'unavailable', 'engine' => null], $scanner->scan('not-opened-while-scanner-is-missing'));
+    }
+
+    public function test_scanner_health_fails_closed_for_missing_or_stale_signatures_without_disclosing_paths(): void
+    {
+        $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'agriconnect-private-scan-health-'.Str::uuid();
+        mkdir($directory);
+        config([
+            'agricultural_documents.scanner_binary' => PHP_BINARY,
+            'agricultural_documents.scanner_database_directory' => $directory,
+            'agricultural_documents.signature_max_age_hours' => 36,
+        ]);
+
+        try {
+            $scanner = app(ClamAvApplicationDocumentScanner::class);
+            $missing = $scanner->health();
+            $this->assertFalse($missing['ready']);
+            $this->assertSame('missing', $missing['checks']['signature_databases']);
+
+            foreach (['main', 'daily', 'bytecode'] as $name) {
+                file_put_contents($directory.DIRECTORY_SEPARATOR.$name.'.cvd', 'synthetic non-signature fixture');
+            }
+            touch($directory.DIRECTORY_SEPARATOR.'daily.cvd', time() - 48 * 3600);
+
+            $stale = $scanner->health();
+            $this->assertFalse($stale['ready']);
+            $this->assertSame('ready', $stale['checks']['signature_databases']);
+            $this->assertSame('stale', $stale['checks']['signature_freshness']);
+            $this->assertSame('not_checked', $stale['checks']['engine_compatibility']);
+            $this->assertStringNotContainsString($directory, json_encode($stale, JSON_THROW_ON_ERROR));
+        } finally {
+            foreach (glob($directory.DIRECTORY_SEPARATOR.'*') ?: [] as $file) {
+                @unlink($file);
+            }
+            @rmdir($directory);
+        }
+    }
+
+    public function test_scanner_health_requires_a_successful_engine_database_probe(): void
+    {
+        $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'agriconnect-private-scan-probe-'.Str::uuid();
+        mkdir($directory);
+        foreach (['main', 'daily', 'bytecode'] as $name) {
+            file_put_contents($directory.DIRECTORY_SEPARATOR.$name.'.cvd', 'synthetic non-signature fixture');
+        }
+        config([
+            'agricultural_documents.scanner_binary' => PHP_BINARY,
+            'agricultural_documents.scanner_database_directory' => $directory,
+            'agricultural_documents.signature_max_age_hours' => 36,
+        ]);
+
+        try {
+            $health = app(ClamAvApplicationDocumentScanner::class)->health();
+            $this->assertFalse($health['ready']);
+            $this->assertSame('failed', $health['checks']['engine_compatibility']);
+            $this->assertStringNotContainsString($directory, json_encode($health, JSON_THROW_ON_ERROR));
+        } finally {
+            foreach (glob($directory.DIRECTORY_SEPARATOR.'*') ?: [] as $file) {
+                @unlink($file);
+            }
+            @rmdir($directory);
+        }
+    }
+
+    public function test_scanner_health_command_reports_status_without_configured_paths(): void
+    {
+        config([
+            'agricultural_documents.scanner_binary' => 'C:\\private\\scanner\\clamscan.exe',
+            'agricultural_documents.scanner_database_directory' => 'C:\\private\\signatures',
+        ]);
+
+        $exitCode = Artisan::call('agricultural-documents:scanner-health');
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Scanner Executable', $output);
+        $this->assertStringNotContainsString('C:\\private', $output);
+    }
+
+    public function test_effective_upload_limit_respects_application_and_requirement_caps(): void
+    {
+        config(['agricultural_documents.maximum_size_bytes' => 10 * 1024 * 1024]);
+        $policy = app(ApplicationDocumentUploadPolicy::class);
+
+        $this->assertSame(2 * 1024 * 1024, $policy->maximumBytes(2 * 1024 * 1024));
+        $this->assertLessThanOrEqual(10 * 1024 * 1024, $policy->maximumBytes(64 * 1024 * 1024));
+        $this->assertSame((int) ceil($policy->maximumBytes(2 * 1024 * 1024) / 1024), $policy->maximumKilobytes(2 * 1024 * 1024));
+    }
+
+    public function test_farmer_upload_endpoint_enforces_the_effective_configured_byte_limit(): void
+    {
+        config([
+            'agricultural_documents.enabled' => true,
+            'agricultural_documents.maximum_size_bytes' => 1024 * 1024,
+        ]);
+        Storage::fake('application-documents');
+        app()->instance(PrivateApplicationDocumentScanner::class, $this->scanner('clean'));
+        $farmer = $this->farmer();
+        $data = $this->applicationWithRequiredPdf($farmer);
+
+        $this->actingAs($farmer['user'])
+            ->post(route('farmer.applications.documents.upload', [$data['application'], $data['requirement']]), [
+                'document' => UploadedFile::fake()->create('too-large.pdf', 1025, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('document');
+
+        $this->assertDatabaseCount('assistance_application_documents', 0);
+        $this->assertSame([], Storage::disk('application-documents')->allFiles());
     }
 
     public function test_upload_is_private_opaque_and_stays_quarantined_when_scanner_is_unavailable(): void

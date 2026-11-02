@@ -27,8 +27,9 @@ class AssistanceApplicationDocumentController extends Controller
         abort_unless($farmer && (int) $application->farmer_id === (int) $farmer->id, 404);
         $documents->assertUploadEnabled();
         $requirement = AssistanceProgramDocumentRequirement::query()->findOrFail($requirement);
+        $maxKilobytes = $documents->maximumUploadKilobytes((int) $requirement->max_size_bytes);
         $data = $request->validate([
-            'document' => ['required', 'file', 'max:65536', 'mimetypes:application/pdf,image/jpeg,image/png'],
+            'document' => ['required', 'file', 'max:'.$maxKilobytes, 'mimetypes:application/pdf,image/jpeg,image/png'],
         ]);
 
         $document = $documents->upload($application, $requirement, $data['document'], $request->user());

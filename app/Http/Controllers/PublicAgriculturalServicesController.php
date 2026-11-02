@@ -8,6 +8,7 @@ use App\Models\AssistanceProgram;
 use App\Services\AgriculturalAnnouncementPresenter;
 use App\Services\AgriculturalBusinessCalendar;
 use App\Services\AgriculturalSchemaCapabilities;
+use App\Services\AssistanceApplicationDocumentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -118,7 +119,7 @@ class PublicAgriculturalServicesController extends Controller
         ]);
     }
 
-    public function program(AssistanceProgram $program, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
+    public function program(AssistanceProgram $program, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents): View
     {
         abort_unless($program->status === 'open', 404);
         $businessDate = $calendar->today();
@@ -142,7 +143,7 @@ class PublicAgriculturalServicesController extends Controller
 
         return view('public.agricultural-services.program', compact(
             'program', 'businessDate', 'announcement', 'publication', 'requirements',
-        ));
+        ) + ['maximumDocumentUploadBytes' => $documents->maximumUploadBytes()]);
     }
 
     public function media(AgriculturalAnnouncement $announcement, int $media, AgriculturalSchemaCapabilities $schema): StreamedResponse

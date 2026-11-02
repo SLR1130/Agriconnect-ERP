@@ -51,7 +51,7 @@
                                 <li><strong>{{ $requirement->display_name }}</strong> — {{ $requirement->is_required ? 'Required' : 'Optional' }}
                                     @if($requirement->description)<span>: {{ $requirement->description }}</span>@endif
                                     @if($requirement->instructions)<span> {{ $requirement->instructions }}</span>@endif
-                                    <small class="block">Accepted types: {{ collect($requirement->accepted_mime_types)->map(fn ($mime) => match ($mime) { 'application/pdf' => 'PDF', 'image/jpeg' => 'JPEG', 'image/png' => 'PNG', default => $mime })->join(', ') }} · Maximum {{ number_format($requirement->max_size_bytes / 1048576, 1) }} MiB</small>
+                                    <small class="block">Accepted types: {{ collect($requirement->accepted_mime_types)->map(fn ($mime) => match ($mime) { 'application/pdf' => 'PDF', 'image/jpeg' => 'JPEG', 'image/png' => 'PNG', default => $mime })->join(', ') }} · Maximum {{ number_format(min($requirement->max_size_bytes, $maximumDocumentUploadBytes) / 1048576, 1) }} MiB</small>
                                 </li>
                             @endforeach
                         </ul>

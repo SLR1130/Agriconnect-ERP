@@ -23,6 +23,7 @@ class AssistanceApplicationDocumentService
     public function __construct(
         private readonly AgriculturalSchemaCapabilities $schema,
         private readonly PrivateApplicationDocumentScanner $scanner,
+        private readonly ApplicationDocumentUploadPolicy $uploadPolicy,
     ) {}
 
     public function uploadEnabled(): bool
@@ -37,6 +38,16 @@ class AssistanceApplicationDocumentService
         } catch (Throwable) {
             return false;
         }
+    }
+
+    public function maximumUploadBytes(?int $requirementMaximum = null): int
+    {
+        return $this->uploadPolicy->maximumBytes($requirementMaximum);
+    }
+
+    public function maximumUploadKilobytes(?int $requirementMaximum = null): int
+    {
+        return $this->uploadPolicy->maximumKilobytes($requirementMaximum);
     }
 
     public function assertUploadEnabled(): void
@@ -65,9 +76,9 @@ class AssistanceApplicationDocumentService
         }
 
         $size = (int) $file->getSize();
-        $limit = min((int) $requirement->max_size_bytes, (int) config('agricultural_documents.maximum_size_bytes', 67108864));
+        $limit = $this->maximumUploadBytes((int) $requirement->max_size_bytes);
         if ($size < 1 || $size > $limit) {
-            throw ValidationException::withMessages(['document' => 'The file is empty or exceeds this requirement’s maximum size.']);
+            throw ValidationException::withMessages(['document' => 'The file is empty or exceeds the maximum upload size for this requirement.']);
         }
 
         $extension = match ($mime) {

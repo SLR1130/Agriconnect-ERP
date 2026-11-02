@@ -44,7 +44,7 @@ class FarmerExperienceController extends Controller
         ] + $catalogData);
     }
 
-    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
+    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents): View
     {
         $farmer = $this->farmer($request);
         abort_unless($program->status === 'open', 404);
@@ -77,6 +77,7 @@ class FarmerExperienceController extends Controller
             'announcement' => $announcement,
             'publication' => $announcement ? $presenter->present($announcement, true) : null,
             'applicationSubmissionReady' => $schema->applicationSubmissionReady(),
+            'maximumDocumentUploadBytes' => $documents->maximumUploadBytes(),
         ]);
     }
 
@@ -124,6 +125,7 @@ class FarmerExperienceController extends Controller
             'documentWorkflowReady' => $schema->documentWorkflowReady(),
             'documentUploadsEnabled' => $documents->uploadEnabled(),
             'scannerAvailable' => $documents->scannerAvailable(),
+            'maximumDocumentUploadBytes' => $documents->maximumUploadBytes(),
             'outstandingRequiredDocuments' => $documents->outstandingRequiredDocuments($application),
         ]);
     }
