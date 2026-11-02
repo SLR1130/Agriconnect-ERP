@@ -129,6 +129,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (form && !window.confirm(form.dataset.confirmSubmit)) event.preventDefault();
     });
 
+    document.querySelectorAll('form[data-private-document-upload]').forEach((form) => {
+        form.addEventListener('submit', () => {
+            const button = form.querySelector('button[type="submit"]');
+            const progress = form.querySelector('[data-document-upload-progress]');
+            if (progress) progress.hidden = false;
+            if (button) {
+                button.disabled = true;
+                button.setAttribute('aria-busy', 'true');
+                button.textContent = 'Uploading securely…';
+            }
+        });
+    });
+
     document.querySelectorAll('[data-publication-gallery-input]').forEach((input) => {
         const form = input.closest('form');
         const list = form?.querySelector('[data-publication-gallery-alt-list]');

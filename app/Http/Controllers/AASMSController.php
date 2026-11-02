@@ -17,6 +17,8 @@ use App\Services\AgriculturalBusinessCalendar;
 use App\Services\InventoryService;
 use App\Services\ProgramRequirementVersionService;
 use App\Services\ProgramEligibilityService;
+use App\Services\AgriculturalSchemaCapabilities;
+use App\Services\AssistanceApplicationDocumentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,26 +43,53 @@ class AASMSController extends Controller
             ->when($request->filled('to'), fn ($q) => $q->whereDate('distributed_at', '<=', $request->to));
     }
 
-    public function index(Request $request, AgriculturalBusinessCalendar $calendar): View
+    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema): View
     {
         $this->staff($request, 'view');
-        $programs = AssistanceProgram::with([
-            'supplyItem', 'applications',
-            'currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher',
-            'draftRequirementVersion.documentRequirements', 'draftRequirementVersion.creator',
-        ])->latest()->get();
+        $requirementsReady = $schema->requirementVersionsReady();
+        $acknowledgmentsReady = $schema->acknowledgmentsReady();
+        $programRelations = ['supplyItem', 'applications'];
+        if ($requirementsReady) {
+            $programRelations = array_merge($programRelations, [
+                'currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher',
+                'draftRequirementVersion.documentRequirements', 'draftRequirementVersion.creator',
+            ]);
+        }
+        $programs = AssistanceProgram::with($programRelations)->latest()->get();
+        if (! $requirementsReady) {
+            $programs->each(fn (AssistanceProgram $program) => $program
+                ->setRelation('currentRequirementVersion', null)
+                ->setRelation('draftRequirementVersion', null));
+        }
         $applicationCounts = AssistanceApplication::query()
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
-        $applications = AssistanceApplication::with([
+        $applicationRelations = [
             'program', 'farmer.user', 'farmer.farms', 'history', 'approvedSupplyItem',
-            'requirementVersion', 'acknowledgment',
-        ])
+        ];
+        if ($requirementsReady) {
+            $applicationRelations[] = 'requirementVersion.documentRequirements';
+            $applicationRelations[] = 'requirementVersion.publisher';
+        }
+        if ($acknowledgmentsReady) {
+            $applicationRelations[] = 'acknowledgment';
+        }
+        $applications = AssistanceApplication::with($applicationRelations)
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->latest()
             ->paginate(20)
             ->withQueryString();
+        if (! $requirementsReady || ! $acknowledgmentsReady) {
+            $applications->getCollection()->each(function (AssistanceApplication $application) use ($requirementsReady, $acknowledgmentsReady): void {
+                if (! $requirementsReady) {
+                    $application->setRelation('requirementVersion', null);
+                }
+                if (! $acknowledgmentsReady) {
+                    $application->setRelation('acknowledgment', null);
+                }
+            });
+        }
         $batches = SupplyBatch::with('item')->where('status', 'available')->where('quantity_available', '>', 0)
             ->where(fn ($query) => $query->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
             ->get();
@@ -78,12 +107,17 @@ class AASMSController extends Controller
             'canReject' => $request->user()->canModuleAction('aasms', 'reject'),
             'canDistribute' => $request->user()->canModuleAction('aasms', 'distribute'),
             'canExport' => $request->user()->canModuleAction('aasms', 'export'),
+            'requirementsSchemaReady' => $requirementsReady,
+            'acknowledgmentsSchemaReady' => $acknowledgmentsReady,
+            'canManagePrograms' => $requirementsReady && $request->user()->canModuleAction('aasms', 'create'),
+            'canEditPrograms' => $requirementsReady && $request->user()->canModuleAction('aasms', 'update'),
         ]);
     }
 
-    public function storeProgram(ProgramRequest $request, ProgramRequirementVersionService $versions): RedirectResponse
+    public function storeProgram(ProgramRequest $request, ProgramRequirementVersionService $versions, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         $this->staff($request, 'create');
+        abort_unless($schema->requirementVersionsReady(), 503, 'Program requirement versioning is unavailable until its database migration is activated.');
         $data = $this->programData($request);
         $draft = DB::transaction(function () use ($data, $versions, $request): AssistanceProgramRequirementVersion {
             $program = AssistanceProgram::create([
@@ -104,9 +138,10 @@ class AASMSController extends Controller
         return back()->with('status', "Private program saved with requirements version {$draft->version_number} as a draft. Publish the requirements version before opening the program.");
     }
 
-    public function updateProgram(ProgramRequest $request, AssistanceProgram $program, ProgramRequirementVersionService $versions): RedirectResponse
+    public function updateProgram(ProgramRequest $request, AssistanceProgram $program, ProgramRequirementVersionService $versions, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         $this->staff($request, 'update');
+        abort_unless($schema->requirementVersionsReady(), 503, 'Program requirement versioning is unavailable until its database migration is activated.');
         $data = $this->programData($request);
         $draft = DB::transaction(function () use ($data, $program, $versions, $request): AssistanceProgramRequirementVersion {
             $program->update([
@@ -123,12 +158,12 @@ class AASMSController extends Controller
         return back()->with('status', "Program details saved. Schedule, eligibility, and document requirements are in draft version {$draft->version_number}; published rules remain effective until that version is published.");
     }
 
-    public function toggleProgram(Request $request, AssistanceProgram $program, ProgramRequirementVersionService $versions): RedirectResponse
+    public function toggleProgram(Request $request, AssistanceProgram $program, ProgramRequirementVersionService $versions, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         $this->staff($request, 'publish');
         $oldStatus = $program->status;
         $newStatus = $oldStatus === 'open' ? 'closed' : 'open';
-        if ($newStatus === 'open' && ! $program->currentRequirementVersion()->exists()) {
+        if ($schema->requirementVersionsReady() && $newStatus === 'open' && ! $program->currentRequirementVersion()->exists()) {
             // Programs that predate versioned authoring receive an explicitly
             // labelled legacy snapshot. A staff-created draft must be reviewed
             // and published first; opening the program cannot publish it for them.
@@ -152,24 +187,58 @@ class AASMSController extends Controller
         return back()->with('status', $newStatus === 'open' ? 'Program published. Application availability still follows its published dates.' : 'Program hidden from public discovery. Existing applications were retained.');
     }
 
-    public function publishRequirements(Request $request, AssistanceProgram $program, AssistanceProgramRequirementVersion $version, ProgramRequirementVersionService $versions): RedirectResponse
+    public function publishRequirements(Request $request, AssistanceProgram $program, int $version, ProgramRequirementVersionService $versions, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         $this->staff($request, 'publish');
+        abort_unless($schema->requirementVersionsReady(), 503, 'Program requirement versioning is unavailable until its database migration is activated.');
+        $version = AssistanceProgramRequirementVersion::query()->findOrFail($version);
         abort_unless((int) $version->program_id === (int) $program->id, 404);
         $published = $versions->publish($version, $request->user()->id);
 
         return back()->with('status', "Requirements version {$published->version_number} published. Existing applications remain attached to their recorded version.");
     }
 
-    public function showApplication(Request $request, AssistanceApplication $application): View
+    public function showApplication(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents): View
     {
         $this->staff($request, 'view');
-        $application->load([
-            'program', 'farmer.user', 'requirementVersion.documentRequirements',
-            'acknowledgment', 'history', 'approvedSupplyItem', 'distributions.batch.item',
-        ]);
+        $relations = ['program', 'farmer.user', 'history', 'approvedSupplyItem', 'distributions.batch.item'];
+        if ($schema->requirementVersionsReady()) {
+            $relations[] = 'requirementVersion.documentRequirements';
+            $relations[] = 'requirementVersion.publisher';
+        }
+        if ($schema->acknowledgmentsReady()) {
+            $relations[] = 'acknowledgment';
+        }
+        $canViewPrivateDocuments = $request->user()->canModuleAction('aasms', 'view')
+            && $request->user()->canModuleAction('aasms', 'documents_view_sensitive');
+        $canReviewDocuments = $canViewPrivateDocuments
+            && $request->user()->canModuleAction('aasms', 'documents_review');
+        if ($schema->documentWorkflowReady() && $canViewPrivateDocuments) {
+            $relations[] = 'documents.requirement';
+            $relations[] = 'documents.events';
+            $relations[] = 'documents.reviewer';
+            $relations[] = 'submissionSnapshots';
+        }
+        $application->load($relations);
+        if (! $schema->requirementVersionsReady()) {
+            $application->setRelation('requirementVersion', null);
+        }
+        if (! $schema->acknowledgmentsReady()) {
+            $application->setRelation('acknowledgment', null);
+        }
+        if (! $schema->documentWorkflowReady() || ! $canViewPrivateDocuments) {
+            $application->setRelation('documents', collect());
+        }
 
-        return view('modules.aasms.application', compact('application'));
+        return view('modules.aasms.application', [
+            'application' => $application,
+            'requirementsSchemaReady' => $schema->requirementVersionsReady(),
+            'documentWorkflowReady' => $schema->documentWorkflowReady(),
+            'canViewPrivateDocuments' => $canViewPrivateDocuments,
+            'canReviewDocuments' => $canReviewDocuments,
+            'documentUploadsEnabled' => $documents->uploadEnabled(),
+            'documentScannerAvailable' => $documents->scannerAvailable(),
+        ]);
     }
 
     private function programData(ProgramRequest $request): array
@@ -197,13 +266,16 @@ class AASMSController extends Controller
         ];
     }
 
-    public function review(Request $request, AssistanceApplication $application, AssistanceService $service): RedirectResponse
+    public function review(Request $request, AssistanceApplication $application, AssistanceService $service, AssistanceApplicationDocumentService $documents): RedirectResponse
     {
         $data = $request->validate(['status' => 'required|in:approved,rejected,returned', 'review_notes' => 'required_if:status,rejected,returned|nullable|max:2000', 'approved_quantity' => 'nullable|numeric|min:.01', 'approved_supply_item_id' => 'nullable|exists:supply_items,id']);
         $permission = match ($data['status']) {
             'approved' => 'approve', 'rejected' => 'reject', default => 'review'
         };
         $this->staff($request, $permission);
+        if ($data['status'] === 'approved') {
+            $documents->assertRequiredDocumentsReady($application, 'approved');
+        }
         $service->status($application, $data['status'], $request->user()->id, $data['review_notes'] ?? null, isset($data['approved_quantity']) ? (float) $data['approved_quantity'] : null, $data['approved_supply_item_id'] ?? null);
 
         return back()->with('status', 'Application reviewed.');
@@ -218,9 +290,10 @@ class AASMSController extends Controller
         return back()->with('status', 'Assistance distributed and inventory released.');
     }
 
-    public function apply(Request $request, AssistanceProgram $program, AssistanceApplicationSubmissionService $submissions): RedirectResponse
+    public function apply(Request $request, AssistanceProgram $program, AssistanceApplicationSubmissionService $submissions, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
+        abort_unless($schema->applicationSubmissionReady(), 503, 'Online applications are temporarily unavailable while the assistance requirements schema is being activated. Your account and application data were not changed.');
         $farmer = $request->user()->farmer()->first();
         abort_unless($farmer && $farmer->registration_status === 'verified', 403);
         $data = $request->validate([
@@ -234,19 +307,26 @@ class AASMSController extends Controller
             ->with('status', 'Your application was received. Keep the reference shown below for tracking.');
     }
 
-    public function resubmit(Request $request, AssistanceApplication $application, ProgramEligibilityService $eligibility): RedirectResponse
+    public function resubmit(Request $request, AssistanceApplication $application, ProgramEligibilityService $eligibility, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents): RedirectResponse
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
         $farmer = $request->user()->farmer()->first();
         abort_unless($farmer, 403);
         $data = $request->validate(['purpose' => ['nullable', 'string', 'max:2000']]);
 
-        DB::transaction(function () use ($application, $farmer, $data, $eligibility, $request): void {
+        DB::transaction(function () use ($application, $farmer, $data, $eligibility, $request, $schema, $documents): void {
+            $relations = ['farmer.farms'];
+            if ($schema->requirementVersionsReady()) {
+                $relations[] = 'program.currentRequirementVersion';
+            } else {
+                $relations[] = 'program';
+            }
             $locked = AssistanceApplication::query()
-                ->with(['program.currentRequirementVersion', 'farmer.farms'])
+                ->with($relations)
                 ->lockForUpdate()
                 ->findOrFail($application->id);
             abort_unless((int) $locked->farmer_id === (int) $farmer->id && $locked->status === 'returned', 403);
+            $documents->assertRequiredDocumentsReady($locked, 'resubmitted');
             $result = $eligibility->requireEligible($locked->program, $locked->farmer);
             $previous = $locked->status;
             $locked->update([
@@ -261,6 +341,8 @@ class AASMSController extends Controller
                 'changed_by' => $request->user()->id,
                 'notes' => 'Farmer resubmitted application.',
             ]);
+            $locked->refresh()->load('program');
+            $documents->recordResubmissionSnapshot($locked, $request->user(), now()->utc());
         });
 
         return back()->with('status', 'Application resubmitted for MAO review.');
@@ -281,16 +363,35 @@ class AASMSController extends Controller
         }, 'aasms-distributions.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function farmerPrograms(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility): View
+    public function farmerPrograms(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility, AgriculturalSchemaCapabilities $schema): View
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
         $farmer = $request->user()->farmer()->with('farms')->firstOrFail();
         $catalogData = $catalog->forFarmer($request, $farmer, $eligibility);
 
+        $applicationRelations = ['program.supplyItem', 'approvedSupplyItem', 'distributions.batch.item', 'history'];
+        if ($schema->acknowledgmentsReady()) {
+            $applicationRelations[] = 'acknowledgment';
+        }
+        if ($schema->requirementVersionsReady()) {
+            $applicationRelations[] = 'requirementVersion';
+        }
+        $applications = AssistanceApplication::with($applicationRelations)->where('farmer_id', $farmer->id)->latest()->get();
+        $applications->each(function (AssistanceApplication $application) use ($schema): void {
+            if (! $schema->acknowledgmentsReady()) {
+                $application->setRelation('acknowledgment', null);
+            }
+            if (! $schema->requirementVersionsReady()) {
+                $application->setRelation('requirementVersion', null);
+            }
+        });
+
         return view('farmer.assistance', [
             'farmer' => $farmer,
-            'applications' => AssistanceApplication::with(['program.supplyItem', 'approvedSupplyItem', 'distributions.batch.item', 'history', 'acknowledgment', 'requirementVersion'])->where('farmer_id', $farmer->id)->latest()->get(),
+            'applications' => $applications,
             'notifications' => $request->user()->notifications()->latest()->take(10)->get(),
+            'applicationSubmissionReady' => $schema->applicationSubmissionReady(),
+            'requirementsSchemaReady' => $schema->requirementVersionsReady(),
         ] + $catalogData);
     }
 }

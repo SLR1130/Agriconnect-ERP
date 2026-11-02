@@ -12,6 +12,8 @@ use App\Services\AgriculturalAnnouncementPresenter;
 use App\Services\AssistanceProgramCatalogService;
 use App\Services\FarmerActivityFeedService;
 use App\Services\ProgramEligibilityService;
+use App\Services\AgriculturalSchemaCapabilities;
+use App\Services\AssistanceApplicationDocumentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,34 +24,48 @@ use Illuminate\View\View;
 
 class FarmerExperienceController extends Controller
 {
-    public function services(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility, AgriculturalAnnouncementPresenter $presenter): View
+    public function services(Request $request, AssistanceProgramCatalogService $catalog, ProgramEligibilityService $eligibility, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
     {
         $farmer = $this->farmer($request)->load('farms');
         $catalogData = $catalog->forFarmer($request, $farmer, $eligibility);
-        $announcements = Schema::hasTable('agricultural_announcements')
-            ? AgriculturalAnnouncement::query()->visibleToFarmers()->with(['program', 'publishedRevision.media'])->latest('published_at')->take(3)->get()
+        $announcementsAvailable = Schema::hasTable('agricultural_announcements');
+        $announcements = $announcementsAvailable
+            ? AgriculturalAnnouncement::query()->visibleToFarmers()->with($schema->announcementRevisionsReady() ? ['program', 'publishedRevision.media'] : ['program'])->latest('published_at')->take(3)->get()
             : collect();
+        if (! $schema->announcementRevisionsReady()) {
+            $announcements->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+        }
 
         return view('farmer.services', [
             'farmer' => $farmer,
-            'announcementsAvailable' => Schema::hasTable('agricultural_announcements'),
+            'announcementsAvailable' => $announcementsAvailable,
             'announcements' => $announcements,
             'announcementPresentations' => $announcements->mapWithKeys(fn (AgriculturalAnnouncement $notice) => [$notice->id => $presenter->present($notice, true)]),
         ] + $catalogData);
     }
 
-    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter): View
+    public function program(Request $request, AssistanceProgram $program, ProgramEligibilityService $eligibility, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
     {
         $farmer = $this->farmer($request);
         abort_unless($program->status === 'open', 404);
         $businessDate = $calendar->today();
 
-        $announcement = AgriculturalAnnouncement::query()->visibleToFarmers()
-            ->where('assistance_program_id', $program->id)
-            ->with('publishedRevision.media')
-            ->latest('published_at')->first();
+        $announcement = Schema::hasTable('agricultural_announcements')
+            ? AgriculturalAnnouncement::query()->visibleToFarmers()
+                ->where('assistance_program_id', $program->id)
+                ->with($schema->announcementRevisionsReady() ? 'publishedRevision.media' : [])
+                ->latest('published_at')->first()
+            : null;
+        if ($announcement && ! $schema->announcementRevisionsReady()) {
+            $announcement->setRelation('publishedRevision', null);
+        }
 
-        $program->load(['supplyItem', 'currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher']);
+        $program->load(['supplyItem']);
+        if ($schema->requirementVersionsReady()) {
+            $program->load(['currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher']);
+        } else {
+            $program->setRelation('currentRequirementVersion', null);
+        }
 
         return view('farmer.program', [
             'farmer' => $farmer,
@@ -60,24 +76,55 @@ class FarmerExperienceController extends Controller
             'submissionKey' => old('submission_key') ?: (string) Str::uuid(),
             'announcement' => $announcement,
             'publication' => $announcement ? $presenter->present($announcement, true) : null,
+            'applicationSubmissionReady' => $schema->applicationSubmissionReady(),
         ]);
     }
 
-    public function application(Request $request, AssistanceApplication $application): View
+    public function application(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema, AssistanceApplicationDocumentService $documents): View
     {
         $farmer = $this->farmer($request);
         abort_unless((int) $application->farmer_id === (int) $farmer->id, 404);
 
+        $relations = [
+            'program.supplyItem', 'approvedSupplyItem',
+            'history' => fn ($query) => $query->orderBy('created_at')->orderBy('id'),
+            'distributions.batch.item',
+        ];
+        if ($schema->requirementVersionsReady()) {
+            $relations[] = 'requirementVersion.documentRequirements';
+        }
+        if ($schema->acknowledgmentsReady()) {
+            $relations[] = 'acknowledgment';
+        }
+        if ($schema->documentWorkflowReady()) {
+            $relations[] = 'documents.requirement';
+            $relations[] = 'documents.events';
+            $relations[] = 'submissionSnapshots';
+        }
+        $application->load($relations);
+        if (! $schema->requirementVersionsReady()) {
+            $application->setRelation('requirementVersion', null);
+        }
+        if (! $schema->acknowledgmentsReady()) {
+            $application->setRelation('acknowledgment', null);
+        }
+        if (! $schema->documentWorkflowReady()) {
+            $application->setRelation('documents', collect());
+        }
+
+        $latestDocuments = $application->documents
+            ->sortByDesc('version_number')
+            ->unique('requirement_id')
+            ->keyBy('requirement_id');
+
         return view('farmer.application', [
             'farmer' => $farmer,
-            'application' => $application->load([
-                'program.supplyItem',
-                'requirementVersion.documentRequirements',
-                'acknowledgment',
-                'approvedSupplyItem',
-                'history' => fn ($query) => $query->orderBy('created_at')->orderBy('id'),
-                'distributions.batch.item',
-            ]),
+            'application' => $application,
+            'latestDocuments' => $latestDocuments,
+            'documentWorkflowReady' => $schema->documentWorkflowReady(),
+            'documentUploadsEnabled' => $documents->uploadEnabled(),
+            'scannerAvailable' => $documents->scannerAvailable(),
+            'outstandingRequiredDocuments' => $documents->outstandingRequiredDocuments($application),
         ]);
     }
 
@@ -155,7 +202,7 @@ class FarmerExperienceController extends Controller
         $readFilter = $filters['read'] ?? '';
         $categoryFilter = $filters['category'] ?? '';
         $categoryTypes = [
-            'assistance' => ['assistance_application_status', 'assistance_distribution_completed'],
+            'assistance' => ['assistance_application_status', 'assistance_document_review', 'assistance_distribution_completed'],
             'production' => ['production_submission_review'],
             'equipment' => ['equipment_request_status'],
             'registration' => ['farmer_registration_status'],

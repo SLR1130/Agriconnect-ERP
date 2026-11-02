@@ -7,6 +7,7 @@ use App\Models\AgriculturalAnnouncementMedia;
 use App\Models\AssistanceProgram;
 use App\Services\AgriculturalAnnouncementPresenter;
 use App\Services\AgriculturalBusinessCalendar;
+use App\Services\AgriculturalSchemaCapabilities;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicAgriculturalServicesController extends Controller
 {
-    public function index(Request $request, AgriculturalBusinessCalendar $calendar): View
+    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema): View
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
@@ -29,8 +30,13 @@ class PublicAgriculturalServicesController extends Controller
         $date = $businessDate->toDateString();
 
         $programQuery = AssistanceProgram::query()->where('status', 'open')
-            ->with('supplyItem')
-            ->with(['announcements' => fn ($query) => $query->visibleToFarmers()->with('publishedRevision.media')->latest('published_at')])
+            ->with('supplyItem');
+        if (\Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements')) {
+            $programQuery->with(['announcements' => fn ($query) => $query->visibleToFarmers()
+                ->with($schema->announcementRevisionsReady() ? 'publishedRevision.media' : [])
+                ->latest('published_at')]);
+        }
+        $programQuery
             ->when($availability === 'available', fn ($query) => $query
                 ->where(fn ($dates) => $dates->whereNull('opens_on')->orWhereDate('opens_on', '<=', $date))
                 ->where(fn ($dates) => $dates->whereNull('closes_on')->orWhereDate('closes_on', '>=', $date)))
@@ -41,13 +47,31 @@ class PublicAgriculturalServicesController extends Controller
             ->when($category !== '', fn ($query) => $query->where('category', $category));
 
         $programs = $programQuery->orderBy('closes_on')->orderBy('name')->paginate(9, ['*'], 'programs_page')->withQueryString();
+        if (! $schema->requirementVersionsReady()) {
+            $programs->getCollection()->each(fn (AssistanceProgram $program) => $program->setRelation('currentRequirementVersion', null));
+        }
+        if (! $schema->announcementRevisionsReady()) {
+            $programs->getCollection()->each(function (AssistanceProgram $program) use ($schema): void {
+                if (! \Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements')) {
+                    $program->setRelation('announcements', collect());
+                    return;
+                }
+                $program->announcements?->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+            });
+        }
         $announcementQuery = AgriculturalAnnouncement::query()->visibleToFarmers()
-            ->with(['program.supplyItem', 'publishedRevision.media'])
+            ->with($schema->announcementRevisionsReady() ? ['program.supplyItem', 'publishedRevision.media'] : ['program.supplyItem'])
             ->when($search !== '', fn ($query) => $query->where(fn ($matches) => $matches
                 ->where('title', 'like', '%'.$search.'%')->orWhere('body', 'like', '%'.$search.'%')))
-            ->when($category !== '', fn ($query) => $query->where('category', $category));
+            ->when($category !== '' && $schema->announcementMetadataReady(), fn ($query) => $query->where('category', $category));
         $announcements = $announcementQuery->latest('published_at')->paginate(6, ['*'], 'announcements_page')->withQueryString();
-        $categories = AgriculturalAnnouncement::query()->visibleToFarmers()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category')
+        if (! $schema->announcementRevisionsReady()) {
+            $announcements->getCollection()->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+        }
+        $announcementCategories = $schema->announcementMetadataReady()
+            ? AgriculturalAnnouncement::query()->visibleToFarmers()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category')
+            : collect();
+        $categories = $announcementCategories
             ->merge(AssistanceProgram::query()->where('status', 'open')->whereNotNull('category')->distinct()->pluck('category'))
             ->unique()->sort()->values();
 
@@ -73,10 +97,14 @@ class PublicAgriculturalServicesController extends Controller
         AgriculturalAnnouncement $announcement,
         AgriculturalAnnouncementPresenter $presenter,
         AgriculturalBusinessCalendar $calendar,
+        AgriculturalSchemaCapabilities $schema,
     ): View
     {
         abort_unless(AgriculturalAnnouncement::query()->visibleToFarmers()->whereKey($announcement->id)->exists(), 404);
-        $announcement->load(['program', 'publishedRevision.media']);
+        $announcement->load($schema->announcementRevisionsReady() ? ['program', 'publishedRevision.media'] : ['program']);
+        if (! $schema->announcementRevisionsReady()) {
+            $announcement->setRelation('publishedRevision', null);
+        }
         $publication = $presenter->present($announcement, true);
         $businessDate = $calendar->today();
         $programAvailability = $publication['program']?->availabilityStateOn($businessDate);
@@ -90,15 +118,25 @@ class PublicAgriculturalServicesController extends Controller
         ]);
     }
 
-    public function program(AssistanceProgram $program, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter): View
+    public function program(AssistanceProgram $program, AgriculturalBusinessCalendar $calendar, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
     {
         abort_unless($program->status === 'open', 404);
         $businessDate = $calendar->today();
-        $program->load(['supplyItem', 'currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher']);
-        $announcement = AgriculturalAnnouncement::query()->visibleToFarmers()
+        $program->load('supplyItem');
+        if ($schema->requirementVersionsReady()) {
+            $program->load(['currentRequirementVersion.documentRequirements', 'currentRequirementVersion.publisher']);
+        } else {
+            $program->setRelation('currentRequirementVersion', null);
+        }
+        $announcement = \Illuminate\Support\Facades\Schema::hasTable('agricultural_announcements')
+            ? AgriculturalAnnouncement::query()->visibleToFarmers()
             ->where('assistance_program_id', $program->id)
-            ->with(['publishedRevision.media'])
-            ->latest('published_at')->first();
+            ->with($schema->announcementRevisionsReady() ? ['publishedRevision.media'] : [])
+            ->latest('published_at')->first()
+            : null;
+        if ($announcement && ! $schema->announcementRevisionsReady()) {
+            $announcement->setRelation('publishedRevision', null);
+        }
         $publication = $announcement ? $presenter->present($announcement, true) : null;
         $requirements = $this->requirements($program);
 
@@ -107,8 +145,10 @@ class PublicAgriculturalServicesController extends Controller
         ));
     }
 
-    public function media(AgriculturalAnnouncement $announcement, AgriculturalAnnouncementMedia $media): StreamedResponse
+    public function media(AgriculturalAnnouncement $announcement, int $media, AgriculturalSchemaCapabilities $schema): StreamedResponse
     {
+        abort_unless($schema->announcementRevisionsReady(), 404);
+        $media = AgriculturalAnnouncementMedia::query()->findOrFail($media);
         abort_unless(AgriculturalAnnouncement::query()->visibleToFarmers()
             ->whereKey($announcement->id)
             ->whereHas('publishedRevision.media', fn ($query) => $query->whereKey($media->id))

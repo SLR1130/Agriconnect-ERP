@@ -10,12 +10,18 @@ use Illuminate\Support\Str;
 
 class AgriculturalAnnouncementPresenter
 {
+    public function __construct(private readonly AgriculturalSchemaCapabilities $schema) {}
+
     /** @return array{content:array,bodyHtml:HtmlString,revision:?AgriculturalAnnouncementRevision,media:\Illuminate\Support\Collection,program:?AssistanceProgram} */
     public function present(AgriculturalAnnouncement $announcement, bool $public = false, ?AgriculturalAnnouncementRevision $revision = null): array
     {
-        $revision ??= $public
-            ? $announcement->publishedRevision
-            : ($announcement->currentRevision ?? $announcement->publishedRevision);
+        if ($this->schema->announcementRevisionsReady()) {
+            $revision ??= $public
+                ? $announcement->publishedRevision
+                : ($announcement->currentRevision ?? $announcement->publishedRevision);
+        } else {
+            $revision = null;
+        }
         $content = $revision?->content ?? ($public ? $announcement->publicContent() : $announcement->editorContent());
         $media = $revision?->media ?? collect();
         $program = null;

@@ -8,6 +8,7 @@ use App\Models\AgriculturalAnnouncementRevision;
 use App\Models\AssistanceProgram;
 use App\Services\AgriculturalAnnouncementPresenter;
 use App\Services\AgriculturalPublicationService;
+use App\Services\AgriculturalSchemaCapabilities;
 use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Http\Request;
@@ -19,9 +20,10 @@ use Illuminate\View\View;
 
 class AnnouncementController extends Controller
 {
-    public function staffIndex(Request $request): View
+    public function staffIndex(Request $request, AgriculturalSchemaCapabilities $schema): View
     {
         abort_unless($request->user()->canModuleAction('aasms', 'view'), 403);
+        abort_unless($schema->announcementRevisionsReady(), 503, 'Announcement revision management is unavailable until the approved database migration is activated.');
 
         return view('modules.aasms.announcements', [
             'announcements' => AgriculturalAnnouncement::query()
@@ -34,17 +36,19 @@ class AnnouncementController extends Controller
         ]);
     }
 
-    public function store(Request $request, AgriculturalPublicationService $publication): RedirectResponse
+    public function store(Request $request, AgriculturalPublicationService $publication, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         abort_unless($request->user()->canModuleAction('aasms', 'create'), 403);
+        abort_unless($schema->announcementRevisionsReady(), 503, 'Announcement publishing is unavailable until the approved database migration is activated.');
         $announcement = $publication->createDraft($this->validatedContent($request), $request->user());
 
         return redirect()->route('modules.aasms.announcements')->with('status', 'Private announcement draft saved. Preview it and request publication review.')->with('created_announcement', $announcement->id);
     }
 
-    public function update(Request $request, AgriculturalAnnouncement $announcement, AgriculturalPublicationService $publication): RedirectResponse
+    public function update(Request $request, AgriculturalAnnouncement $announcement, AgriculturalPublicationService $publication, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         abort_unless($request->user()->canModuleAction('aasms', 'update'), 403);
+        abort_unless($schema->announcementRevisionsReady(), 503, 'Announcement publishing is unavailable until the approved database migration is activated.');
         if (! in_array($announcement->status, ['draft', 'published'], true)) {
             throw ValidationException::withMessages(['announcement' => 'Archived announcements cannot be edited. Create a new announcement if updated information is needed.']);
         }
@@ -57,10 +61,11 @@ class AnnouncementController extends Controller
         return redirect()->route('modules.aasms.announcements')->with('status', $message)->with('created_revision', $revision->id);
     }
 
-    public function publish(Request $request, AgriculturalAnnouncement $announcement, AgriculturalPublicationService $publication): RedirectResponse
+    public function publish(Request $request, AgriculturalAnnouncement $announcement, AgriculturalPublicationService $publication, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         abort_unless($request->user()->canModuleAction('aasms', 'view')
             && $request->user()->canModuleAction('aasms', 'publish'), 403);
+        abort_unless($schema->announcementRevisionsReady(), 503, 'Announcement publishing is unavailable until the approved database migration is activated.');
         $revision = $announcement->currentRevision;
         abort_unless($revision, 404);
 
@@ -69,18 +74,21 @@ class AnnouncementController extends Controller
         return back()->with('status', 'The reviewed publication revision is now visible to the public.');
     }
 
-    public function archive(Request $request, AgriculturalAnnouncement $announcement, AgriculturalPublicationService $publication): RedirectResponse
+    public function archive(Request $request, AgriculturalAnnouncement $announcement, AgriculturalPublicationService $publication, AgriculturalSchemaCapabilities $schema): RedirectResponse
     {
         abort_unless($request->user()->canModuleAction('aasms', 'view')
             && $request->user()->canModuleAction('aasms', 'publish'), 403);
+        abort_unless($schema->announcementRevisionsReady(), 503, 'Announcement publishing is unavailable until the approved database migration is activated.');
         $publication->archive($announcement, $request->user());
 
         return back()->with('status', 'Announcement archived. Its publication history is retained.');
     }
 
-    public function preview(Request $request, AgriculturalAnnouncement $announcement, AgriculturalAnnouncementRevision $revision, AgriculturalAnnouncementPresenter $presenter): View
+    public function preview(Request $request, AgriculturalAnnouncement $announcement, int $revision, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
     {
         abort_unless($request->user()->canModuleAction('aasms', 'view'), 403);
+        abort_unless($schema->announcementRevisionsReady(), 404);
+        $revision = AgriculturalAnnouncementRevision::query()->findOrFail($revision);
         abort_unless((int) $revision->announcement_id === (int) $announcement->id, 404);
 
         return view('public.agricultural-services.announcement', [
@@ -90,20 +98,26 @@ class AnnouncementController extends Controller
         ]);
     }
 
-    public function staffMedia(Request $request, AgriculturalAnnouncement $announcement, AgriculturalAnnouncementRevision $revision, AgriculturalAnnouncementMedia $media): StreamedResponse
+    public function staffMedia(Request $request, AgriculturalAnnouncement $announcement, int $revision, int $media, AgriculturalSchemaCapabilities $schema): StreamedResponse
     {
         abort_unless($request->user()->canModuleAction('aasms', 'view'), 403);
+        abort_unless($schema->announcementRevisionsReady(), 404);
+        $revision = AgriculturalAnnouncementRevision::query()->findOrFail($revision);
+        $media = AgriculturalAnnouncementMedia::query()->findOrFail($media);
         abort_unless((int) $revision->announcement_id === (int) $announcement->id
             && (int) $media->revision_id === (int) $revision->id, 404);
 
         return $this->imageResponse($media);
     }
 
-    public function farmerIndex(AgriculturalAnnouncementPresenter $presenter): View
+    public function farmerIndex(AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
     {
         abort_unless(request()->user()->hasRole('farmer'), 403);
         $announcements = AgriculturalAnnouncement::query()->visibleToFarmers()
-            ->with(['program', 'publishedRevision.media'])->latest('published_at')->paginate(12)->withQueryString();
+            ->with($schema->announcementRevisionsReady() ? ['program', 'publishedRevision.media'] : ['program'])->latest('published_at')->paginate(12)->withQueryString();
+        if (! $schema->announcementRevisionsReady()) {
+            $announcements->getCollection()->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+        }
 
         return view('farmer.announcements', [
             'announcements' => $announcements,
@@ -111,11 +125,14 @@ class AnnouncementController extends Controller
         ]);
     }
 
-    public function farmerShow(AgriculturalAnnouncement $announcement, AgriculturalAnnouncementPresenter $presenter): View
+    public function farmerShow(AgriculturalAnnouncement $announcement, AgriculturalAnnouncementPresenter $presenter, AgriculturalSchemaCapabilities $schema): View
     {
         abort_unless(request()->user()->hasRole('farmer'), 403);
         abort_unless(AgriculturalAnnouncement::query()->visibleToFarmers()->whereKey($announcement->id)->exists(), 404);
-        $announcement->load(['program', 'publishedRevision.media']);
+        $announcement->load($schema->announcementRevisionsReady() ? ['program', 'publishedRevision.media'] : ['program']);
+        if (! $schema->announcementRevisionsReady()) {
+            $announcement->setRelation('publishedRevision', null);
+        }
 
         return view('farmer.announcement', [
             'announcement' => $announcement,

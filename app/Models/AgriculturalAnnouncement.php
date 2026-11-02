@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class AgriculturalAnnouncement extends Model
 {
@@ -54,12 +55,20 @@ class AgriculturalAnnouncement extends Model
 
     public function editorContent(): array
     {
-        return $this->currentRevision?->content ?? $this->legacyContent();
+        $revision = $this->revisionSchemaReady()
+            ? ($this->relationLoaded('currentRevision') ? $this->getRelation('currentRevision') : $this->currentRevision()->first())
+            : null;
+
+        return $revision?->content ?? $this->legacyContent();
     }
 
     public function publicContent(): array
     {
-        return $this->publishedRevision?->content ?? $this->legacyContent();
+        $revision = $this->revisionSchemaReady()
+            ? ($this->relationLoaded('publishedRevision') ? $this->getRelation('publishedRevision') : $this->publishedRevision()->first())
+            : null;
+
+        return $revision?->content ?? $this->legacyContent();
     }
 
     private function legacyContent(): array
@@ -76,5 +85,13 @@ class AgriculturalAnnouncement extends Model
             'contact_details' => $this->contact_details,
             'instructions' => $this->instructions,
         ];
+    }
+
+    private function revisionSchemaReady(): bool
+    {
+        return Schema::hasTable('agricultural_announcement_revisions')
+            && Schema::hasTable('agricultural_announcement_media')
+            && Schema::hasColumn('agricultural_announcements', 'current_revision_id')
+            && Schema::hasColumn('agricultural_announcements', 'published_revision_id');
     }
 }

@@ -3,23 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssistanceApplication;
+use App\Services\AgriculturalSchemaCapabilities;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class ApplicationAcknowledgmentController extends Controller
 {
-    public function farmer(Request $request, AssistanceApplication $application): Response
+    public function farmer(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema): Response
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
         $farmer = $request->user()->farmer()->first();
         abort_unless($farmer && (int) $application->farmer_id === (int) $farmer->id, 404);
+        abort_unless($schema->acknowledgmentsReady(), 404);
 
         return $this->render($request, $application);
     }
 
-    public function staff(Request $request, AssistanceApplication $application): Response
+    public function staff(Request $request, AssistanceApplication $application, AgriculturalSchemaCapabilities $schema): Response
     {
         abort_unless($request->user()->canModuleAction('aasms', 'view'), 403);
+        abort_unless($schema->acknowledgmentsReady(), 404);
 
         return $this->render($request, $application);
     }

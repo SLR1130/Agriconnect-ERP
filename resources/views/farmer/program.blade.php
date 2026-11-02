@@ -93,18 +93,22 @@
                     <a class="farmer-button farmer-button-light" href="{{ route('farmer.assistance') }}">Back to assistance programs <x-ui.icon name="next" size="sm" /></a>
                 @endif
             @else
-                <p>Review the details above. You can send one application while the program is open and your profile meets the listed checks.</p>
-                <div class="farmer-requirements-panel my-4"><strong>Applying as:</strong> {{ $farmer->user->name }} · {{ $farmer->farmer_code }} · {{ $farmer->barangay }}. These details come from your FFRMS record.</div>
-                <form method="POST" action="{{ route('farmer.assistance.apply', $program) }}" class="farmer-program-apply-form">
-                    @csrf<input type="hidden" name="submission_key" value="{{ $submissionKey }}">
-                    <div class="farmer-field">
-                        <label for="application-purpose">How will this support your farm? <span class="font-normal">(optional)</span></label>
-                        <textarea id="application-purpose" name="purpose" maxlength="2000" rows="4">{{ old('purpose') }}</textarea>
-                        <small>Do not include sensitive personal information. The MAO will review this note with your application.</small>
-                    </div>
-                    <p class="mb-3 text-xs text-slate-600">Submitting records receipt of your application. It does not guarantee approval or entitlement to assistance.</p>
-                    <button class="farmer-button farmer-button-gold" type="submit">Submit application <x-ui.icon name="next" size="sm" /></button>
-                </form>
+                @if($applicationSubmissionReady)
+                    <p>Review the details above. You can send one application while the program is open and your profile meets the listed checks.</p>
+                    <div class="farmer-requirements-panel my-4"><strong>Applying as:</strong> {{ $farmer->user->name }} · {{ $farmer->farmer_code }} · {{ $farmer->barangay }}. These details come from your FFRMS record.</div>
+                    <form method="POST" action="{{ route('farmer.assistance.apply', $program) }}" class="farmer-program-apply-form">
+                        @csrf<input type="hidden" name="submission_key" value="{{ $submissionKey }}">
+                        <div class="farmer-field">
+                            <label for="application-purpose">How will this support your farm? <span class="font-normal">(optional)</span></label>
+                            <textarea id="application-purpose" name="purpose" maxlength="2000">{{ old('purpose') }}</textarea>
+                            <small>Do not include sensitive personal information. The MAO will review this note with your application.</small>
+                        </div>
+                        <p class="mb-3 text-xs text-slate-600">Submitting records receipt of your application. It does not guarantee approval or entitlement to assistance.</p>
+                        <button class="farmer-button farmer-button-gold" type="submit">Submit application <x-ui.icon name="next" size="sm" /></button>
+                    </form>
+                @else
+                    <p class="farmer-program-state-note" role="status">Online applications are temporarily paused while the assistance database update is pending. Your farmer and program records remain unchanged. Please try again later or contact the MAO.</p>
+                @endif
             @endif
         </aside>
     </div>

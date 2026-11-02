@@ -15,4 +15,6 @@ class AssistanceApplication extends Model
     public function approvedSupplyItem(){ return $this->belongsTo(SupplyItem::class, 'approved_supply_item_id'); }
     public function requirementVersion(){ return $this->belongsTo(AssistanceProgramRequirementVersion::class, 'requirement_version_id'); }
     public function acknowledgment(){ return $this->hasOne(AssistanceApplicationAcknowledgment::class, 'application_id'); }
+    public function documents(){ return $this->hasMany(AssistanceApplicationDocument::class, 'application_id')->orderBy('requirement_id')->orderByDesc('version_number'); }
+    public function submissionSnapshots(){ return $this->hasMany(AssistanceApplicationSubmissionSnapshot::class, 'application_id')->orderBy('attempt_number'); }
 }

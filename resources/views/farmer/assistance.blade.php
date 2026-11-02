@@ -8,6 +8,9 @@
             <a class="font-bold underline" href="{{ route('farmer.farms') }}">View verification progress</a>
         </div>
     @endif
+    @if(!$applicationSubmissionReady)
+        <div class="farmer-message farmer-message-warning" role="status">Online application submission is temporarily paused while the assistance database update is pending. Existing applications and their history remain available.</div>
+    @endif
 
     @include('farmer.partials.assistance-catalog', [
         'catalogHeading' => 'Published assistance programs',

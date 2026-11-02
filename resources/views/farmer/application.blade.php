@@ -80,25 +80,81 @@
                     </ul>
                     @if($application->requirementVersion)
                         <p class="mt-3 text-xs text-slate-500">Requirements version {{ $application->requirementVersion->version_number }}@if($application->requirementVersion->source === 'legacy_snapshot') · legacy baseline; original publisher and publication date are unknown @endif</p>
-                        <h4 class="mt-4 font-semibold">Document requirements at submission</h4>
-                        @if(collect(data_get($ackSnapshot, 'requirements_version.documents', []))->isNotEmpty())
-                            <ul>@foreach(data_get($ackSnapshot, 'requirements_version.documents', []) as $requirement)<li>{{ $requirement['name'] }} · {{ $requirement['required'] ? 'Required' : 'Optional' }}</li>@endforeach</ul>
+                        <h4 class="mt-4 font-semibold">Supporting documents for this application</h4>
+                        @if($documentUploadsEnabled && !$scannerAvailable)<p class="farmer-message farmer-message-warning mt-3" role="status">Files can only be placed in private quarantine while malware scanning is unavailable. Uploaded files cannot be opened, reviewed, or marked complete. Please wait until the MAO confirms scanning is active.</p>@endif
+                        @if($application->requirementVersion->documentRequirements->isNotEmpty())
+                            <div class="mt-3 space-y-3">
+                                @foreach($application->requirementVersion->documentRequirements as $requirement)
+                                    @php($uploadedDocument = $latestDocuments->get($requirement->id))
+                                    <article class="rounded-xl border border-slate-200 bg-white p-4">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div>
+                                                <h5 class="font-semibold">{{ $requirement->display_name }} <span class="text-xs font-normal text-slate-500">{{ $requirement->is_required ? 'Required' : 'Optional' }}</span></h5>
+                                                @if($requirement->description)<p class="mt-1 text-sm text-slate-600">{{ $requirement->description }}</p>@endif
+                                                @if($requirement->instructions)<p class="mt-1 text-sm text-slate-600">{{ $requirement->instructions }}</p>@endif
+                                                <p class="mt-2 text-xs text-slate-500">Accepted: {{ collect($requirement->accepted_mime_types)->map(fn ($mime) => match ($mime) { 'application/pdf' => 'PDF', 'image/jpeg' => 'JPEG', 'image/png' => 'PNG', default => $mime })->join(', ') }} · Maximum {{ number_format(min($requirement->max_size_bytes, config('agricultural_documents.maximum_size_bytes')) / 1048576, 1) }} MiB</p>
+                                            </div>
+                                            @if($uploadedDocument)
+                                                <span class="farmer-pill {{ $uploadedDocument->scan_status === 'clean' ? 'farmer-pill-warn' : 'farmer-pill-bad' }}">{{ match($uploadedDocument->scan_status) { 'clean' => 'Security scan passed', 'infected' => 'Rejected by security scan', 'unavailable' => 'Quarantined · scanner unavailable', 'failed' => 'Quarantined · scan failed', default => 'Quarantined · scan pending' } }}</span>
+                                            @else
+                                                <span class="farmer-pill">Not uploaded</span>
+                                            @endif
+                                        </div>
+                                        @if($uploadedDocument)
+                                            <div class="mt-3 border-t border-slate-100 pt-3 text-sm">
+                                                <p><strong>File:</strong> {{ $uploadedDocument->original_filename }} · version {{ $uploadedDocument->version_number }} · {{ number_format($uploadedDocument->file_size / 1024, 0) }} KB</p>
+                                                <p class="mt-1"><strong>MAO review:</strong> {{ str($uploadedDocument->review_status)->replace('_', ' ')->headline() }}</p>
+                                                @if($uploadedDocument->farmer_correction_notes)<p class="farmer-message farmer-message-warning mt-2"><strong>Correction requested:</strong> {{ $uploadedDocument->farmer_correction_notes }}</p>@endif
+                                                @foreach($uploadedDocument->events->where('visibility', 'farmer') as $documentEvent)
+                                                    <p class="mt-2 text-xs text-slate-500">{{ $documentEvent->created_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y g:i A') }} · {{ $documentEvent->note }}</p>
+                                                @endforeach
+                                                @if($uploadedDocument->scan_status === 'clean')<a class="farmer-text-link mt-2 inline-flex" href="{{ route('farmer.applications.documents.file', [$application, $uploadedDocument]) }}">Download private file <x-ui.icon name="download" size="sm" /></a>@endif
+                                            </div>
+                                        @endif
+                                        @if($documentUploadsEnabled && in_array($application->status, ['submitted', 'returned'], true))
+                                            <form class="mt-3 border-t border-slate-100 pt-3" method="POST" enctype="multipart/form-data" action="{{ route('farmer.applications.documents.upload', [$application, $requirement]) }}" data-private-document-upload>
+                                                @csrf
+                                                <label class="farmer-field"><span>{{ $uploadedDocument ? 'Upload a replacement file' : 'Choose a file' }}</span><input type="file" name="document" accept="{{ collect($requirement->accepted_mime_types)->map(fn ($mime) => match ($mime) { 'application/pdf' => '.pdf', 'image/jpeg' => '.jpg,.jpeg', 'image/png' => '.png', default => '' })->filter()->join(',') }}" required></label>
+                                                @error('document')<p class="farmer-field-error">{{ $message }}</p>@enderror
+                                                <div class="mt-3 flex items-center gap-3 text-sm text-slate-600" data-document-upload-progress hidden aria-live="polite">
+                                                    <progress max="100" aria-label="Document upload in progress" class="w-24 accent-emerald-700"></progress>
+                                                    <span>Uploading to private quarantine. Keep this page open until the confirmation appears.</span>
+                                                </div>
+                                                <button class="farmer-button mt-3" type="submit">{{ $uploadedDocument ? 'Submit replacement securely' : 'Upload securely' }}</button>
+                                            </form>
+                                        @elseif(!$documentUploadsEnabled)
+                                            <p class="mt-3 border-t border-slate-100 pt-3 text-xs text-amber-800">Online uploads are not active for this system. Do not attach sensitive records here; follow the MAO instructions.</p>
+                                        @endif
+                                    </article>
+                                @endforeach
+                            </div>
                         @else
-                            <p>No digitized document checklist was recorded for this application version.</p>
+                            <p>No digital document checklist was published for this application version.</p>
                         @endif
-                        <p class="mt-2 text-sm">Online document upload was not active when this application was submitted; the acknowledgment does not claim files were received.</p>
+                        <p class="mt-3 text-xs text-slate-500">The original acknowledgment records the initial submission. Later files and corrections are recorded separately.</p>
                     @endif
                 </section>
 
                 @if($application->status === 'returned')
+                    @if($outstandingRequiredDocuments === [])
                     <form id="application-resubmit" class="farmer-tracking-form" method="POST" action="{{ route('farmer.assistance.resubmit', $application) }}">
                         @csrf
                         <div class="farmer-field"><label for="resubmit-purpose">Updated application purpose</label><textarea id="resubmit-purpose" name="purpose" maxlength="2000" rows="4">{{ old('purpose', $application->purpose) }}</textarea></div>
                         @error('purpose')<p class="farmer-field-error">{{ $message }}</p>@enderror
                         <button class="farmer-button" type="submit">Resubmit for MAO review</button>
                     </form>
+                    @else
+                        <div class="farmer-message farmer-message-warning" role="status"><strong>Resubmission is paused.</strong> Each required document must pass security scanning and receive MAO verification first. Pending: {{ implode(', ', $outstandingRequiredDocuments) }}.</div>
+                    @endif
                 @endif
             </section>
+
+            @if($application->relationLoaded('submissionSnapshots') && $application->submissionSnapshots->where('submission_type', 'resubmission')->isNotEmpty())
+                <section class="farmer-card">
+                    <div class="farmer-section-heading"><div><h2>Resubmission history</h2><p>Later corrections are recorded separately from your original acknowledgment.</p></div></div>
+                    <ol class="space-y-3">@foreach($application->submissionSnapshots->where('submission_type', 'resubmission') as $snapshot)<li class="border-l-2 border-emerald-600 pl-4"><strong>Attempt {{ $snapshot->attempt_number }} submitted</strong><time class="ml-2 text-xs text-slate-500">{{ $snapshot->submitted_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y g:i A') }}</time><ul class="mt-1 text-sm">@foreach(data_get($snapshot->snapshot, 'documents', []) as $file)<li>{{ $file['requirement_name'] }} · version {{ $file['document_version'] }} · {{ str($file['review_status'])->replace('_', ' ')->headline() }}</li>@endforeach</ul></li>@endforeach</ol>
+                </section>
+            @endif
 
             <section class="farmer-card">
                 <div class="farmer-section-heading"><div><h2>Distributions received</h2><p>Physical distributions recorded for this application.</p></div></div>

@@ -11,7 +11,10 @@ use Illuminate\Support\Collection;
 
 class AssistanceProgramCatalogService
 {
-    public function __construct(private readonly AgriculturalBusinessCalendar $calendar) {}
+    public function __construct(
+        private readonly AgriculturalBusinessCalendar $calendar,
+        private readonly AgriculturalSchemaCapabilities $schema,
+    ) {}
 
     /**
      * Return the same published, date-aware program catalog to both farmer
@@ -41,11 +44,20 @@ class AssistanceProgramCatalogService
                 ->orWhere('description', 'like', '%'.$search.'%')))
             ->when($category !== '', fn ($query) => $query->where('category', $category));
 
-        $programs = $programQuery->with(['supplyItem', 'currentRequirementVersion.documentRequirements'])
+        $with = ['supplyItem'];
+        if ($this->schema->requirementVersionsReady()) {
+            $with[] = 'currentRequirementVersion.documentRequirements';
+        }
+
+        $programs = $programQuery->with($with)
             ->orderBy('closes_on')
             ->orderBy('name')
             ->paginate(9)
             ->withQueryString();
+
+        if (! $this->schema->requirementVersionsReady()) {
+            $programs->getCollection()->each(fn (AssistanceProgram $program) => $program->setRelation('currentRequirementVersion', null));
+        }
 
         return [
             'search' => $search,

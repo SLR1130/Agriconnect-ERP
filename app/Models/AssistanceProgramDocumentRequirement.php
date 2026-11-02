@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 class AssistanceProgramDocumentRequirement extends Model
@@ -32,5 +33,10 @@ class AssistanceProgramDocumentRequirement extends Model
     public function version(): BelongsTo
     {
         return $this->belongsTo(AssistanceProgramRequirementVersion::class, 'requirement_version_id');
+    }
+
+    public function applicationDocuments(): HasMany
+    {
+        return $this->hasMany(AssistanceApplicationDocument::class, 'requirement_id')->orderByDesc('version_number');
     }
 }

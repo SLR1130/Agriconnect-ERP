@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class AssistanceProgram extends Model
 {
@@ -64,9 +65,12 @@ class AssistanceProgram extends Model
     public function isAvailableOn(CarbonImmutable $businessDate): bool
     {
         $date = $businessDate->toDateString();
-        $version = $this->relationLoaded('currentRequirementVersion')
-            ? $this->getRelation('currentRequirementVersion')
-            : $this->currentRequirementVersion()->first();
+        $version = null;
+        if (Schema::hasTable('assistance_program_requirement_versions')) {
+            $version = $this->relationLoaded('currentRequirementVersion')
+                ? $this->getRelation('currentRequirementVersion')
+                : $this->currentRequirementVersion()->first();
+        }
         $opensOn = ($version?->opens_on ?? $this->opens_on)?->toDateString();
         $closesOn = ($version?->closes_on ?? $this->closes_on)?->toDateString();
 

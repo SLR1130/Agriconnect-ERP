@@ -27,6 +27,7 @@
 
     @if(session('status'))<div class="aas-card mb-5 border-l-4 border-emerald-600 px-5 py-4 text-sm text-emerald-800" role="status">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="aas-card mb-5 border-l-4 border-red-500 px-5 py-4 text-sm text-red-700" role="alert" tabindex="-1"><b>Assistance action needs attention.</b><ul class="mt-2 list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+    @if(!$requirementsSchemaReady)<div class="aas-card mb-5 border-l-4 border-amber-500 px-5 py-4 text-sm text-amber-900" role="status"><strong>Requirements versioning is not active on this database.</strong> Existing programs and application records remain viewable; program editing and new online applications are paused until the reviewed additive migrations are activated.</div>@endif
 
     <div class="erp-workspace" data-erp-workspace data-workspace-param="workspace" data-workspace-default="overview" data-workspace-initial="{{ old('_erp_workspace', old('_aasms_workspace', request('workspace', 'overview'))) }}">
         <div class="flex flex-wrap items-end justify-between gap-3">
@@ -55,7 +56,7 @@
         </section>
 
         <section id="aasms-panel-programs" class="erp-workspace-panel space-y-4" role="tabpanel" aria-labelledby="aasms-tab-programs" tabindex="0" data-erp-workspace-panel="programs" hidden>
-            @if($canCreate)
+            @if($canManagePrograms)
                 <section class="aas-card p-5">
                     <details class="aas-disclosure" @if(old('_aasms_workspace') === 'programs' && old('_aasms_form') === 'create-program') open @endif>
                         <summary>Create private assistance program and eligibility rules</summary>
@@ -100,7 +101,7 @@
                                     @endif
                                     <form method="POST" action="{{ route('modules.aasms.programs.toggle', $program) }}" data-confirm-submit="{{ $program->status === 'open' ? 'Hide' : 'Publish' }} this assistance program?">@csrf<input type="hidden" name="_aasms_workspace" value="programs"><button class="aas-btn aas-sage w-full" type="submit">{{ $program->status === 'open' ? 'Hide from public' : 'Publish for public' }}</button></form>
                                 @endif
-                                @if($canUpdate)
+                                @if($canEditPrograms)
                                     <details class="aas-disclosure" @if($programEditorOpen && old('_aasms_form') === 'edit-program') open @endif><summary>Edit program and eligibility</summary>
                                         <form method="POST" action="{{ route('modules.aasms.programs.update', $program) }}" class="mt-3 grid gap-2">@csrf @method('PATCH')<input type="hidden" name="_aasms_workspace" value="programs"><input type="hidden" name="_aasms_form" value="edit-program"><input type="hidden" name="_aasms_program_id" value="{{ $program->id }}">
                                             <label class="aas-inline-label">Program name<input class="aas-input mt-1" name="name" value="{{ $programEditorOpen ? old('name', $program->name) : $program->name }}" required></label>
@@ -121,7 +122,7 @@
                                         </form>
                                     </details>
                                 @endif
-                                @if(!$canUpdate && !$canPublish)<span class="text-xs text-gray-500">Read-only access</span>@endif
+                                @if(!$canEditPrograms && !$canPublish)<span class="text-xs text-gray-500">Read-only access</span>@endif
                             </div></td>
                         </tr>
                     @empty

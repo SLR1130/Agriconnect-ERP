@@ -7,6 +7,7 @@ use App\Models\AssistanceProgram;
 use App\Models\AssistanceProgramRequirementVersion;
 use App\Models\AssistanceStatusHistory;
 use App\Models\Farmer;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class AssistanceApplicationSubmissionService
         private readonly AgriculturalBusinessCalendar $calendar,
         private readonly ProgramEligibilityService $eligibility,
         private readonly ProgramRequirementVersionService $versions,
+        private readonly AssistanceApplicationDocumentService $documents,
     ) {}
 
     public function submit(AssistanceProgram $program, Farmer $farmer, string $purpose, string $submissionKey, int $actorId): AssistanceApplication
@@ -74,6 +76,7 @@ class AssistanceApplicationSubmissionService
                     'snapshot_sha256' => hash('sha256', $snapshotJson),
                     'generated_at' => $submittedAt,
                 ]);
+                $this->documents->recordInitialSubmissionSnapshot($application, User::findOrFail($actorId), $submittedAt);
 
                 return $application->fresh(['program', 'requirementVersion', 'acknowledgment']);
             }, 3);

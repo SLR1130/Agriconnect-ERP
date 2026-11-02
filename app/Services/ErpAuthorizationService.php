@@ -31,7 +31,7 @@ class ErpAuthorizationService
                 'ffrms' => ['view', 'create', 'update', 'review', 'approve', 'reject', 'export'],
                 'apms' => ['view', 'create', 'update', 'export'],
                 'aisms' => ['view', 'create', 'receive', 'release', 'adjust', 'export'],
-                'aasms' => ['view', 'create', 'update', 'review', 'approve', 'reject', 'distribute', 'export'],
+                'aasms' => ['view', 'create', 'update', 'review', 'approve', 'reject', 'distribute', 'export', 'documents_view_sensitive', 'documents_review'],
                 'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
                 'abpms' => ['view', 'create', 'update', 'review', 'approve', 'reject', 'export'],
             ],
@@ -41,7 +41,7 @@ class ErpAuthorizationService
             'modules' => [
                 'ffrms' => ['view', 'update', 'review', 'export'],
                 'apms' => ['view', 'create', 'update', 'export'],
-                'aasms' => ['view', 'review', 'export'],
+                'aasms' => ['view', 'review', 'export', 'documents_view_sensitive', 'documents_review'],
             ],
         ],
         'module_personnel' => [
@@ -50,7 +50,7 @@ class ErpAuthorizationService
                 'ffrms' => ['view', 'create', 'update', 'review', 'export'],
                 'apms' => ['view', 'create', 'update', 'export'],
                 'aisms' => ['view', 'create', 'update', 'receive', 'release', 'adjust', 'export'],
-                'aasms' => ['view', 'create', 'update', 'review', 'export'],
+                'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review'],
                 'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
                 'abpms' => ['view', 'create', 'update', 'review', 'export'],
             ],
@@ -78,6 +78,10 @@ class ErpAuthorizationService
             return false;
         }
 
+        if (in_array($permission, ['modules.aasms.documents_view_sensitive', 'modules.aasms.documents_review'], true)) {
+            return $this->hasExactAasmsDocumentGrant($user, $permission);
+        }
+
         $roles = $user->roles()->with(['moduleAccess.module'])->get();
         $userAssignments = $user->moduleAssignments()->with('module')->get();
         $hasExplicitModulePersonnelAssignments = $userAssignments->isNotEmpty();
@@ -102,6 +106,36 @@ class ErpAuthorizationService
             }
 
             if ($this->userModuleAllows($role, $permission, $userAssignments)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Sensitive evidence permissions require a literal grant; wildcards and generic AASMS access never imply them. */
+    private function hasExactAasmsDocumentGrant(User $user, string $permission): bool
+    {
+        $roles = $user->roles()->with(['moduleAccess.module'])->get();
+        $assignments = $user->moduleAssignments()->with('module')->get();
+
+        foreach ($roles as $role) {
+            if (! $role->is_active || $role->slug === 'authorized_viewer' || $role->slug === 'farmer') {
+                continue;
+            }
+            if ($role->slug === 'super_admin') {
+                return true;
+            }
+            if (in_array($permission, $role->permissions ?? [], true)) {
+                return true;
+            }
+            $moduleAction = str_replace('modules.aasms.', '', $permission);
+            if ($role->moduleAccess->contains(fn ($grant) => $grant->module?->slug === 'aasms'
+                && in_array($moduleAction, $grant->permissions ?? [], true))) {
+                return true;
+            }
+            if ($role->slug === 'module_personnel' && $assignments->contains(fn ($grant) => $grant->module?->slug === 'aasms'
+                && in_array($moduleAction, $grant->permissions ?? [], true))) {
                 return true;
             }
         }
@@ -176,7 +210,7 @@ class ErpAuthorizationService
             'ffrms' => ['view', 'create', 'update', 'review', 'export'],
             'apms' => ['view', 'create', 'update', 'export'],
             'aisms' => ['view', 'create', 'update', 'receive', 'release', 'adjust', 'export'],
-            'aasms' => ['view', 'create', 'update', 'review', 'export'],
+            'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review'],
             'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
             'abpms' => ['view', 'create', 'update', 'review', 'export'],
         ];

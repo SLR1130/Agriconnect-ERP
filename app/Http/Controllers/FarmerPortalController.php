@@ -11,6 +11,7 @@ use App\Services\AgriculturalBusinessCalendar;
 use App\Services\AgriculturalAnnouncementPresenter;
 use App\Services\FarmerActivityFeedService;
 use App\Services\FarmerRegistrationService;
+use App\Services\AgriculturalSchemaCapabilities;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,7 +45,7 @@ class FarmerPortalController extends Controller
         return redirect()->route('farmer.portal')->with('status', 'Your account was created. Your farmer registration is pending MAO verification.');
     }
 
-    public function dashboard(Request $request, AgriculturalBusinessCalendar $calendar, FarmerActivityFeedService $activityFeed, AgriculturalAnnouncementPresenter $announcementPresenter): View
+    public function dashboard(Request $request, AgriculturalBusinessCalendar $calendar, FarmerActivityFeedService $activityFeed, AgriculturalAnnouncementPresenter $announcementPresenter, AgriculturalSchemaCapabilities $schema): View
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
 
@@ -62,15 +63,31 @@ class FarmerPortalController extends Controller
             ->reject(fn (array $activity) => in_array($activity['type'].':'.$activity['record_id'], $attentionKeys, true))
             ->take(5)
             ->values();
-        $programs = AssistanceProgram::query()->with(['supplyItem', 'announcements' => fn ($query) => $query->visibleToFarmers()->with('publishedRevision.media')])
+        $announcementRelations = ['supplyItem'];
+        if (Schema::hasTable('agricultural_announcements')) {
+            $announcementRelations['announcements'] = fn ($query) => $query->visibleToFarmers()
+                ->with($schema->announcementRevisionsReady() ? 'publishedRevision.media' : [])
+                ->latest('published_at');
+        }
+        $programs = AssistanceProgram::query()->with($announcementRelations)
             ->where('status', 'open')
             ->where(fn ($query) => $query->whereNull('opens_on')->orWhereDate('opens_on', '<=', $businessDate))
             ->where(fn ($query) => $query->whereNull('closes_on')->orWhereDate('closes_on', '>=', $businessDate))
             ->orderBy('closes_on')->take(3)->get();
         $announcementsAvailable = Schema::hasTable('agricultural_announcements');
         $announcements = $announcementsAvailable
-            ? AgriculturalAnnouncement::query()->visibleToFarmers()->with(['program', 'publishedRevision.media'])->latest('published_at')->take(3)->get()
+            ? AgriculturalAnnouncement::query()->visibleToFarmers()->with($schema->announcementRevisionsReady() ? ['program', 'publishedRevision.media'] : ['program'])->latest('published_at')->take(3)->get()
             : collect();
+        if (! $schema->announcementRevisionsReady()) {
+            $announcements->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+            $programs->each(function (AssistanceProgram $program): void {
+                if (! Schema::hasTable('agricultural_announcements')) {
+                    $program->setRelation('announcements', collect());
+                    return;
+                }
+                $program->announcements?->each(fn (AgriculturalAnnouncement $notice) => $notice->setRelation('publishedRevision', null));
+            });
+        }
 
         return view('farmer.portal', [
             'farmer' => $farmer,

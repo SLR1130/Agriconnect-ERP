@@ -28,7 +28,7 @@ return new class extends Migration {
         Schema::create('assistance_program_document_requirements', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('requirement_version_id')
-                ->constrained('assistance_program_requirement_versions')
+                ->constrained('assistance_program_requirement_versions', 'id', 'aasms_doc_req_version_fk')
                 ->restrictOnDelete();
             $table->string('requirement_key', 80);
             $table->string('display_name', 150);

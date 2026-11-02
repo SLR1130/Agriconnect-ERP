@@ -10,13 +10,19 @@ use Illuminate\Validation\ValidationException;
 
 class ProgramEligibilityService
 {
-    public function __construct(private readonly AgriculturalBusinessCalendar $calendar) {}
+    public function __construct(
+        private readonly AgriculturalBusinessCalendar $calendar,
+        private readonly AgriculturalSchemaCapabilities $schema,
+    ) {}
 
     public function check(AssistanceProgram $program, Farmer $farmer, ?CarbonImmutable $businessDate = null): array
     {
-        $version = $program->relationLoaded('currentRequirementVersion')
-            ? $program->getRelation('currentRequirementVersion')
-            : $program->currentRequirementVersion()->first();
+        $version = null;
+        if ($this->schema->requirementVersionsReady()) {
+            $version = $program->relationLoaded('currentRequirementVersion')
+                ? $program->getRelation('currentRequirementVersion')
+                : $program->currentRequirementVersion()->first();
+        }
         $rules = $version?->eligibility_rules ?? $program->eligibility_rules ?? [];
         $reasons = [];
         if (($rules['requires_verified_farmer'] ?? true) && ! $farmer->isVerified()) {

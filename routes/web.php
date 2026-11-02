@@ -6,6 +6,7 @@ use App\Http\Controllers\AEAMSController;
 use App\Http\Controllers\AISMSController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ApplicationAcknowledgmentController;
+use App\Http\Controllers\AssistanceApplicationDocumentController;
 use App\Http\Controllers\APMSController;
 use App\Http\Controllers\Auth\AccountSetupController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -59,6 +60,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/programs/{program}', [FarmerExperienceController::class, 'program'])->name('farmer.programs.show');
         Route::get('/applications/{application}', [FarmerExperienceController::class, 'application'])->name('farmer.applications.show');
         Route::get('/applications/{application}/acknowledgment', [ApplicationAcknowledgmentController::class, 'farmer'])->name('farmer.applications.acknowledgment');
+        Route::post('/applications/{application}/requirements/{requirement}/documents', [AssistanceApplicationDocumentController::class, 'farmerUpload'])->name('farmer.applications.documents.upload');
+        Route::get('/applications/{application}/documents/{document}', [AssistanceApplicationDocumentController::class, 'farmerFile'])->name('farmer.applications.documents.file');
         Route::get('/equipment-requests/{equipmentRequest}', [FarmerExperienceController::class, 'equipmentRequest'])->name('farmer.equipment-requests.show');
         Route::get('/farms', [FarmerPortalController::class, 'farms'])->name('farmer.farms');
         Route::get('/profile', [FarmerPortalController::class, 'profile'])->name('farmer.profile');
@@ -125,6 +128,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/aasms/programs/{program}/toggle', [AASMSController::class, 'toggleProgram'])->name('modules.aasms.programs.toggle');
         Route::post('/aasms/programs/{program}/requirements/{version}/publish', [AASMSController::class, 'publishRequirements'])->name('modules.aasms.requirements.publish');
         Route::get('/aasms/applications/{application}', [AASMSController::class, 'showApplication'])->name('modules.aasms.applications.show');
+        Route::get('/aasms/applications/{application}/documents/{document}', [AssistanceApplicationDocumentController::class, 'staffFile'])->name('modules.aasms.applications.documents.file');
+        Route::patch('/aasms/applications/{application}/documents/{document}/review', [AssistanceApplicationDocumentController::class, 'review'])->name('modules.aasms.applications.documents.review');
         Route::get('/aasms/applications/{application}/acknowledgment', [ApplicationAcknowledgmentController::class, 'staff'])->name('modules.aasms.applications.acknowledgment');
         Route::post('/aasms/applications/{application}/review', [AASMSController::class, 'review'])->name('modules.aasms.review');
         Route::post('/aasms/applications/{application}/distribute', [AASMSController::class, 'distribute'])->name('modules.aasms.distribute');
