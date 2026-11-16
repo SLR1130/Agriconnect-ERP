@@ -87,7 +87,7 @@
         ['Crop & livestock records', 'Send information for MAO review and view official records.', route('farmer.production'), 'crop', 'from-amber-500 to-orange-600'],
         ['Fisheries', 'Send fishery information and review official records.', route('farmer.production', ['section' => 'fisheries']), 'fish', 'from-cyan-500 to-blue-600'],
         ['Farm monitoring', 'Read MAO visits and report pests or disease.', route('farmer.production', ['section' => 'monitoring']), 'monitoring', 'from-purple-500 to-indigo-600'],
-        ['Market opportunities', 'See current MAO interest notices and offer available products for review.', route('farmer.market'), 'inventory', 'from-rose-500 to-pink-600'],
+        ['MAO announcements', 'Read current MAO notices, service updates, and farming advisories.', route('farmer.announcements'), 'inventory', 'from-rose-500 to-pink-600'],
     ] as [$name, $copy, $url, $icon, $gradient])
                 <a href="{{ $url }}"
                     class="farmer-card group relative block overflow-hidden no-underline transition-all duration-300 hover:-translate-y-1 hover:border-emerald-400 hover:shadow-2xl">

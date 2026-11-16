@@ -13,8 +13,8 @@ use App\Models\FarmerRegistrationHistory;
 use App\Models\PestDiseaseIncident;
 use App\Models\Role;
 use App\Models\User;
-use App\Notifications\EquipmentRequestStatusChanged;
 use App\Notifications\AssistanceStatusNotification;
+use App\Notifications\EquipmentRequestStatusChanged;
 use App\Services\AgriculturalBusinessCalendar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -49,7 +49,7 @@ class FarmerExperienceTest extends TestCase
         $open = AssistanceProgram::create(['name' => 'Rice Seed Support', 'status' => 'open', 'category' => 'Seeds']);
         $closed = AssistanceProgram::create(['name' => 'Internal Draft', 'status' => 'closed']);
 
-        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertSee('Recent service activity')->assertSee('1 registered farm')->assertDontSee('name="phone"', false);
+        $this->actingAs($data['user'])->get('/farmer')->assertOk()->assertSee('Rice Seed Support')->assertSee('Registration pending')->assertSee('Recent service activity')->assertSee('registered farm')->assertSee('MAO announcements')->assertSee(route('farmer.announcements'), false)->assertDontSee('name="phone"', false);
         $this->actingAs($data['user'])->get('/farmer/services?search=Rice')->assertOk()->assertSee('Rice Seed Support')->assertDontSee('Internal Draft');
         $this->actingAs($data['user'])->get('/farmer/assistance')->assertOk()->assertSee('Rice Seed Support');
         $this->actingAs($data['user'])->get('/farmer/programs/'.$open->id)->assertOk()->assertSee('Farmer registration must be verified');
