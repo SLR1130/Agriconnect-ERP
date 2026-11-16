@@ -22,9 +22,18 @@ class InventoryService
                 }
 
                 $receivedOn = Carbon::parse($data['received_on'])->toDateString();
+                $manufacturedOn = filled($data['manufactured_on'] ?? null)
+                    ? Carbon::parse($data['manufactured_on'])->toDateString()
+                    : null;
                 $expiresOn = filled($data['expires_on'] ?? null)
                     ? Carbon::parse($data['expires_on'])->toDateString()
                     : null;
+
+                if ($manufacturedOn && $manufacturedOn > $receivedOn) {
+                    throw ValidationException::withMessages([
+                        'manufactured_on' => 'The manufacturing date cannot be later than the receipt date.',
+                    ]);
+                }
 
                 if ($expiresOn && $expiresOn < $receivedOn) {
                     throw ValidationException::withMessages([
@@ -57,15 +66,22 @@ class InventoryService
                     ],
                     [
                         'received_on' => $receivedOn,
+                        'manufactured_on' => $manufacturedOn,
                         'expires_on' => $expiresOn,
                         'quantity_received' => '0.00',
                         'quantity_available' => '0.00',
+                        'supplier_id' => $data['supplier_id'] ?? null,
+                        'unit_cost' => filled($data['unit_cost'] ?? null)
+                            ? $this->money($this->decimalCents($data['unit_cost']))
+                            : null,
                         'status' => 'available',
                     ],
                 );
                 if ($batch->status !== 'available') {
                     throw ValidationException::withMessages(['batch_number' => 'Stock cannot be added to a batch that is not available.']);
                 }
+
+                $this->mergeReceiptMetadata($batch, $data, $manufacturedOn, $expiresOn);
 
                 $batch->update([
                     'quantity_received' => $this->money($this->decimalCents($batch->quantity_received) + $quantityCents),
@@ -181,13 +197,143 @@ class InventoryService
         }
     }
 
+    public function transfer(array $data, int $userId): InventoryMovement
+    {
+        $key = trim((string) ($data['idempotency_key'] ?? ''));
+        if ($key === '') {
+            throw ValidationException::withMessages(['idempotency_key' => 'A transfer retry key is required.']);
+        }
+
+        try {
+            return DB::transaction(function () use ($data, $userId, $key) {
+                $existing = $this->existingMovement($key);
+                if ($existing) {
+                    return $this->assertSameTransfer($existing, $data, $userId);
+                }
+
+                $source = SupplyBatch::query()->lockForUpdate()->findOrFail($data['supply_batch_id']);
+                $destination = InventoryLocation::query()->whereKey($data['destination_location_id'])
+                    ->where('is_active', true)->lockForUpdate()->first();
+
+                if (! $destination) {
+                    throw ValidationException::withMessages(['destination_location_id' => 'The destination location is inactive.']);
+                }
+                if ((int) $source->location_id === (int) $destination->id) {
+                    throw ValidationException::withMessages(['destination_location_id' => 'Choose a different destination location.']);
+                }
+                if ($source->status !== 'available') {
+                    throw ValidationException::withMessages(['supply_batch_id' => 'Only available batches can be transferred.']);
+                }
+                if ($source->expires_on?->lt(today())) {
+                    throw ValidationException::withMessages(['supply_batch_id' => 'Expired batches cannot be transferred.']);
+                }
+
+                $quantityCents = $this->decimalCents($data['quantity'] ?? null);
+                $availableCents = $this->decimalCents($source->quantity_available);
+                if ($quantityCents <= 0 || $availableCents < $quantityCents) {
+                    throw ValidationException::withMessages(['quantity' => 'Insufficient available stock for this transfer.']);
+                }
+
+                $target = SupplyBatch::query()->lockForUpdate()->firstOrCreate(
+                    [
+                        'supply_item_id' => $source->supply_item_id,
+                        'location_id' => $destination->id,
+                        'batch_number' => $source->batch_number,
+                    ],
+                    [
+                        'supplier_id' => $source->supplier_id,
+                        'received_on' => today()->toDateString(),
+                        'manufactured_on' => $source->manufactured_on?->toDateString(),
+                        'expires_on' => $source->expires_on?->toDateString(),
+                        'quantity_received' => '0.00',
+                        'quantity_available' => '0.00',
+                        'unit_cost' => $source->unit_cost,
+                        'status' => 'available',
+                    ],
+                );
+
+                if ($target->status !== 'available') {
+                    throw ValidationException::withMessages(['destination_location_id' => 'The matching destination batch is not available.']);
+                }
+
+                $this->mergeReceiptMetadata($target, [
+                    'supplier_id' => $source->supplier_id,
+                    'unit_cost' => $source->unit_cost,
+                ], $source->manufactured_on?->toDateString(), $source->expires_on?->toDateString());
+
+                $source->update(['quantity_available' => $this->money($availableCents - $quantityCents)]);
+                $target->update([
+                    'quantity_received' => $this->money($this->decimalCents($target->quantity_received) + $quantityCents),
+                    'quantity_available' => $this->money($this->decimalCents($target->quantity_available) + $quantityCents),
+                ]);
+
+                return InventoryMovement::create([
+                    'reference' => 'TRF-'.str()->upper(str()->random(16)),
+                    'supply_batch_id' => $source->id,
+                    'related_batch_id' => $target->id,
+                    'user_id' => $userId,
+                    'movement_type' => 'transfer',
+                    'quantity' => $this->money($quantityCents),
+                    'idempotency_key' => $key,
+                    'recipient' => $destination->name,
+                    'purpose' => 'Warehouse transfer',
+                    'notes' => $data['notes'] ?? null,
+                ]);
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            return $this->recoverDuplicate($exception, $key, fn (InventoryMovement $movement) => $this->assertSameTransfer($movement, $data, $userId));
+        }
+    }
+
+    public function dispose(array $data, int $userId): InventoryMovement
+    {
+        $key = trim((string) ($data['idempotency_key'] ?? ''));
+        $reason = trim((string) ($data['reason'] ?? ''));
+        if ($key === '') {
+            throw ValidationException::withMessages(['idempotency_key' => 'A disposal retry key is required.']);
+        }
+        if ($reason === '') {
+            throw ValidationException::withMessages(['reason' => 'A disposal reason is required.']);
+        }
+
+        try {
+            return DB::transaction(function () use ($data, $userId, $key, $reason) {
+                $existing = $this->existingMovement($key);
+                if ($existing) {
+                    return $this->assertSameDisposal($existing, $data, $userId, $reason);
+                }
+
+                $batch = SupplyBatch::query()->lockForUpdate()->findOrFail($data['supply_batch_id']);
+                $availableCents = $this->decimalCents($batch->quantity_available);
+                if ($availableCents <= 0) {
+                    throw ValidationException::withMessages(['supply_batch_id' => 'This batch has no stock left to dispose.']);
+                }
+
+                $batch->update(['quantity_available' => '0.00', 'status' => 'disposed']);
+
+                return InventoryMovement::create([
+                    'reference' => 'DSP-'.str()->upper(str()->random(16)),
+                    'supply_batch_id' => $batch->id,
+                    'user_id' => $userId,
+                    'movement_type' => 'adjustment',
+                    'quantity' => $this->money(-$availableCents),
+                    'idempotency_key' => $key,
+                    'adjustment_reason' => 'Disposal: '.$reason,
+                    'notes' => $data['notes'] ?? null,
+                ]);
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            return $this->recoverDuplicate($exception, $key, fn (InventoryMovement $movement) => $this->assertSameDisposal($movement, $data, $userId, $reason));
+        }
+    }
+
     private function existingMovement(?string $key): ?InventoryMovement
     {
         if (blank($key)) {
             return null;
         }
 
-        return InventoryMovement::query()->with('batch')->where('idempotency_key', $key)->first();
+        return InventoryMovement::query()->with(['batch', 'relatedBatch'])->where('idempotency_key', $key)->first();
     }
 
     private function recoverDuplicate(UniqueConstraintViolationException $exception, ?string $key, callable $assertSame): InventoryMovement
@@ -210,7 +356,10 @@ class InventoryService
             && (string) $batch?->batch_number === (string) ($data['batch_number'] ?? '')
             && $this->decimalCents($movement->quantity) === $this->decimalCents($data['quantity'] ?? null)
             && optional($batch?->received_on)->toDateString() === Carbon::parse($data['received_on'])->toDateString()
+            && optional($batch?->manufactured_on)->toDateString() === (filled($data['manufactured_on'] ?? null) ? Carbon::parse($data['manufactured_on'])->toDateString() : null)
             && optional($batch?->expires_on)->toDateString() === (filled($data['expires_on'] ?? null) ? Carbon::parse($data['expires_on'])->toDateString() : null)
+            && (int) ($batch?->supplier_id ?? 0) === (int) ($data['supplier_id'] ?? 0)
+            && $this->nullableMoney($batch?->unit_cost) === $this->nullableMoney($data['unit_cost'] ?? null)
             && $this->normalizedText($movement->notes) === $this->normalizedText($data['notes'] ?? null);
 
         return $this->returnOrReject($movement, $same);
@@ -241,6 +390,63 @@ class InventoryService
         return $this->returnOrReject($movement, $same);
     }
 
+    private function assertSameTransfer(InventoryMovement $movement, array $data, int $userId): InventoryMovement
+    {
+        $same = $movement->movement_type === 'transfer'
+            && (int) $movement->user_id === $userId
+            && (int) $movement->supply_batch_id === (int) ($data['supply_batch_id'] ?? 0)
+            && (int) $movement->relatedBatch?->location_id === (int) ($data['destination_location_id'] ?? 0)
+            && $this->decimalCents($movement->quantity) === $this->decimalCents($data['quantity'] ?? null)
+            && $this->normalizedText($movement->notes) === $this->normalizedText($data['notes'] ?? null);
+
+        return $this->returnOrReject($movement, $same);
+    }
+
+    private function assertSameDisposal(InventoryMovement $movement, array $data, int $userId, string $reason): InventoryMovement
+    {
+        $same = $movement->movement_type === 'adjustment'
+            && (int) $movement->user_id === $userId
+            && (int) $movement->supply_batch_id === (int) ($data['supply_batch_id'] ?? 0)
+            && (string) $movement->adjustment_reason === 'Disposal: '.$reason
+            && $this->normalizedText($movement->notes) === $this->normalizedText($data['notes'] ?? null);
+
+        return $this->returnOrReject($movement, $same);
+    }
+
+    private function mergeReceiptMetadata(SupplyBatch $batch, array $data, ?string $manufacturedOn, ?string $expiresOn): void
+    {
+        $incoming = [
+            'supplier_id' => $data['supplier_id'] ?? null,
+            'manufactured_on' => $manufacturedOn,
+            'expires_on' => $expiresOn,
+            'unit_cost' => filled($data['unit_cost'] ?? null) ? $this->money($this->decimalCents($data['unit_cost'])) : null,
+        ];
+        $updates = [];
+
+        foreach ($incoming as $field => $value) {
+            if ($value === null) {
+                continue;
+            }
+            $current = $field === 'manufactured_on' || $field === 'expires_on'
+                ? $batch->{$field}?->toDateString()
+                : ($field === 'unit_cost' ? $this->nullableMoney($batch->{$field}) : $batch->{$field});
+            $comparable = $field === 'unit_cost' ? $this->nullableMoney($value) : $value;
+
+            if ($current !== null && (string) $current !== (string) $comparable) {
+                throw ValidationException::withMessages([
+                    'batch_number' => 'This batch already exists with different supplier, date, or cost details.',
+                ]);
+            }
+            if ($current === null) {
+                $updates[$field] = $value;
+            }
+        }
+
+        if ($updates !== []) {
+            $batch->update($updates);
+        }
+    }
+
     private function returnOrReject(InventoryMovement $movement, bool $same): InventoryMovement
     {
         if (! $same) {
@@ -257,6 +463,11 @@ class InventoryService
         $text = trim((string) ($value ?? ''));
 
         return $text === '' ? null : $text;
+    }
+
+    private function nullableMoney(mixed $value): ?string
+    {
+        return filled($value) ? $this->money($this->decimalCents($value)) : null;
     }
 
     private function decimalCents(mixed $value): int

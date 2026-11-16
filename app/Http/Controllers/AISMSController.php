@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\InventoryLocation;
 use App\Models\InventoryMovement;
+use App\Models\ProcurementSupplier;
 use App\Models\SupplyBatch;
 use App\Models\SupplyCategory;
 use App\Models\SupplyItem;
@@ -28,7 +29,7 @@ class AISMSController extends Controller
 
         $search = $request->string('search')->toString();
         $allItems = SupplyItem::query()->where('status', 'active')->orderBy('name')->get();
-        $allPositiveBatches = SupplyBatch::query()->with(['item', 'location'])
+        $allPositiveBatches = SupplyBatch::query()->with(['item', 'location', 'supplier'])
             ->where('quantity_available', '>', 0)
             ->latest()
             ->get();
@@ -63,7 +64,7 @@ class AISMSController extends Controller
             ->whereDate('expires_on', '<', today())
             ->get();
         $movements = $this->filteredMovements($request)
-            ->with(['batch.item', 'batch.location', 'user'])
+            ->with(['batch.item', 'batch.location', 'relatedBatch.location', 'user'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'movements_page')
@@ -93,6 +94,7 @@ class AISMSController extends Controller
             'categories' => SupplyCategory::query()->where('is_active', true)->orderBy('name')->get(),
             'units' => UnitOfMeasurement::query()->orderBy('name')->get(),
             'locations' => $locations,
+            'suppliers' => ProcurementSupplier::query()->where('is_active', true)->orderBy('name')->get(),
             'filterLocations' => InventoryLocation::query()->orderBy('name')->get(),
             'movements' => $movements,
             'itemOptions' => $itemOptions,
@@ -103,6 +105,8 @@ class AISMSController extends Controller
             'canReceive' => $request->user()->canModuleAction('aisms', 'receive'),
             'canRelease' => $request->user()->canModuleAction('aisms', 'release'),
             'canAdjust' => $request->user()->canModuleAction('aisms', 'adjust'),
+            'canTransfer' => $request->user()->canModuleAction('aisms', 'transfer'),
+            'canUpdate' => $request->user()->canModuleAction('aisms', 'update'),
             'canExport' => $request->user()->canModuleAction('aisms', 'export'),
         ]);
     }
@@ -113,7 +117,7 @@ class AISMSController extends Controller
         $data = $request->validate([
             'category_id' => 'required|exists:supply_categories,id',
             'unit_id' => 'required|exists:units_of_measurement,id',
-            'code' => 'required|max:50',
+            'code' => 'required|max:50|unique:supply_items,code',
             'name' => 'required|max:150',
             'minimum_stock' => 'required|numeric|min:0',
         ]);
@@ -132,6 +136,9 @@ class AISMSController extends Controller
             'batch_number' => 'required|max:100',
             'received_on' => 'required|date',
             'expires_on' => 'nullable|date|after_or_equal:received_on',
+            'manufactured_on' => 'nullable|date|before_or_equal:received_on',
+            'supplier_id' => 'nullable|exists:procurement_suppliers,id',
+            'unit_cost' => 'nullable|numeric|min:0',
             'quantity' => 'required|numeric|decimal:0,2|min:0.01',
             'idempotency_key' => 'nullable|string|max:100',
             'notes' => 'nullable|max:1000',
@@ -158,6 +165,90 @@ class AISMSController extends Controller
         return back()->with('status', 'Stock adjustment posted.');
     }
 
+    public function transfer(Request $request, InventoryService $service): RedirectResponse
+    {
+        $this->authz($request, 'transfer');
+        $data = $request->validate([
+            'supply_batch_id' => 'required|exists:supply_batches,id',
+            'destination_location_id' => 'required|exists:inventory_locations,id',
+            'quantity' => 'required|numeric|decimal:0,2|min:0.01',
+            'idempotency_key' => 'required|string|max:100',
+            'notes' => 'nullable|max:1000',
+        ]);
+
+        $service->transfer($data, $request->user()->id);
+
+        return back()->with('status', 'Warehouse transfer posted.');
+    }
+
+    public function updateBatch(Request $request, SupplyBatch $batch): RedirectResponse
+    {
+        $this->authz($request, 'update');
+        $data = $request->validate([
+            'supplier_id' => 'nullable|exists:procurement_suppliers,id',
+            'manufactured_on' => 'nullable|date|before_or_equal:received_on',
+            'expires_on' => 'nullable|date|after_or_equal:received_on',
+            'unit_cost' => 'nullable|numeric|min:0',
+        ] + ['received_on' => 'required|date']);
+
+        abort_unless($data['received_on'] === $batch->received_on?->toDateString(), 422, 'The recorded receipt date cannot be changed here.');
+        unset($data['received_on']);
+        $batch->update($data);
+
+        return back()->with('status', 'Batch details updated.');
+    }
+
+    public function updateBatchStatus(Request $request, SupplyBatch $batch): RedirectResponse
+    {
+        $this->authz($request, 'update');
+        $data = $request->validate(['status' => 'required|in:available,quarantined']);
+        abort_if($batch->status === 'disposed', 422, 'Disposed batches cannot be reopened.');
+        $batch->update($data);
+
+        return back()->with('status', $data['status'] === 'quarantined' ? 'Batch placed on hold.' : 'Batch returned to available stock.');
+    }
+
+    public function dispose(Request $request, SupplyBatch $batch, InventoryService $service): RedirectResponse
+    {
+        $this->authz($request, 'adjust');
+        $data = $request->validate([
+            'reason' => 'required|string|max:500',
+            'notes' => 'nullable|string|max:1000',
+            'idempotency_key' => 'required|string|max:100',
+        ]);
+        $service->dispose($data + ['supply_batch_id' => $batch->id], $request->user()->id);
+
+        return back()->with('status', 'Remaining batch stock disposed with an audit record.');
+    }
+
+    public function storeLocation(Request $request): RedirectResponse
+    {
+        $this->authz($request, 'create');
+        $data = $request->validate([
+            'name' => 'required|string|max:150|unique:inventory_locations,name',
+            'description' => 'nullable|string|max:500',
+        ]);
+        InventoryLocation::create($data + ['is_active' => true]);
+
+        return back()->with('status', 'Inventory location registered.');
+    }
+
+    public function storeSupplier(Request $request): RedirectResponse
+    {
+        $this->authz($request, 'create');
+        $data = $request->validate([
+            'name' => 'required|string|max:180|unique:procurement_suppliers,name',
+            'contact_person' => 'nullable|string|max:180',
+            'email' => 'nullable|email|max:180',
+            'phone' => 'nullable|string|max:40',
+            'address' => 'nullable|string|max:255',
+            'registration_reference' => 'nullable|string|max:100',
+        ]);
+        ProcurementSupplier::create($data + ['is_active' => true]);
+
+        return back()->with('status', 'Shared supplier registered.');
+    }
+
     public function release(Request $request, InventoryService $service): RedirectResponse
     {
         $this->authz($request, 'release');
@@ -180,13 +271,13 @@ class AISMSController extends Controller
         $this->authz($request, 'export');
         $this->validateFilters($request);
         $query = $this->filteredMovements($request)
-            ->with(['batch.item', 'batch.location', 'user'])
+            ->with(['batch.item', 'batch.location', 'relatedBatch.location', 'user'])
             ->orderBy('created_at')
             ->orderBy('id');
 
         return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Reference', 'Date and time', 'Supply code', 'Supply', 'Movement type', 'Quantity', 'Batch', 'Location', 'Responsible personnel', 'Recipient', 'Purpose', 'Adjustment reason', 'Notes']);
+            fputcsv($out, ['Reference', 'Date and time', 'Supply code', 'Supply', 'Movement type', 'Quantity', 'Batch', 'Source location', 'Destination location', 'Responsible personnel', 'Recipient', 'Purpose', 'Adjustment reason', 'Notes']);
             $query->chunkById(500, function ($movements) use ($out) {
                 foreach ($movements as $movement) {
                     $batch = $movement->batch;
@@ -199,6 +290,7 @@ class AISMSController extends Controller
                         $movement->quantity,
                         $batch?->batch_number,
                         $batch?->location?->name,
+                        $movement->relatedBatch?->location?->name,
                         $movement->user?->name,
                         $movement->recipient,
                         $movement->purpose,
@@ -216,7 +308,7 @@ class AISMSController extends Controller
     {
         $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
-            'movement_type' => ['nullable', 'in:receipt,release,adjustment'],
+            'movement_type' => ['nullable', 'in:receipt,release,transfer,adjustment'],
             'supply_item_id' => ['nullable', 'integer', 'exists:supply_items,id'],
             'location_id' => ['nullable', 'integer', 'exists:inventory_locations,id'],
             'date_from' => ['nullable', 'date'],
