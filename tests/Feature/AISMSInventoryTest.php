@@ -11,6 +11,7 @@ use App\Models\SupplyItem;
 use App\Models\UnitOfMeasurement;
 use App\Models\User;
 use App\Services\InventoryService;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +60,117 @@ class AISMSInventoryTest extends TestCase
         ], $data['user']->id);
 
         return SupplyBatch::where('batch_number', $number)->firstOrFail();
+    }
+
+    private function createLegacyAismsDatabase(array $productOverrides = [], array $batchOverrides = []): ConnectionInterface
+    {
+        config(['database.connections.aisms_legacy' => [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ]]);
+        DB::purge('aisms_legacy');
+        $schema = Schema::connection('aisms_legacy');
+        $schema->create('warehouses', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->string('code');
+            $table->string('name');
+            $table->string('location')->nullable();
+            $table->boolean('is_active');
+            $table->timestamps();
+        });
+        $schema->create('products', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->string('sku');
+            $table->string('name');
+            $table->string('category');
+            $table->string('unit');
+            $table->decimal('reorder_level', 14, 3);
+            $table->boolean('is_active');
+            $table->timestamps();
+        });
+        $schema->create('suppliers', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->string('code');
+            $table->string('name');
+            $table->string('contact_person')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('email')->nullable();
+            $table->string('address')->nullable();
+            $table->boolean('is_active');
+            $table->timestamps();
+        });
+        $schema->create('inventory_batches', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('warehouse_id');
+            $table->unsignedBigInteger('supplier_id')->nullable();
+            $table->string('lot_number');
+            $table->date('manufactured_at')->nullable();
+            $table->date('expires_at')->nullable();
+            $table->date('received_at')->nullable();
+            $table->decimal('quantity', 14, 3);
+            $table->decimal('unit_cost', 14, 2)->nullable();
+            $table->string('status');
+            $table->string('source_reference')->nullable();
+            $table->timestamps();
+        });
+
+        $legacy = DB::connection('aisms_legacy');
+        $now = now();
+        $legacy->table('warehouses')->insert([
+            'id' => 1,
+            'uuid' => 'legacy-wh',
+            'code' => 'LEG-WH',
+            'name' => 'Legacy Warehouse',
+            'location' => 'North compound',
+            'is_active' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $legacy->table('products')->insert(array_merge([
+            'id' => 1,
+            'uuid' => 'legacy-product',
+            'sku' => 'LEG-SEED',
+            'name' => 'Legacy seed',
+            'category' => 'Seeds',
+            'unit' => 'kg',
+            'reorder_level' => 3,
+            'is_active' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $productOverrides));
+        $legacy->table('suppliers')->insert([
+            'id' => 1,
+            'uuid' => 'legacy-supplier',
+            'code' => 'LEG-SUP',
+            'name' => 'Legacy Supplier',
+            'is_active' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $legacy->table('inventory_batches')->insert(array_merge([
+            'id' => 1,
+            'uuid' => 'legacy-batch-uuid',
+            'product_id' => 1,
+            'warehouse_id' => 1,
+            'supplier_id' => 1,
+            'lot_number' => 'LEG-LOT',
+            'received_at' => today()->toDateString(),
+            'quantity' => 7.5,
+            'unit_cost' => 25,
+            'status' => 'active',
+            'source_reference' => 'OLD-RCV-1',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $batchOverrides));
+
+        return $legacy;
     }
 
     public function test_receipt_release_and_adjustment_persist_and_balance(): void
@@ -186,69 +298,7 @@ class AISMSInventoryTest extends TestCase
     public function test_standalone_import_command_consolidates_current_lot_balance(): void
     {
         $data = $this->setupInventory();
-        config(['database.connections.aisms_legacy' => [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
-            'foreign_key_constraints' => true,
-        ]]);
-        DB::purge('aisms_legacy');
-        $schema = Schema::connection('aisms_legacy');
-        $schema->create('warehouses', function (Blueprint $table): void {
-            $table->id();
-            $table->string('uuid');
-            $table->string('code');
-            $table->string('name');
-            $table->string('location')->nullable();
-            $table->boolean('is_active');
-            $table->timestamps();
-        });
-        $schema->create('products', function (Blueprint $table): void {
-            $table->id();
-            $table->string('uuid');
-            $table->string('sku');
-            $table->string('name');
-            $table->string('category');
-            $table->string('unit');
-            $table->decimal('reorder_level', 14, 3);
-            $table->boolean('is_active');
-            $table->timestamps();
-        });
-        $schema->create('suppliers', function (Blueprint $table): void {
-            $table->id();
-            $table->string('uuid');
-            $table->string('code');
-            $table->string('name');
-            $table->string('contact_person')->nullable();
-            $table->string('phone')->nullable();
-            $table->string('email')->nullable();
-            $table->string('address')->nullable();
-            $table->boolean('is_active');
-            $table->timestamps();
-        });
-        $schema->create('inventory_batches', function (Blueprint $table): void {
-            $table->id();
-            $table->string('uuid');
-            $table->unsignedBigInteger('product_id');
-            $table->unsignedBigInteger('warehouse_id');
-            $table->unsignedBigInteger('supplier_id')->nullable();
-            $table->string('lot_number');
-            $table->date('manufactured_at')->nullable();
-            $table->date('expires_at')->nullable();
-            $table->date('received_at')->nullable();
-            $table->decimal('quantity', 14, 3);
-            $table->decimal('unit_cost', 14, 2)->nullable();
-            $table->string('status');
-            $table->string('source_reference')->nullable();
-            $table->timestamps();
-        });
-
-        $legacy = DB::connection('aisms_legacy');
-        $now = now();
-        $legacy->table('warehouses')->insert(['id' => 1, 'uuid' => 'legacy-wh', 'code' => 'LEG-WH', 'name' => 'Legacy Warehouse', 'location' => 'North compound', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
-        $legacy->table('products')->insert(['id' => 1, 'uuid' => 'legacy-product', 'sku' => 'LEG-SEED', 'name' => 'Legacy seed', 'category' => 'Seeds', 'unit' => 'kg', 'reorder_level' => 3, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
-        $legacy->table('suppliers')->insert(['id' => 1, 'uuid' => 'legacy-supplier', 'code' => 'LEG-SUP', 'name' => 'Legacy Supplier', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
-        $legacy->table('inventory_batches')->insert(['id' => 1, 'uuid' => 'legacy-batch-uuid', 'product_id' => 1, 'warehouse_id' => 1, 'supplier_id' => 1, 'lot_number' => 'LEG-LOT', 'received_at' => today()->toDateString(), 'quantity' => 7.5, 'unit_cost' => 25, 'status' => 'active', 'source_reference' => 'OLD-RCV-1', 'created_at' => $now, 'updated_at' => $now]);
+        $this->createLegacyAismsDatabase();
 
         $this->artisan('aisms:import-standalone', ['--user' => $data['user']->id, '--commit' => true])->assertSuccessful();
 
@@ -257,6 +307,79 @@ class AISMSInventoryTest extends TestCase
         $this->assertSame('7.50', (string) $batch->quantity_available);
         $this->assertSame('25.00', (string) $batch->unit_cost);
         $this->assertDatabaseHas('inventory_movements', ['supply_batch_id' => $batch->id, 'idempotency_key' => 'legacy-aisms-legacy-batch-uuid']);
+    }
+
+    public function test_standalone_import_dry_run_rejects_unsupported_quantity_precision_without_writes(): void
+    {
+        $this->setupInventory();
+        $this->createLegacyAismsDatabase([], ['quantity' => 7.555]);
+
+        $this->artisan('aisms:import-standalone')
+            ->expectsOutputToContain('uses more than two quantity decimal places')
+            ->assertFailed();
+
+        $this->assertDatabaseMissing('supply_items', ['code' => 'LEG-SEED']);
+        $this->assertDatabaseCount('inventory_movements', 0);
+    }
+
+    public function test_standalone_import_dry_run_rejects_duplicate_positive_lot_keys(): void
+    {
+        $this->setupInventory();
+        $legacy = $this->createLegacyAismsDatabase();
+        $duplicate = (array) $legacy->table('inventory_batches')->first();
+        $duplicate['id'] = 2;
+        $duplicate['uuid'] = 'legacy-batch-duplicate';
+        $duplicate['quantity'] = 1;
+        $legacy->table('inventory_batches')->insert($duplicate);
+
+        $this->artisan('aisms:import-standalone')
+            ->expectsOutputToContain('is duplicated for the same product and warehouse')
+            ->assertFailed();
+
+        $this->assertDatabaseMissing('supply_items', ['code' => 'LEG-SEED']);
+    }
+
+    public function test_standalone_import_dry_run_rejects_conflicting_erp_product(): void
+    {
+        $data = $this->setupInventory();
+        $this->createLegacyAismsDatabase();
+        SupplyItem::create([
+            'category_id' => $data['item']->category_id,
+            'unit_id' => $data['item']->unit_id,
+            'code' => 'LEG-SEED',
+            'name' => 'Different ERP item',
+            'minimum_stock' => 3,
+            'status' => 'active',
+        ]);
+
+        $this->artisan('aisms:import-standalone')
+            ->expectsOutputToContain('conflicts with different ERP item details')
+            ->assertFailed();
+
+        $this->assertDatabaseCount('inventory_movements', 0);
+    }
+
+    public function test_standalone_import_ignores_non_positive_balances_and_retries_safely(): void
+    {
+        $data = $this->setupInventory();
+        $legacy = $this->createLegacyAismsDatabase();
+        $ignored = (array) $legacy->table('inventory_batches')->first();
+        $ignored['id'] = 2;
+        $ignored['uuid'] = 'legacy-zero-batch';
+        $ignored['lot_number'] = 'ZERO-LOT';
+        $ignored['quantity'] = 0;
+        $legacy->table('inventory_batches')->insert($ignored);
+
+        $this->artisan('aisms:import-standalone', ['--user' => $data['user']->id, '--commit' => true])
+            ->expectsOutputToContain('Non-positive balances ignored')
+            ->assertSuccessful();
+        $this->artisan('aisms:import-standalone', ['--user' => $data['user']->id, '--commit' => true])
+            ->assertSuccessful();
+
+        $item = SupplyItem::query()->where('code', 'LEG-SEED')->firstOrFail();
+        $this->assertSame(1, SupplyBatch::query()->where('supply_item_id', $item->id)->count());
+        $this->assertDatabaseMissing('supply_batches', ['batch_number' => 'ZERO-LOT']);
+        $this->assertSame(1, DB::table('inventory_movements')->where('idempotency_key', 'legacy-aisms-legacy-batch-uuid')->count());
     }
 
     public function test_insufficient_and_expired_releases_are_rejected(): void

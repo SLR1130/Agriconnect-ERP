@@ -30,20 +30,23 @@ class ImportStandaloneAisms extends Command
 
         try {
             $this->assertLegacySchema($legacy);
+            $this->validateLegacyData($legacy);
             $counts = [
                 ['Products', $legacy->table('products')->count()],
                 ['Warehouses', $legacy->table('warehouses')->count()],
                 ['Suppliers', $legacy->table('suppliers')->count()],
                 ['Inventory batches', $legacy->table('inventory_batches')->count()],
                 ['Positive lot balances', $legacy->table('inventory_batches')->where('quantity', '>', 0)->count()],
+                ['Non-positive balances ignored', $legacy->table('inventory_batches')->where('quantity', '<=', 0)->count()],
             ];
         } catch (Throwable $exception) {
-            $this->error('Standalone AISMS could not be read: '.$exception->getMessage());
+            $this->error('Standalone AISMS validation failed: '.$exception->getMessage());
 
             return self::FAILURE;
         }
 
         $this->table(['Source record', 'Count'], $counts);
+        $this->info('Preflight validation passed. No legacy records were changed.');
         $this->warn('Historical standalone movement rows remain in the legacy database/export. This command imports catalog records and current lot balances so the ERP becomes the single live ledger.');
 
         if (! $this->option('commit')) {
@@ -67,7 +70,7 @@ class ImportStandaloneAisms extends Command
                 $suppliers = $this->importSuppliers($legacy, $imported);
                 $products = $this->importProducts($legacy, $imported);
 
-                $legacy->table('inventory_batches')->orderBy('id')->chunkById(250, function ($rows) use ($locations, $suppliers, $products, $user, &$imported): void {
+                $legacy->table('inventory_batches')->where('quantity', '>', 0)->orderBy('id')->chunkById(250, function ($rows) use ($locations, $suppliers, $products, $user, &$imported): void {
                     foreach ($rows as $legacyBatch) {
                         $scaledQuantity = (float) $legacyBatch->quantity * 100;
                         if (abs($scaledQuantity - round($scaledQuantity)) > 0.00001) {
@@ -87,7 +90,7 @@ class ImportStandaloneAisms extends Command
                         $quantity = number_format((float) $legacyBatch->quantity, 2, '.', '');
                         $receivedOn = $legacyBatch->received_at
                             ?: (filled($legacyBatch->created_at) ? substr((string) $legacyBatch->created_at, 0, 10) : today()->toDateString());
-                        $status = match ($legacyBatch->status) {
+                        $status = match (Str::lower(trim((string) $legacyBatch->status))) {
                             'active' => 'available',
                             'quarantined' => 'quarantined',
                             'disposed' => 'disposed',
@@ -141,6 +144,110 @@ class ImportStandaloneAisms extends Command
             if (! $schema->hasTable($table)) {
                 throw new \RuntimeException("Required source table [{$table}] is missing.");
             }
+        }
+    }
+
+    private function validateLegacyData(ConnectionInterface $legacy): void
+    {
+        $products = $legacy->table('products')->orderBy('id')->get();
+        $warehouses = $legacy->table('warehouses')->orderBy('id')->get();
+        $suppliers = $legacy->table('suppliers')->orderBy('id')->get();
+
+        $this->assertUniqueTextField($products, 'sku', 'product SKU');
+        $this->assertUniqueTextField($warehouses, 'name', 'warehouse name');
+        $this->assertUniqueTextField($suppliers, 'name', 'supplier name');
+
+        foreach ($products as $source) {
+            foreach (['name', 'category', 'unit'] as $field) {
+                if (blank($source->{$field})) {
+                    throw new \RuntimeException("Legacy product {$source->sku} has a blank {$field}.");
+                }
+            }
+
+            $scaledMinimum = (float) $source->reorder_level * 100;
+            if (abs($scaledMinimum - round($scaledMinimum)) > 0.00001) {
+                throw new \RuntimeException('Legacy product '.$source->sku.' uses more than two reorder-level decimal places. Resolve that precision before committing the import.');
+            }
+
+            $existing = SupplyItem::query()
+                ->with(['category', 'unit'])
+                ->where('code', $source->sku)
+                ->first();
+            if (! $existing) {
+                continue;
+            }
+
+            [, $unitSymbol] = $this->normalizeUnit((string) $source->unit);
+            if (
+                Str::lower(trim($existing->name)) !== Str::lower(trim((string) $source->name))
+                || Str::lower(trim((string) $existing->category?->name)) !== Str::lower(trim((string) $source->category))
+                || Str::lower(trim((string) $existing->unit?->symbol)) !== Str::lower($unitSymbol)
+            ) {
+                throw new \RuntimeException('Legacy product code '.$source->sku.' conflicts with different ERP item details.');
+            }
+        }
+
+        $productIds = array_fill_keys($products->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
+        $warehouseIds = array_fill_keys($warehouses->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
+        $supplierIds = array_fill_keys($suppliers->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
+        $batchUuids = [];
+        $lotKeys = [];
+
+        foreach ($legacy->table('inventory_batches')->where('quantity', '>', 0)->orderBy('id')->get() as $batch) {
+            if (blank($batch->uuid) || blank($batch->lot_number)) {
+                throw new \RuntimeException('Every positive legacy batch requires a UUID and lot number.');
+            }
+
+            $uuid = Str::lower(trim((string) $batch->uuid));
+            if (isset($batchUuids[$uuid])) {
+                throw new \RuntimeException('Legacy batch UUID '.$batch->uuid.' is duplicated.');
+            }
+            $batchUuids[$uuid] = true;
+
+            $productId = (int) $batch->product_id;
+            $warehouseId = (int) $batch->warehouse_id;
+            if (! isset($productIds[$productId])) {
+                throw new \RuntimeException('Legacy batch '.$batch->uuid.' references missing product ID '.$productId.'.');
+            }
+            if (! isset($warehouseIds[$warehouseId])) {
+                throw new \RuntimeException('Legacy batch '.$batch->uuid.' references missing warehouse ID '.$warehouseId.'.');
+            }
+            if (filled($batch->supplier_id) && ! isset($supplierIds[(int) $batch->supplier_id])) {
+                throw new \RuntimeException('Legacy batch '.$batch->uuid.' references missing supplier ID '.$batch->supplier_id.'.');
+            }
+
+            $lotKey = $productId.'|'.$warehouseId.'|'.Str::lower(trim((string) $batch->lot_number));
+            if (isset($lotKeys[$lotKey])) {
+                throw new \RuntimeException('Legacy lot '.$batch->lot_number.' is duplicated for the same product and warehouse.');
+            }
+            $lotKeys[$lotKey] = true;
+
+            $scaledQuantity = (float) $batch->quantity * 100;
+            if (abs($scaledQuantity - round($scaledQuantity)) > 0.00001) {
+                throw new \RuntimeException('Legacy batch '.$batch->uuid.' uses more than two quantity decimal places. Resolve that precision before committing the import.');
+            }
+
+            $status = Str::lower(trim((string) $batch->status));
+            if (! in_array($status, ['active', 'quarantined', 'disposed'], true)) {
+                throw new \RuntimeException('Legacy batch '.$batch->uuid.' has unsupported status ['.$batch->status.'].');
+            }
+        }
+    }
+
+    private function assertUniqueTextField(iterable $records, string $field, string $label): void
+    {
+        $seen = [];
+        foreach ($records as $record) {
+            $value = trim((string) $record->{$field});
+            if ($value === '') {
+                throw new \RuntimeException("Legacy {$label} cannot be blank.");
+            }
+
+            $key = Str::lower($value);
+            if (isset($seen[$key])) {
+                throw new \RuntimeException("Legacy {$label} [{$value}] is duplicated.");
+            }
+            $seen[$key] = true;
         }
     }
 
