@@ -309,6 +309,79 @@ class AISMSInventoryTest extends TestCase
         $this->assertDatabaseHas('inventory_movements', ['supply_batch_id' => $batch->id, 'idempotency_key' => 'legacy-aisms-legacy-batch-uuid']);
     }
 
+    public function test_standalone_import_dry_run_rejects_unsupported_quantity_precision_without_writes(): void
+    {
+        $this->setupInventory();
+        $this->createLegacyAismsDatabase([], ['quantity' => 7.555]);
+
+        $this->artisan('aisms:import-standalone')
+            ->expectsOutputToContain('uses more than two quantity decimal places')
+            ->assertFailed();
+
+        $this->assertDatabaseMissing('supply_items', ['code' => 'LEG-SEED']);
+        $this->assertDatabaseCount('inventory_movements', 0);
+    }
+
+    public function test_standalone_import_dry_run_rejects_duplicate_positive_lot_keys(): void
+    {
+        $this->setupInventory();
+        $legacy = $this->createLegacyAismsDatabase();
+        $duplicate = (array) $legacy->table('inventory_batches')->first();
+        $duplicate['id'] = 2;
+        $duplicate['uuid'] = 'legacy-batch-duplicate';
+        $duplicate['quantity'] = 1;
+        $legacy->table('inventory_batches')->insert($duplicate);
+
+        $this->artisan('aisms:import-standalone')
+            ->expectsOutputToContain('is duplicated for the same product and warehouse')
+            ->assertFailed();
+
+        $this->assertDatabaseMissing('supply_items', ['code' => 'LEG-SEED']);
+    }
+
+    public function test_standalone_import_dry_run_rejects_conflicting_erp_product(): void
+    {
+        $data = $this->setupInventory();
+        $this->createLegacyAismsDatabase();
+        SupplyItem::create([
+            'category_id' => $data['item']->category_id,
+            'unit_id' => $data['item']->unit_id,
+            'code' => 'LEG-SEED',
+            'name' => 'Different ERP item',
+            'minimum_stock' => 3,
+            'status' => 'active',
+        ]);
+
+        $this->artisan('aisms:import-standalone')
+            ->expectsOutputToContain('conflicts with different ERP item details')
+            ->assertFailed();
+
+        $this->assertDatabaseCount('inventory_movements', 0);
+    }
+
+    public function test_standalone_import_ignores_non_positive_balances_and_retries_safely(): void
+    {
+        $data = $this->setupInventory();
+        $legacy = $this->createLegacyAismsDatabase();
+        $ignored = (array) $legacy->table('inventory_batches')->first();
+        $ignored['id'] = 2;
+        $ignored['uuid'] = 'legacy-zero-batch';
+        $ignored['lot_number'] = 'ZERO-LOT';
+        $ignored['quantity'] = 0;
+        $legacy->table('inventory_batches')->insert($ignored);
+
+        $this->artisan('aisms:import-standalone', ['--user' => $data['user']->id, '--commit' => true])
+            ->expectsOutputToContain('Non-positive balances ignored')
+            ->assertSuccessful();
+        $this->artisan('aisms:import-standalone', ['--user' => $data['user']->id, '--commit' => true])
+            ->assertSuccessful();
+
+        $item = SupplyItem::query()->where('code', 'LEG-SEED')->firstOrFail();
+        $this->assertSame(1, SupplyBatch::query()->where('supply_item_id', $item->id)->count());
+        $this->assertDatabaseMissing('supply_batches', ['batch_number' => 'ZERO-LOT']);
+        $this->assertSame(1, DB::table('inventory_movements')->where('idempotency_key', 'legacy-aisms-legacy-batch-uuid')->count());
+    }
+
     public function test_insufficient_and_expired_releases_are_rejected(): void
     {
         $data = $this->setupInventory();
