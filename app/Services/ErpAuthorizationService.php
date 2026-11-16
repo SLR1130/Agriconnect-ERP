@@ -30,7 +30,7 @@ class ErpAuthorizationService
             'modules' => [
                 'ffrms' => ['view', 'create', 'update', 'review', 'approve', 'reject', 'export'],
                 'apms' => ['view', 'create', 'update', 'export'],
-                'aisms' => ['view', 'create', 'receive', 'release', 'adjust', 'export'],
+                'aisms' => ['view', 'create', 'update', 'receive', 'release', 'transfer', 'adjust', 'export'],
                 'aasms' => ['view', 'create', 'update', 'review', 'approve', 'reject', 'distribute', 'export', 'documents_view_sensitive', 'documents_review'],
                 'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
                 'abpms' => ['view', 'create', 'update', 'review', 'approve', 'reject', 'export'],
@@ -49,7 +49,7 @@ class ErpAuthorizationService
             'modules' => [
                 'ffrms' => ['view', 'create', 'update', 'review', 'export'],
                 'apms' => ['view', 'create', 'update', 'export'],
-                'aisms' => ['view', 'create', 'update', 'receive', 'release', 'adjust', 'export'],
+                'aisms' => ['view', 'create', 'update', 'receive', 'release', 'transfer', 'adjust', 'export'],
                 'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review'],
                 'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
                 'abpms' => ['view', 'create', 'update', 'review', 'export'],
@@ -239,7 +239,7 @@ class ErpAuthorizationService
         return [
             'ffrms' => ['view', 'create', 'update', 'review', 'export'],
             'apms' => ['view', 'create', 'update', 'export'],
-            'aisms' => ['view', 'create', 'update', 'receive', 'release', 'adjust', 'export'],
+            'aisms' => ['view', 'create', 'update', 'receive', 'release', 'transfer', 'adjust', 'export'],
             'aasms' => ['view', 'create', 'update', 'review', 'export', 'documents_view_sensitive', 'documents_review', 'intake_assist', 'claim_ticket_view', 'claim_ticket_issue', 'claim_ticket_verify', 'claim_ticket_revoke', 'claim_ticket_reissue', 'claim_ticket_history', 'identity_confirm', 'handover_distribute'],
             'aeams' => ['view', 'create', 'update', 'review', 'issue', 'return', 'maintenance', 'export'],
             'abpms' => ['view', 'create', 'update', 'review', 'export'],
@@ -318,8 +318,7 @@ class ErpAuthorizationService
             return false;
         }
 
-        return $assignments->first(fn ($assignment) =>
-            $assignment->module?->slug === $module && $assignment->hasPermission($action)
+        return $assignments->first(fn ($assignment) => $assignment->module?->slug === $module && $assignment->hasPermission($action)
         ) !== null;
     }
 
@@ -374,8 +373,7 @@ class ErpAuthorizationService
 
             if ($role->slug === 'module_personnel') {
                 $explicitAssignments = $user->moduleAssignments()->with('module')->get();
-                if ($explicitAssignments->contains(fn ($assignment) =>
-                    $assignment->module?->slug === 'aasms'
+                if ($explicitAssignments->contains(fn ($assignment) => $assignment->module?->slug === 'aasms'
                     && in_array('intake_assist', $assignment->permissions ?? [], true)
                 )) {
                     return true;
@@ -487,8 +485,7 @@ class ErpAuthorizationService
             return true;
         }
 
-        return $role->moduleAccess->contains(fn ($grant) =>
-            $grant->module?->slug === 'aasms'
+        return $role->moduleAccess->contains(fn ($grant) => $grant->module?->slug === 'aasms'
             && in_array('intake_assist', $grant->permissions ?? [], true)
         );
     }

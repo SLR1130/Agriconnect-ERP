@@ -64,6 +64,22 @@ return [
             ]) : [],
         ],
 
+        'aisms_legacy' => [
+            'driver' => env('AISMS_LEGACY_DB_CONNECTION', 'mysql'),
+            'host' => env('AISMS_LEGACY_DB_HOST', '127.0.0.1'),
+            'port' => env('AISMS_LEGACY_DB_PORT', '3306'),
+            'database' => env('AISMS_LEGACY_DB_DATABASE', 'agriconnect_aisms'),
+            'username' => env('AISMS_LEGACY_DB_USERNAME', 'root'),
+            'password' => env('AISMS_LEGACY_DB_PASSWORD', ''),
+            'unix_socket' => env('AISMS_LEGACY_DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

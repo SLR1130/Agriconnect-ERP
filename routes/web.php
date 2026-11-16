@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AASMSClaimTicketController;
 use App\Http\Controllers\AASMSController;
 use App\Http\Controllers\AASMSHandoverController;
 use App\Http\Controllers\AASMSIntakeController;
@@ -7,16 +8,15 @@ use App\Http\Controllers\ABPMSController;
 use App\Http\Controllers\AEAMSController;
 use App\Http\Controllers\AISMSController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\APMSController;
 use App\Http\Controllers\ApplicationAcknowledgmentController;
 use App\Http\Controllers\AssistanceApplicationDocumentController;
-use App\Http\Controllers\APMSController;
 use App\Http\Controllers\Auth\AccountSetupController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ERP\AdministrationController;
 use App\Http\Controllers\ERP\DashboardController;
-use App\Http\Controllers\FarmerExperienceController;
 use App\Http\Controllers\FarmerClaimTicketController;
-use App\Http\Controllers\AASMSClaimTicketController;
+use App\Http\Controllers\FarmerExperienceController;
 use App\Http\Controllers\FarmerPortalController;
 use App\Http\Controllers\FarmerProductionController;
 use App\Http\Controllers\FFRMSController;
@@ -120,7 +120,13 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/aisms/items', [AISMSController::class, 'item'])->name('modules.aisms.items.store');
         Route::post('/aisms/receipts', [AISMSController::class, 'receive'])->name('modules.aisms.receipts.store');
         Route::post('/aisms/releases', [AISMSController::class, 'release'])->name('modules.aisms.releases.store');
+        Route::post('/aisms/transfers', [AISMSController::class, 'transfer'])->name('modules.aisms.transfers.store');
         Route::post('/aisms/adjustments', [AISMSController::class, 'adjust'])->name('modules.aisms.adjustments.store');
+        Route::patch('/aisms/batches/{batch}', [AISMSController::class, 'updateBatch'])->name('modules.aisms.batches.update');
+        Route::patch('/aisms/batches/{batch}/status', [AISMSController::class, 'updateBatchStatus'])->name('modules.aisms.batches.status');
+        Route::post('/aisms/batches/{batch}/dispose', [AISMSController::class, 'dispose'])->name('modules.aisms.batches.dispose');
+        Route::post('/aisms/locations', [AISMSController::class, 'storeLocation'])->name('modules.aisms.locations.store');
+        Route::post('/aisms/suppliers', [AISMSController::class, 'storeSupplier'])->name('modules.aisms.suppliers.store');
         Route::get('/aisms/export', [AISMSController::class, 'export'])->name('modules.aisms.export');
 
         Route::get('/aasms', [AASMSController::class, 'index'])->name('modules.aasms.dashboard');

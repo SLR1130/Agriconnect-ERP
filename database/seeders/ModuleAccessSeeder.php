@@ -15,7 +15,7 @@ class ModuleAccessSeeder extends Seeder
             'municipal_agriculturist' => ['view', 'create', 'update'],
             // The default local assignment is AISMS only. Additional module
             // assignments must be explicitly reviewed and added by an admin.
-            'module_personnel' => ['view', 'create', 'update', 'receive', 'release', 'adjust'],
+            'module_personnel' => ['view', 'create', 'update', 'receive', 'release', 'transfer', 'adjust'],
             'authorized_viewer' => ['view'],
         ];
 

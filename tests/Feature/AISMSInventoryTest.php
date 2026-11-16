@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\InventoryLocation;
+use App\Models\ProcurementSupplier;
 use App\Models\Role;
 use App\Models\SupplyBatch;
 use App\Models\SupplyCategory;
@@ -10,7 +11,10 @@ use App\Models\SupplyItem;
 use App\Models\UnitOfMeasurement;
 use App\Models\User;
 use App\Services\InventoryService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -87,6 +91,172 @@ class AISMSInventoryTest extends TestCase
             'idempotency_key' => 'adjust-basic',
         ], $data['user']->id);
         $this->assertSame('9.00', (string) $batch->fresh()->quantity_available);
+    }
+
+    public function test_receipt_preserves_shared_supplier_lot_dates_and_unit_cost(): void
+    {
+        $data = $this->setupInventory();
+        $supplier = ProcurementSupplier::create(['name' => 'Regional Seed Cooperative', 'is_active' => true]);
+
+        app(InventoryService::class)->receive([
+            'supply_item_id' => $data['item']->id,
+            'location_id' => $data['location']->id,
+            'supplier_id' => $supplier->id,
+            'batch_number' => 'TRACE-1',
+            'received_on' => today()->toDateString(),
+            'manufactured_on' => today()->subMonth()->toDateString(),
+            'expires_on' => today()->addYear()->toDateString(),
+            'quantity' => 10,
+            'unit_cost' => '82.50',
+            'idempotency_key' => 'traceable-receipt',
+        ], $data['user']->id);
+
+        $batch = SupplyBatch::query()->where('batch_number', 'TRACE-1')->firstOrFail();
+        $this->assertSame($supplier->id, $batch->supplier_id);
+        $this->assertSame('82.50', (string) $batch->unit_cost);
+        $this->assertSame(today()->subMonth()->toDateString(), $batch->manufactured_on?->toDateString());
+    }
+
+    public function test_transfer_moves_one_lot_between_locations_once(): void
+    {
+        $data = $this->setupInventory();
+        $destination = InventoryLocation::create(['name' => 'East Warehouse', 'is_active' => true]);
+        $source = $this->receiveBatch($data, 'MOVE-1', 10);
+        $payload = [
+            'supply_batch_id' => $source->id,
+            'destination_location_id' => $destination->id,
+            'quantity' => '3.25',
+            'idempotency_key' => 'transfer-move-1',
+            'notes' => 'Rebalance storage capacity.',
+        ];
+
+        $first = app(InventoryService::class)->transfer($payload, $data['user']->id);
+        $retry = app(InventoryService::class)->transfer($payload, $data['user']->id);
+
+        $target = SupplyBatch::query()->where('location_id', $destination->id)->where('batch_number', 'MOVE-1')->firstOrFail();
+        $this->assertSame($first->id, $retry->id);
+        $this->assertSame('6.75', (string) $source->fresh()->quantity_available);
+        $this->assertSame('3.25', (string) $target->quantity_available);
+        $this->assertSame('10.00', number_format((float) SupplyBatch::sum('quantity_available'), 2, '.', ''));
+        $this->assertDatabaseHas('inventory_movements', [
+            'id' => $first->id,
+            'movement_type' => 'transfer',
+            'supply_batch_id' => $source->id,
+            'related_batch_id' => $target->id,
+            'idempotency_key' => 'transfer-move-1',
+        ]);
+    }
+
+    public function test_quarantined_or_expired_lots_cannot_be_transferred(): void
+    {
+        $data = $this->setupInventory();
+        $destination = InventoryLocation::create(['name' => 'North Warehouse', 'is_active' => true]);
+        $batch = $this->receiveBatch($data, 'HELD-1', 4);
+        $batch->update(['status' => 'quarantined']);
+
+        $this->expectException(ValidationException::class);
+        app(InventoryService::class)->transfer([
+            'supply_batch_id' => $batch->id,
+            'destination_location_id' => $destination->id,
+            'quantity' => 1,
+            'idempotency_key' => 'held-transfer',
+        ], $data['user']->id);
+    }
+
+    public function test_disposal_zeros_the_batch_and_is_idempotent(): void
+    {
+        $data = $this->setupInventory();
+        $batch = $this->receiveBatch($data, 'DISPOSE-1', 2.5);
+        $payload = [
+            'supply_batch_id' => $batch->id,
+            'reason' => 'Packaging contaminated during inspection',
+            'idempotency_key' => 'dispose-1',
+        ];
+
+        $first = app(InventoryService::class)->dispose($payload, $data['user']->id);
+        $retry = app(InventoryService::class)->dispose($payload, $data['user']->id);
+
+        $this->assertSame($first->id, $retry->id);
+        $this->assertSame('0.00', (string) $batch->fresh()->quantity_available);
+        $this->assertSame('disposed', $batch->fresh()->status);
+        $this->assertSame('-2.50', (string) $first->quantity);
+        $this->assertSame('Disposal: Packaging contaminated during inspection', $first->adjustment_reason);
+    }
+
+    public function test_standalone_import_command_consolidates_current_lot_balance(): void
+    {
+        $data = $this->setupInventory();
+        config(['database.connections.aisms_legacy' => [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ]]);
+        DB::purge('aisms_legacy');
+        $schema = Schema::connection('aisms_legacy');
+        $schema->create('warehouses', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->string('code');
+            $table->string('name');
+            $table->string('location')->nullable();
+            $table->boolean('is_active');
+            $table->timestamps();
+        });
+        $schema->create('products', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->string('sku');
+            $table->string('name');
+            $table->string('category');
+            $table->string('unit');
+            $table->decimal('reorder_level', 14, 3);
+            $table->boolean('is_active');
+            $table->timestamps();
+        });
+        $schema->create('suppliers', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->string('code');
+            $table->string('name');
+            $table->string('contact_person')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('email')->nullable();
+            $table->string('address')->nullable();
+            $table->boolean('is_active');
+            $table->timestamps();
+        });
+        $schema->create('inventory_batches', function (Blueprint $table): void {
+            $table->id();
+            $table->string('uuid');
+            $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('warehouse_id');
+            $table->unsignedBigInteger('supplier_id')->nullable();
+            $table->string('lot_number');
+            $table->date('manufactured_at')->nullable();
+            $table->date('expires_at')->nullable();
+            $table->date('received_at')->nullable();
+            $table->decimal('quantity', 14, 3);
+            $table->decimal('unit_cost', 14, 2)->nullable();
+            $table->string('status');
+            $table->string('source_reference')->nullable();
+            $table->timestamps();
+        });
+
+        $legacy = DB::connection('aisms_legacy');
+        $now = now();
+        $legacy->table('warehouses')->insert(['id' => 1, 'uuid' => 'legacy-wh', 'code' => 'LEG-WH', 'name' => 'Legacy Warehouse', 'location' => 'North compound', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
+        $legacy->table('products')->insert(['id' => 1, 'uuid' => 'legacy-product', 'sku' => 'LEG-SEED', 'name' => 'Legacy seed', 'category' => 'Seeds', 'unit' => 'kg', 'reorder_level' => 3, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
+        $legacy->table('suppliers')->insert(['id' => 1, 'uuid' => 'legacy-supplier', 'code' => 'LEG-SUP', 'name' => 'Legacy Supplier', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
+        $legacy->table('inventory_batches')->insert(['id' => 1, 'uuid' => 'legacy-batch-uuid', 'product_id' => 1, 'warehouse_id' => 1, 'supplier_id' => 1, 'lot_number' => 'LEG-LOT', 'received_at' => today()->toDateString(), 'quantity' => 7.5, 'unit_cost' => 25, 'status' => 'active', 'source_reference' => 'OLD-RCV-1', 'created_at' => $now, 'updated_at' => $now]);
+
+        $this->artisan('aisms:import-standalone', ['--user' => $data['user']->id, '--commit' => true])->assertSuccessful();
+
+        $item = SupplyItem::query()->where('code', 'LEG-SEED')->firstOrFail();
+        $batch = SupplyBatch::query()->where('supply_item_id', $item->id)->where('batch_number', 'LEG-LOT')->firstOrFail();
+        $this->assertSame('7.50', (string) $batch->quantity_available);
+        $this->assertSame('25.00', (string) $batch->unit_cost);
+        $this->assertDatabaseHas('inventory_movements', ['supply_batch_id' => $batch->id, 'idempotency_key' => 'legacy-aisms-legacy-batch-uuid']);
     }
 
     public function test_insufficient_and_expired_releases_are_rejected(): void
@@ -300,11 +470,13 @@ class AISMSInventoryTest extends TestCase
             ->assertSee('data-aisms-open-form="receive-stock"', false)
             ->assertSee('data-aisms-form="receive"', false)
             ->assertSee('data-aisms-form="release"', false)
+            ->assertSee('data-aisms-form="transfer"', false)
             ->assertSee('data-aisms-form="adjust"', false)
             ->assertSee('data-aisms-form="item"', false)
             ->assertDontSee('data-aisms-form="receive" open', false)
             ->assertSee(route('modules.aisms.receipts.store'), false)
             ->assertSee(route('modules.aisms.releases.store'), false)
+            ->assertSee(route('modules.aisms.transfers.store'), false)
             ->assertSee(route('modules.aisms.adjustments.store'), false)
             ->assertSee(route('modules.aisms.items.store'), false);
 

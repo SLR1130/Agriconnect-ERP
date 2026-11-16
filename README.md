@@ -123,6 +123,19 @@ agriconnect-erp/
 
 ## Module Development Guidelines
 
+### AISMS consolidation
+
+The ERP-embedded AISMS is the authoritative inventory ledger. It includes traceable receipts (supplier, lot dates, and unit cost), releases, warehouse transfers, quantity adjustments, quarantine/disposal controls, live low-stock and expiry monitoring, CSV history, and consolidated ERP reports. AASMS distributions and ABPMS physical receipts use the same `InventoryService`, `supply_batches`, and `inventory_movements`; do not run a second synchronized inventory database in parallel.
+
+To consolidate an existing standalone AISMS installation, configure the read-only `AISMS_LEGACY_DB_*` values in `.env`, then review a dry run before committing:
+
+```bash
+php artisan aisms:import-standalone
+php artisan aisms:import-standalone --user=<active-erp-user-id> --commit
+```
+
+The importer copies the catalog and current lot balances, creates traceable ERP opening-receipt records, skips any lot already present, and never writes to the legacy database. Keep the legacy database read-only for its historical transaction detail after sign-off.
+
 ### For Module Developers
 
 Each agricultural module is developed independently within the `app/Modules/` directory:
