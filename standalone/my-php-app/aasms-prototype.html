@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriConnect | Agricultural Assistance & Subsidy Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>/* =========================================================
+   AgriConnect AASMS – Design System
+   Color Palette: Forest Green, Emerald, Harvest Gold, Mint, Ivory
+   Fonts: Poppins (headings) · Inter (body)
+   ========================================================= */
+
+:root {
+  --forest:   #164A35;
+  --deep:     #073f30;
+  --emerald:  #27845B;
+  --gold:     #E6B54B;
+  --gold-bg:  #FDF3DC;
+  --mint:     #E5F1E9;
+  --ivory:    #F7F9F5;
+  --ink:      #263A31;
+  --muted:    #6B7F74;
+  --line:     #E2EBE4;
+  --white:    #FFFFFF;
+  --red:      #D94F3D;
+  --red-bg:   #FDECEA;
+  --teal:     #2A8E8E;
+  --teal-bg:  #E0F4F4;
+  --sidebar-w: 256px;
+  --topbar-h:  66px;
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 4px rgba(22,74,53,.06);
+  --shadow:    0 4px 18px rgba(22,74,53,.09);
+  --shadow-lg: 0 8px 32px rgba(22,74,53,.13);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  background: var(--ivory);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+}
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; border: none; background: none; }
+a { text-decoration: none; }
+img { display: block; max-width: 100%; }
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+aside#sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: linear-gradient(175deg, var(--forest) 0%, #0a3d28 100%);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+aside#sidebar::-webkit-scrollbar { width: 0; }
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.brand-icon {
+  width: 42px; height: 42px;
+  background: rgba(230,181,75,.15);
+  border-radius: 12px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.brand-name {
+  display: block;
+  font-family: 'Poppins', sans-serif;
+  font-size: 15.5px; font-weight: 700;
+  color: #fff;
+  letter-spacing: -.3px;
+}
+.brand-sub {
+  display: block;
+  font-size: 11px; color: #9dc4b0;
+  margin-top: 1px;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  color: #7aaa93;
+  padding: 20px 20px 8px;
+  font-weight: 600;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 16px);
+  margin: 2px 8px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  color: #c5dfd4;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: background .18s, color .18s;
+  text-align: left;
+}
+.nav-icon {
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  opacity: .85;
+}
+.nav:hover { background: rgba(255,255,255,.07); color: #fff; }
+.nav.active {
+  background: var(--emerald);
+  color: #fff;
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+.nav.active .nav-icon { opacity: 1; }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 14px 20px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.office-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.office-avatar {
+  width: 36px; height: 36px;
+  background: var(--emerald);
+  border-radius: 10px;
+  display: grid; place-items: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px; font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.office-name { font-size: 12.5px; font-weight: 600; color: #dff0e8; }
+.office-role { font-size: 11px; color: #7aaa93; margin-top: 1px; }
+
+/* =========================================================
+   APP BODY & TOPBAR
+   ========================================================= */
+.app-body {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-width: 0;
+  transition: margin-left .28s cubic-bezier(.4,0,.2,1);
+}
+
+.topbar {
+  height: var(--topbar-h);
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 26px;
+  position: sticky;
+  top: 0; z-index: 50;
+  gap: 16px;
+}
+.topbar-left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+.topbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.sidebar-toggle {
+  display: none;
+  padding: 7px;
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+}
+.sidebar-toggle:hover { background: var(--mint); }
+
+.topbar-search-wrap {
+  position: relative;
+  flex: 1; max-width: 420px;
+}
+.search-icon {
+  position: absolute;
+  left: 13px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.topbar-search {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  padding: 10px 14px 10px 38px;
+  background: var(--ivory);
+  color: var(--ink);
+  outline: none;
+  font-size: 13px;
+  transition: border-color .18s, background .18s;
+}
+.topbar-search:focus { border-color: var(--emerald); background: var(--white); }
+
+.icon-btn {
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  position: relative;
+  transition: background .15s;
+}
+.icon-btn:hover { background: var(--mint); color: var(--forest); }
+.notif-dot {
+  position: absolute;
+  top: 7px; right: 7px;
+  width: 8px; height: 8px;
+  background: var(--gold);
+  border-radius: 50%;
+  border: 2px solid var(--white);
+}
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 30px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background .15s;
+}
+.user-chip:hover { background: var(--mint); }
+.user-avatar {
+  width: 28px; height: 28px;
+  background: var(--forest);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 700;
+  color: #fff;
+}
+.user-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+
+/* =========================================================
+   MAIN CONTENT AREA
+   ========================================================= */
+main#main {
+  padding: 28px 28px 24px;
+  flex: 1;
+}
+
+/* PAGE HEADER */
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+}
+.page-head-text h2 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 24px; font-weight: 700;
+  color: var(--deep);
+  letter-spacing: -.5px;
+}
+.page-head-text p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.page-head-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* BREADCRUMB */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.breadcrumb span { color: var(--emerald); font-weight: 600; }
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  font-size: 13px; font-weight: 600;
+  transition: filter .15s, box-shadow .15s;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--emerald); color: #fff; box-shadow: 0 2px 8px rgba(39,132,91,.2); }
+.btn-primary:hover { filter: brightness(.93); }
+.btn-secondary { background: var(--white); color: var(--forest); border: 1px solid var(--line); }
+.btn-secondary:hover { background: var(--mint); }
+.btn-gold { background: var(--gold); color: #4d3b11; }
+.btn-gold:hover { filter: brightness(.95); }
+.btn-sm { padding: 7px 12px; font-size: 12px; }
+.btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid #f5c7c1; }
+.btn-danger:hover { background: #fad5d0; }
+
+/* =========================================================
+   STAT CARDS
+   ========================================================= */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.stat-card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s;
+}
+.stat-card:hover { box-shadow: var(--shadow); }
+.stat-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.stat-label { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.stat-icon-wrap {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.stat-icon-wrap.green  { background: var(--mint); color: var(--emerald); }
+.stat-icon-wrap.gold   { background: var(--gold-bg); color: #a07825; }
+.stat-icon-wrap.teal   { background: var(--teal-bg); color: var(--teal); }
+.stat-icon-wrap.red    { background: var(--red-bg); color: var(--red); }
+.stat-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 28px; font-weight: 700;
+  color: var(--deep);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.stat-trend {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.stat-trend.up { color: var(--emerald); }
+.stat-trend.neutral { color: var(--muted); }
+.stat-trend.down { color: var(--red); }
+
+/* =========================================================
+   PANELS / CARDS
+   ========================================================= */
+.panel {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 0;
+}
+.panel-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14.5px; font-weight: 700;
+  color: var(--deep);
+}
+.panel-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.panel-body { padding: 18px 22px 22px; }
+.panel-body-flush { padding: 0; }
+
+.grid-2 { display: grid; grid-template-columns: 1.45fr 1fr; gap: 18px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+
+/* =========================================================
+   CHARTS
+   ========================================================= */
+.chart-wrap { position: relative; height: 220px; }
+.chart-legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.legend-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+/* Donut chart area */
+.donut-section {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 0 4px;
+}
+.donut-chart-wrap { position: relative; width: 160px; height: 160px; flex-shrink: 0; }
+.donut-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+.donut-center-val {
+  font-family: 'Poppins', sans-serif;
+  font-size: 20px; font-weight: 700;
+  color: var(--deep); display: block;
+}
+.donut-center-lbl { font-size: 10px; color: var(--muted); }
+.donut-legend { flex: 1; min-width: 0; }
+.donut-legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.donut-legend-row:last-child { border-bottom: none; }
+.donut-legend-row .dl-label { color: var(--muted); display: flex; align-items: center; gap: 7px; }
+.donut-legend-row .dl-val { font-weight: 700; color: var(--ink); }
+
+/* =========================================================
+   TABLES
+   ========================================================= */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.table-scroll { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 700px;
+}
+thead th {
+  background: #F2F7F4;
+  color: var(--forest);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: .3px;
+  text-align: left;
+  padding: 12px 16px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+tbody td {
+  padding: 13px 16px;
+  border-bottom: 1px solid #F0F4F1;
+  vertical-align: middle;
+  color: var(--ink);
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #FAFCFA; }
+
+.farmer-name { font-weight: 600; color: var(--deep); }
+.farmer-barangay { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+/* PILLS / STATUS BADGES */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 5px;
+  white-space: nowrap;
+}
+.pill::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pill-pending     { background: #FFF4D6; color: #7A5500; }
+.pill-pending::before { background: #E6B54B; }
+.pill-review      { background: #E8F0FE; color: #1A56A8; }
+.pill-review::before { background: #3B82F6; }
+.pill-verified    { background: var(--teal-bg); color: #1A6E6E; }
+.pill-verified::before { background: var(--teal); }
+.pill-approved    { background: var(--mint); color: #0F5C37; }
+.pill-approved::before { background: var(--emerald); }
+.pill-distributed { background: #EAFAF0; color: #0D5430; }
+.pill-distributed::before { background: #18A45A; }
+.pill-rejected    { background: var(--red-bg); color: #9D352E; }
+.pill-rejected::before { background: var(--red); }
+
+/* SEARCH / FILTER FIELDS */
+.field {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  background: var(--white);
+  color: var(--ink);
+  outline: none;
+  font-size: 13px;
+  transition: border-color .15s;
+}
+.field:focus { border-color: var(--emerald); }
+.search-field { min-width: 220px; }
+.filter-select { min-width: 155px; }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--muted);
+}
+.empty-state svg { margin: 0 auto 12px; opacity: .35; }
+.empty-state p { font-size: 13.5px; }
+
+/* =========================================================
+   FORMS
+   ========================================================= */
+.form-section-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px; font-weight: 700;
+  color: var(--forest);
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.form-grid-2 { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.form-grid-3 { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1/-1; }
+label.form-label { font-size: 12px; font-weight: 700; color: #4E6055; }
+.form-input {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--white);
+  color: var(--ink);
+  outline: none;
+  transition: border-color .15s;
+  font-size: 13.5px;
+}
+.form-input:focus { border-color: var(--emerald); box-shadow: 0 0 0 3px rgba(39,132,91,.1); }
+textarea.form-input { min-height: 88px; resize: vertical; }
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+/* =========================================================
+   NOTICE / ALERT BANNERS
+   ========================================================= */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  margin-bottom: 18px;
+  line-height: 1.55;
+}
+.notice-info  { background: var(--mint); color: var(--forest); border-left: 3px solid var(--emerald); }
+.notice-warn  { background: var(--gold-bg); color: #5a3d00; border-left: 3px solid var(--gold); }
+.notice-error { background: var(--red-bg); color: var(--red); border-left: 3px solid var(--red); }
+
+/* =========================================================
+   PROGRAM CARDS
+   ========================================================= */
+.program-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-bottom: 24px; }
+.program-card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s, transform .2s;
+}
+.program-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+.program-card-icon {
+  width: 44px; height: 44px;
+  border-radius: 13px;
+  display: grid; place-items: center;
+  margin-bottom: 14px;
+}
+.program-card h3 { font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 700; color: var(--deep); margin-bottom: 7px; }
+.program-card p  { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+.program-card-stats { display: flex; gap: 14px; flex-wrap: wrap; }
+.program-stat { display: flex; flex-direction: column; }
+.program-stat-val { font-family: 'Poppins', sans-serif; font-size: 18px; font-weight: 700; color: var(--deep); }
+.program-stat-lbl { font-size: 11px; color: var(--muted); }
+.program-bar { height: 5px; border-radius: 99px; background: var(--line); margin-top: 12px; overflow: hidden; }
+.program-bar-fill { height: 100%; border-radius: 99px; }
+
+/* =========================================================
+   RECENT ACTIVITY
+   ========================================================= */
+.activity-list { list-style: none; }
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.activity-text { flex: 1; font-size: 13px; color: var(--ink); }
+.activity-text strong { color: var(--deep); }
+.activity-meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(6,30,20,.45);
+  backdrop-filter: blur(2px);
+  z-index: 200;
+  display: grid; place-items: center;
+  padding: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%; max-width: 640px;
+  max-height: 92vh;
+  overflow-y: auto;
+  transform: translateY(16px);
+  transition: transform .22s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+  margin-bottom: 18px;
+}
+.modal-title { font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 700; color: var(--deep); }
+.modal-close {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  color: var(--muted);
+  transition: background .15s;
+}
+.modal-close:hover { background: var(--mint); color: var(--forest); }
+.modal-body { padding: 0 24px 24px; }
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+.footer {
+  text-align: center;
+  padding: 16px 24px;
+  font-size: 11.5px;
+  color: #8EA496;
+  border-top: 1px solid var(--line);
+  background: var(--white);
+}
+
+/* =========================================================
+   TOAST
+   ========================================================= */
+.toast {
+  position: fixed;
+  bottom: 26px; right: 26px;
+  background: var(--deep);
+  color: #fff;
+  padding: 13px 18px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  font-size: 13.5px; font-weight: 500;
+  z-index: 999;
+  display: none;
+  max-width: 340px;
+  animation: slideUp .22s ease-out;
+}
+@keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* =========================================================
+   DIVIDERS / UTILS
+   ========================================================= */
+.divider { height: 1px; background: var(--line); margin: 18px 0; }
+.mb-4  { margin-bottom: 4px; }
+.mb-8  { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+.hidden { display: none !important; }
+.text-muted { color: var(--muted); font-size: 12.5px; }
+.text-emerald { color: var(--emerald); font-weight: 600; }
+.text-gold    { color: #a07825; font-weight: 600; }
+.text-red     { color: var(--red); font-weight: 600; }
+.fw-600 { font-weight: 600; }
+.fw-700 { font-weight: 700; }
+
+/* =========================================================
+   SETTINGS PAGE
+   ========================================================= */
+.settings-section { margin-bottom: 20px; }
+.settings-label {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* =========================================================
+   RECORD DETAIL VIEW
+   ========================================================= */
+.record-meta {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  background: var(--ivory);
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+.record-meta-item { display: flex; flex-direction: column; gap: 3px; }
+.record-meta-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.record-meta-val { font-size: 14px; font-weight: 600; color: var(--deep); }
+
+.timeline { list-style: none; padding-left: 2px; }
+.timeline-item {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 18px;
+  position: relative;
+}
+.timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 14px; top: 28px;
+  width: 1px; height: calc(100% - 10px);
+  background: var(--line);
+}
+.timeline-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.timeline-text { font-size: 13px; color: var(--ink); padding-top: 5px; }
+.timeline-time { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 1100px) {
+  .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .grid-2     { grid-template-columns: 1fr; }
+  .program-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 900px) {
+  :root { --sidebar-w: 0px; }
+  aside#sidebar {
+    transform: translateX(-256px);
+    width: 256px;
+    box-shadow: var(--shadow-lg);
+  }
+  aside#sidebar.open { transform: translateX(0); }
+  .app-body { margin-left: 0; }
+  .sidebar-toggle { display: grid; }
+  .topbar { padding: 0 16px; }
+  main#main { padding: 18px 16px; }
+}
+
+@media (max-width: 640px) {
+  .stats-grid { grid-template-columns: 1fr; gap: 10px; }
+  .program-grid { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .form-grid-2 { grid-template-columns: 1fr; }
+  .form-grid-3 { grid-template-columns: 1fr; }
+  .page-head { flex-direction: column; }
+  .topbar-search-wrap { max-width: 180px; }
+}
+
+/* =========================================================
+   LOGIN SCREEN
+   ========================================================= */
+.login-screen {
+  min-height: 100vh;
+  background: linear-gradient(145deg, var(--forest) 0%, #0a3d28 60%, #072e1e 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.login-card {
+  background: var(--white);
+  border-radius: 18px;
+  padding: 40px 36px 32px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  text-align: center;
+}
+.login-logo {
+  width: 62px; height: 62px;
+  background: var(--mint);
+  border-radius: 18px;
+  display: grid; place-items: center;
+  margin: 0 auto 16px;
+}
+.login-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 22px; font-weight: 800;
+  color: var(--deep);
+  letter-spacing: -.5px;
+  margin-bottom: 4px;
+}
+.login-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.login-module {
+  font-size: 11.5px;
+  color: var(--emerald);
+  font-weight: 600;
+  margin-bottom: 26px;
+  padding: 6px 12px;
+  background: var(--mint);
+  border-radius: 20px;
+  display: inline-block;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  margin-bottom: 18px;
+}
+.login-error {
+  background: var(--red-bg);
+  color: var(--red);
+  font-size: 12.5px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  text-align: center;
+}
+.login-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+.login-footer {
+  margin-top: 28px;
+  font-size: 11.5px;
+  color: rgba(255,255,255,.4);
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M16 3C9.373 3 4 8.373 4 15c0 4.418 2.239 8.315 5.636 10.636L16 29l6.364-3.364C25.761 23.315 28 19.418 28 15c0-6.627-5.373-12-12-12z" fill="#E6B54B" opacity=".9"/><path d="M16 8v14M10 12l6 3 6-3" stroke="#164A35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h1 class="login-title">AgriConnect</h1>
+    <p class="login-sub">Bongabong Municipal Agriculture Office</p>
+    <p class="login-module">Agricultural Assistance & Subsidy Management System</p>
+
+    <form id="loginForm" class="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" id="loginUser" placeholder="Enter username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="loginPass" type="password" placeholder="Enter password" required autocomplete="current-password">
+      </div>
+      <div id="loginError" class="login-error hidden">Incorrect username or password.</div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px">Sign In</button>
+    </form>
+
+    <p class="login-hint">Demo credentials: <strong>admin</strong> / <strong>admin123</strong></p>
+  </div>
+  <div class="login-footer">AgriConnect AASMS · Bongabong MAO · Prototype</div>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="appScreen" class="hidden">
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">
+      <svg width="26" height="26" viewBox="0 0 32 32" fill="none"><path d="M16 3C9.373 3 4 8.373 4 15c0 4.418 2.239 8.315 5.636 10.636L16 29l6.364-3.364C25.761 23.315 28 19.418 28 15c0-6.627-5.373-12-12-12z" fill="#E6B54B" opacity=".85"/><path d="M16 8v14M10 12l6 3 6-3" stroke="#164A35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="brand-text">
+      <span class="brand-name">AgriConnect</span>
+      <span class="brand-sub">Bongabong MAO</span>
+    </div>
+  </div>
+
+  <div class="nav-section-label">ASSISTANCE MANAGEMENT</div>
+  <button class="nav active" data-page="dashboard">
+    <span class="nav-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    </span>
+    Dashboard
+  </button>
+  <button class="nav" data-page="applications">
+    <span class="nav-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </span>
+    Assistance Applications
+  </button>
+  <button class="nav" data-page="beneficiaries">
+    <span class="nav-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </span>
+    Beneficiary Verification
+  </button>
+  <button class="nav" data-page="distribution">
+    <span class="nav-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </span>
+    Subsidy Distribution
+  </button>
+  <button class="nav" data-page="reports">
+    <span class="nav-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    </span>
+    Programs &amp; Reports
+  </button>
+  <button class="nav" data-page="settings">
+    <span class="nav-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </span>
+    Settings
+  </button>
+
+  <div class="sidebar-footer">
+    <div class="office-badge">
+      <div class="office-avatar">MAO</div>
+      <div>
+        <div class="office-name">Bongabong MAO</div>
+        <div class="office-role">Admin User</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<div class="app-body">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="topbar-search-wrap">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="topbar-search" id="globalSearch" placeholder="Search applications, beneficiaries, programs..." aria-label="Search">
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" onclick="showToast('No new notifications.')" aria-label="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="notif-dot"></span>
+      </button>
+      <div class="user-chip" onclick="go('settings')">
+        <div class="user-avatar">A</div>
+        <span class="user-label">Admin</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- PAGE CONTENT -->
+  <main id="main"></main>
+
+  <div class="footer">AgriConnect AASMS · Agricultural Assistance and Subsidy Management System · Bongabong Municipal Agriculture Office · Prototype with sample data</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+</div><!-- end appScreen -->
+
+<script>// ── LOGIN ─────────────────────────────────────────────────
+function handleLogin(e) {
+  e.preventDefault();
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const err  = document.getElementById('loginError');
+  if (user === 'admin' && pass === 'admin123') {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').classList.remove('hidden');
+    render();
+  } else {
+    err.classList.remove('hidden');
+  }
+}
+
+'use strict';
+/* =========================================================
+   AgriConnect AASMS – Application Logic
+   Agricultural Assistance & Subsidy Management System
+   Bongabong Municipal Agriculture Office
+   ========================================================= */
+
+// ── SAMPLE DATA ──────────────────────────────────────────
+const SEED = [
+  {id:'AAS-2026-001',name:'Maria Santos',barangay:'Poblacion',program:'Fertilizer Subsidy',type:'In-Kind',date:'Oct 10, 2026',status:'Under Review',amount:5000,farmerId:'F-1001',contact:'09171234501',notes:'Fertilizer support for rice production. Documents submitted: barangay cert, RSA ID.'},
+  {id:'AAS-2026-002',name:'Juan Dela Cruz',barangay:'Anilao',program:'Rice Seeds Assistance',type:'In-Kind',date:'Oct 09, 2026',status:'Approved',amount:3500,farmerId:'F-1002',contact:'09171234502',notes:'Certified rice seeds for wet season planting.'},
+  {id:'AAS-2026-003',name:'Elena Reyes',barangay:'Lisap',program:'Farm Inputs Support',type:'In-Kind',date:'Oct 08, 2026',status:'Pending',amount:4200,farmerId:'F-1003',contact:'09171234503',notes:'Seeds and farm inputs for vegetable production.'},
+  {id:'AAS-2026-004',name:'Roberto Mendoza',barangay:'Bantawon',program:'Small Farmer Assistance',type:'Cash',date:'Oct 07, 2026',status:'Verified',amount:6000,farmerId:'F-1004',contact:'09171234504',notes:'Small farmer support program beneficiary.'},
+  {id:'AAS-2026-005',name:'Ana Villanueva',barangay:'Dayhagan',program:'Fertilizer Subsidy',type:'In-Kind',date:'Oct 06, 2026',status:'Distributed',amount:5000,farmerId:'F-1005',contact:'09171234505',notes:'Seasonal fertilizer subsidy – 2nd quarter.'},
+  {id:'AAS-2026-006',name:'Pedro Ramos',barangay:'Camantigue',program:'Rice Seeds Assistance',type:'In-Kind',date:'Oct 05, 2026',status:'Rejected',amount:0,farmerId:'F-1006',contact:'09171234506',notes:'Rejected: incomplete supporting documents.'},
+  {id:'AAS-2026-007',name:'Nelia Bautista',barangay:'Bagong Buhay',program:'High-Value Crops Assistance',type:'In-Kind',date:'Oct 04, 2026',status:'Approved',amount:7500,farmerId:'F-1007',contact:'09171234507',notes:'Support for banana and mango farming.'},
+  {id:'AAS-2026-008',name:'Crisanto Flores',barangay:'Formon',program:'Farm Inputs Support',type:'In-Kind',date:'Oct 03, 2026',status:'Distributed',amount:4800,farmerId:'F-1008',contact:'09171234508',notes:'Pesticides and foliar fertilizer.'},
+  {id:'AAS-2026-009',name:'Lourdes Castillo',barangay:'Hagan',program:'Fertilizer Subsidy',type:'In-Kind',date:'Oct 02, 2026',status:'Pending',amount:5000,farmerId:'F-1009',contact:'09171234509',notes:'Application under processing.'},
+  {id:'AAS-2026-010',name:'Danilo Perez',barangay:'Malibo',program:'Small Farmer Assistance',type:'Cash',date:'Oct 01, 2026',status:'Distributed',amount:6000,farmerId:'F-1010',contact:'09171234510',notes:'Cash assistance released via barangay.'},
+  {id:'AAS-2026-011',name:'Salvacion Cruz',barangay:'Morente',program:'Rice Seeds Assistance',type:'In-Kind',date:'Sep 30, 2026',status:'Approved',amount:3500,farmerId:'F-1011',contact:'09171234511',notes:'Awaiting release schedule.'},
+  {id:'AAS-2026-012',name:'Bernardo Oca',barangay:'Pambisan Malaki',program:'High-Value Crops Assistance',type:'In-Kind',date:'Sep 29, 2026',status:'Verified',amount:8000,farmerId:'F-1012',contact:'09171234512',notes:'Cacao and banana planting support.'},
+  {id:'AAS-2026-013',name:'Rosario Dimacali',barangay:'Pambisan Munti',program:'Fertilizer Subsidy',type:'In-Kind',date:'Sep 28, 2026',status:'Distributed',amount:5000,farmerId:'F-1013',contact:'09171234513',notes:'Completed. Reference: DIST-2026-013.'},
+  {id:'AAS-2026-014',name:'Armando Torres',barangay:'Pawid',program:'Farm Inputs Support',type:'In-Kind',date:'Sep 27, 2026',status:'Under Review',amount:4200,farmerId:'F-1014',contact:'09171234514',notes:'Documents under verification.'},
+  {id:'AAS-2026-015',name:'Gloria Manalo',barangay:'Poypoy',program:'Fertilizer Subsidy',type:'In-Kind',date:'Sep 26, 2026',status:'Pending',amount:5000,farmerId:'F-1015',contact:'09171234515',notes:'New application.'},
+  {id:'AAS-2026-016',name:'Teofilo Guinto',barangay:'Tiguion',program:'Small Farmer Assistance',type:'Cash',date:'Sep 25, 2026',status:'Approved',amount:6000,farmerId:'F-1016',contact:'09171234516',notes:'Approved – awaiting distribution.'},
+  {id:'AAS-2026-017',name:'Violeta Aquino',barangay:'Tubuan',program:'High-Value Crops Assistance',type:'In-Kind',date:'Sep 24, 2026',status:'Rejected',amount:0,farmerId:'F-1017',contact:'09171234517',notes:'Rejected: does not meet eligibility criteria.'},
+  {id:'AAS-2026-018',name:'Ernesto Bondoc',barangay:'Usab',program:'Farm Inputs Support',type:'In-Kind',date:'Sep 23, 2026',status:'Distributed',amount:4200,farmerId:'F-1018',contact:'09171234518',notes:'Distributed successfully.'},
+];
+
+const PROGRAMS = ['Fertilizer Subsidy','Rice Seeds Assistance','Farm Inputs Support','Small Farmer Assistance','High-Value Crops Assistance','Equipment Support','Other Agricultural Assistance'];
+const STATUSES = ['Pending','Under Review','Verified','Approved','Distributed','Rejected'];
+const BARANGAYS = ['Anilao','Bagong Buhay','Bantawon','Banus','Buli','Camantigue','Campaasan','Dayhagan','Formon','Hagan','Labasan','Lisap','Malibo','Morente','Pambisan Malaki','Pambisan Munti','Pawid','Poblacion','Poypoy','Tiguion','Tubuan','Usab'];
+
+// ── STATE ────────────────────────────────────────────────
+let records = JSON.parse(localStorage.getItem('aasms_v2') || 'null') || SEED.map(x => ({...x}));
+let currentPage = 'dashboard';
+let chartInstances = {};
+
+// ── UTILS ─────────────────────────────────────────────────
+const money = n => '₱' + Number(n || 0).toLocaleString('en-PH');
+const save = () => localStorage.setItem('aasms_v2', JSON.stringify(records));
+
+function statusPill(s) {
+  const map = {
+    'Pending': 'pending', 'Under Review': 'review',
+    'Verified': 'verified', 'Approved': 'approved',
+    'Distributed': 'distributed', 'Rejected': 'rejected'
+  };
+  return `<span class="pill pill-${map[s] || 'pending'}">${s}</span>`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(window._toast);
+  window._toast = setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+function destroyCharts() {
+  Object.values(chartInstances).forEach(c => { try { c.destroy(); } catch(e) {} });
+  chartInstances = {};
+}
+
+// ── NAVIGATION ────────────────────────────────────────────
+function go(p) {
+  currentPage = p;
+  destroyCharts();
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('active', b.dataset.page === p));
+  // close sidebar on mobile
+  document.getElementById('sidebar').classList.remove('open');
+  render();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+document.querySelectorAll('.nav').forEach(b => b.addEventListener('click', () => go(b.dataset.page)));
+
+// ── SVG ICONS ─────────────────────────────────────────────
+const icons = {
+  apps:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+  user:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  cash:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  chart:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  check:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  clock:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  plus:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  export: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  info:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  trash:  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
+};
+
+// ── PAGE HEADER ───────────────────────────────────────────
+function pageHeader(title, subtitle, actions = '') {
+  return `<div class="page-head">
+    <div class="page-head-text">
+      <h2>${title}</h2>
+      <p>${subtitle}</p>
+    </div>
+    <div class="page-head-actions">${actions}</div>
+  </div>`;
+}
+
+// ── STAT CARD ────────────────────────────────────────────
+function statCard(label, value, iconHtml, trend, trendClass, colorClass) {
+  return `<div class="stat-card">
+    <div class="stat-card-top">
+      <span class="stat-label">${label}</span>
+      <div class="stat-icon-wrap ${colorClass}">${iconHtml}</div>
+    </div>
+    <div class="stat-value">${value}</div>
+    <div class="stat-trend ${trendClass}">${trend}</div>
+  </div>`;
+}
+
+// ── TABLE ROWS ────────────────────────────────────────────
+function buildRows(list) {
+  if (!list.length) return `<tr><td colspan="7">
+    <div class="empty-state">
+      ${icons.apps}
+      <p>No matching records found.</p>
+    </div>
+  </td></tr>`;
+  return list.map(r => `<tr>
+    <td><span class="fw-600" style="color:var(--emerald)">${r.id}</span></td>
+    <td>
+      <div class="farmer-name">${r.name}</div>
+      <div class="farmer-barangay">${r.barangay}</div>
+    </td>
+    <td>${r.program}</td>
+    <td>${r.date}</td>
+    <td class="fw-600">${r.amount ? money(r.amount) : '—'}</td>
+    <td>${statusPill(r.status)}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick="viewRecord('${r.id}')">Manage</button>
+    </td>
+  </tr>`).join('');
+}
+
+function buildTable(list, title = 'Assistance Records') {
+  return `<div class="panel" style="margin-bottom:0">
+    <div class="table-toolbar">
+      <span class="panel-title">${title}</span>
+      <div style="flex:1"></div>
+      <button class="btn btn-secondary btn-sm" onclick="exportCSV()">${icons.export} Export CSV</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Application ID</th>
+          <th>Farmer / Barangay</th>
+          <th>Program</th>
+          <th>Date Filed</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr></thead>
+        <tbody>${buildRows(list)}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ── DASHBOARD PAGE ────────────────────────────────────────
+function pageDashboard() {
+  const pending = records.filter(r => ['Pending','Under Review'].includes(r.status)).length;
+  const verified = records.filter(r => ['Verified','Approved'].includes(r.status)).length;
+  const distributed = records.filter(r => r.status === 'Distributed');
+  const distTotal = distributed.reduce((s, r) => s + r.amount, 0);
+  const total = records.length;
+
+  const recentActivities = [...records].sort((a,b) => b.id.localeCompare(a.id)).slice(0,5);
+
+  const activityDotColor = s => ({
+    'Pending':'#E6B54B','Under Review':'#3B82F6','Verified':'#2A8E8E',
+    'Approved':'#27845B','Distributed':'#18A45A','Rejected':'#D94F3D'
+  }[s] || '#ccc');
+
+  return `
+  ${pageHeader('Assistance & Subsidy Dashboard', 'Agricultural assistance program overview for Bongabong MAO')}
+
+  <div class="stats-grid">
+    ${statCard('Total Applications', total, icons.apps, `${total} total records`, 'neutral', 'green')}
+    ${statCard('Pending Evaluation', pending, icons.clock, 'Awaiting office review', 'neutral', 'gold')}
+    ${statCard('Verified / Approved', verified, icons.check, 'Ready or awaiting release', 'up', 'teal')}
+    ${statCard('Total Distributed', money(distTotal), icons.cash, `${distributed.length} completed releases`, 'up', 'green')}
+  </div>
+
+  <div class="grid-2 mb-20">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Monthly Application Trend</div>
+          <div class="panel-subtitle">Applications filed per month (2026)</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+        <div class="chart-legend">
+          <span><i class="legend-dot" style="background:#27845B"></i>Applications</span>
+          <span><i class="legend-dot" style="background:#E6B54B"></i>Distributed Amount</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Applications by Status</div>
+          <div class="panel-subtitle">Current distribution</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="donut-section">
+          <div class="donut-chart-wrap">
+            <canvas id="donutChart"></canvas>
+            <div class="donut-center">
+              <span class="donut-center-val">${total}</span>
+              <span class="donut-center-lbl">Total</span>
+            </div>
+          </div>
+          <div class="donut-legend">
+            ${STATUSES.map(s => {
+              const c = records.filter(r => r.status === s).length;
+              return `<div class="donut-legend-row">
+                <span class="dl-label"><i class="legend-dot" style="background:${activityDotColor(s)}"></i>${s}</span>
+                <span class="dl-val">${c}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Recent Assistance Requests</div>
+        <button class="btn btn-secondary btn-sm" onclick="go('applications')">View All</button>
+      </div>
+      <div class="panel-body-flush">
+        <div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Farmer</th><th>Program</th><th>Status</th>
+            </tr></thead>
+            <tbody>${recentActivities.map(r => `<tr>
+              <td><span style="color:var(--emerald);font-weight:600">${r.id}</span></td>
+              <td><div class="farmer-name">${r.name}</div><div class="farmer-barangay">${r.barangay}</div></td>
+              <td style="font-size:12px">${r.program}</td>
+              <td>${statusPill(r.status)}</td>
+            </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Program Summary</div>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap" style="height:200px"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function initDashboardCharts() {
+  // Line chart
+  const lCtx = document.getElementById('lineChart');
+  if (lCtx) {
+    chartInstances.line = new Chart(lCtx, {
+      type: 'line',
+      data: {
+        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'],
+        datasets: [
+          { label: 'Applications', data: [8,12,10,15,14,18,20,16,22,18],
+            borderColor: '#27845B', backgroundColor: 'rgba(39,132,91,.1)',
+            fill: true, tension: .4, pointRadius: 4, pointBackgroundColor: '#27845B' },
+          { label: 'Distributed (₱ thousands)', data: [3,6,5,9,8,10,12,9,14,11],
+            borderColor: '#E6B54B', backgroundColor: 'rgba(230,181,75,.08)',
+            fill: true, tension: .4, pointRadius: 4, pointBackgroundColor: '#E6B54B' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: '#E2EBE4' }, ticks: { font: { size: 11 } } },
+                  x: { grid: { display: false }, ticks: { font: { size: 11 } } } }
+      }
+    });
+  }
+
+  // Donut chart
+  const dCtx = document.getElementById('donutChart');
+  if (dCtx) {
+    const counts = STATUSES.map(s => records.filter(r => r.status === s).length);
+    chartInstances.donut = new Chart(dCtx, {
+      type: 'doughnut',
+      data: {
+        labels: STATUSES,
+        datasets: [{ data: counts,
+          backgroundColor: ['#E6B54B','#3B82F6','#2A8E8E','#27845B','#18A45A','#D94F3D'],
+          borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '68%',
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: ctx => ` ${ctx.label}: ${ctx.parsed}`
+        }}}
+      }
+    });
+  }
+
+  // Bar chart
+  const bCtx = document.getElementById('barChart');
+  if (bCtx) {
+    const progNames = PROGRAMS.slice(0,5).map(p => p.replace(' Assistance','').replace(' Subsidy',''));
+    const progCounts = PROGRAMS.slice(0,5).map(p => records.filter(r => r.program === p).length);
+    chartInstances.bar = new Chart(bCtx, {
+      type: 'bar',
+      data: {
+        labels: progNames,
+        datasets: [{ label: 'Applications', data: progCounts,
+          backgroundColor: ['#27845B','#E6B54B','#2A8E8E','#164A35','#3B82F6'],
+          borderRadius: 6, borderSkipped: false }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, grid: { color: '#E2EBE4' }, ticks: { font: { size: 11 } } },
+                  y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
+      }
+    });
+  }
+}
+
+// ── APPLICATIONS PAGE ─────────────────────────────────────
+function pageApplications() {
+  const programOptions = PROGRAMS.map(p => `<option value="${p}">${p}</option>`).join('');
+  const statusOptions = STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
+  const barangayOptions = BARANGAYS.map(b => `<option value="${b}">${b}</option>`).join('');
+
+  return `
+  ${pageHeader('Assistance Applications',
+    'Review, process, and manage farmer applications',
+    `<button class="btn btn-secondary btn-sm" onclick="exportCSV()">${icons.export} Export CSV</button>
+     <button class="btn btn-primary" onclick="showNewApplicationModal()">${icons.plus} New Application</button>`
+  )}
+  <div class="panel mb-20">
+    <div class="table-toolbar">
+      <input class="field search-field" id="appSearch" placeholder="Search name, ID, barangay..." oninput="filterApps()">
+      <select class="field filter-select" id="appStatusFilter" onchange="filterApps()">
+        <option value="">All Statuses</option>${statusOptions}
+      </select>
+      <select class="field filter-select" id="appProgramFilter" onchange="filterApps()">
+        <option value="">All Programs</option>${programOptions}
+      </select>
+      <select class="field filter-select" id="appBarangayFilter" onchange="filterApps()">
+        <option value="">All Barangays</option>${barangayOptions}
+      </select>
+    </div>
+    <div id="appTableContainer">
+      ${buildTableInner(records, `All Applications (${records.length})`)}
+    </div>
+  </div>`;
+}
+
+function buildTableInner(list, title) {
+  return `<div>
+    <div style="padding:12px 22px 10px;font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--line)">
+      ${icons.apps} &nbsp;<span style="font-weight:600;color:var(--deep)">${title}</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Application ID</th><th>Farmer / Barangay</th><th>Program</th>
+          <th>Date Filed</th><th>Amount</th><th>Status</th><th>Action</th>
+        </tr></thead>
+        <tbody>${buildRows(list)}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function filterApps() {
+  const q = (document.getElementById('appSearch')?.value || '').toLowerCase();
+  const s = document.getElementById('appStatusFilter')?.value || '';
+  const p = document.getElementById('appProgramFilter')?.value || '';
+  const b = document.getElementById('appBarangayFilter')?.value || '';
+  const list = records.filter(r =>
+    `${r.id} ${r.name} ${r.barangay} ${r.farmerId}`.toLowerCase().includes(q) &&
+    (!s || r.status === s) && (!p || r.program === p) && (!b || r.barangay === b)
+  );
+  const el = document.getElementById('appTableContainer');
+  if (el) el.innerHTML = buildTableInner(list, `Applications (${list.length} shown)`);
+}
+
+// ── BENEFICIARIES PAGE ────────────────────────────────────
+function pageBeneficiaries() {
+  const statusOptions = STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
+  return `
+  ${pageHeader('Beneficiary Verification',
+    'Verify farmer identity and eligibility before approval',
+    `<button class="btn btn-secondary btn-sm" onclick="exportCSV()">${icons.export} Export</button>`
+  )}
+  <div class="notice notice-info mb-20">
+    ${icons.info}
+    <span>Verify farmer identity, barangay records, and supporting documents before marking an application as <strong>Verified</strong> or <strong>Approved</strong>. Only MAO-cleared beneficiaries should proceed to distribution.</span>
+  </div>
+  <div class="panel">
+    <div class="table-toolbar">
+      <input class="field search-field" id="benSearch" placeholder="Search beneficiary name or ID..." oninput="filterBen()">
+      <select class="field filter-select" id="benStatusFilter" onchange="filterBen()">
+        <option value="">All Statuses</option>${statusOptions}
+      </select>
+    </div>
+    <div id="benTableContainer">
+      ${buildBeneficiaryTable(records)}
+    </div>
+  </div>`;
+}
+
+function buildBeneficiaryTable(list) {
+  if (!list.length) return `<div class="empty-state"><p>No records found.</p></div>`;
+  return `<div class="table-scroll"><table>
+    <thead><tr>
+      <th>App ID</th><th>Farmer</th><th>Farmer ID</th><th>Barangay</th>
+      <th>Program</th><th>Status</th><th>Action</th>
+    </tr></thead>
+    <tbody>${list.map(r => `<tr>
+      <td><span class="fw-600" style="color:var(--emerald)">${r.id}</span></td>
+      <td><div class="farmer-name">${r.name}</div></td>
+      <td style="font-size:12px;color:var(--muted)">${r.farmerId}</td>
+      <td>${r.barangay}</td>
+      <td style="font-size:12px">${r.program}</td>
+      <td>${statusPill(r.status)}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="viewRecord('${r.id}')">Verify / Manage</button></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function filterBen() {
+  const q = (document.getElementById('benSearch')?.value || '').toLowerCase();
+  const s = document.getElementById('benStatusFilter')?.value || '';
+  const list = records.filter(r =>
+    `${r.id} ${r.name} ${r.barangay} ${r.farmerId}`.toLowerCase().includes(q) &&
+    (!s || r.status === s)
+  );
+  const el = document.getElementById('benTableContainer');
+  if (el) el.innerHTML = buildBeneficiaryTable(list);
+}
+
+// ── DISTRIBUTION PAGE ──────────────────────────────────────
+function pageDistribution() {
+  const approved = records.filter(r => r.status === 'Approved').length;
+  const distCount = records.filter(r => r.status === 'Distributed').length;
+  const distTotal = records.filter(r => r.status === 'Distributed').reduce((s,r) => s + r.amount, 0);
+  const pending = records.filter(r => ['Pending','Under Review'].includes(r.status)).length;
+  const distList = records.filter(r => ['Approved','Distributed'].includes(r.status));
+
+  return `
+  ${pageHeader('Subsidy Distribution',
+    'Track approved assistance and record subsidy distribution',
+    `<button class="btn btn-primary" onclick="showToast('Open an Approved application and change its status to Distributed to record a release.')">${icons.cash} Record Distribution</button>`
+  )}
+  <div class="stats-grid mb-20">
+    ${statCard('Approved for Distribution', approved, icons.check, 'Ready for release', 'up', 'green')}
+    ${statCard('Distributed', distCount, icons.cash, 'Completed releases', 'up', 'teal')}
+    ${statCard('Total Distributed Value', money(distTotal), icons.chart, 'Based on recorded amounts', 'up', 'gold')}
+    ${statCard('Pending Review', pending, icons.clock, 'Not yet approved', 'neutral', 'gold')}
+  </div>
+  <div class="notice notice-warn mb-20">
+    ${icons.info}
+    <span>Only <strong>Approved</strong> applications can be marked as <strong>Distributed</strong>. Use the Manage button to record the release date and confirm distribution. Keep reference numbers for audit.</span>
+  </div>
+  <div class="panel mb-20">
+    <div class="panel-header" style="padding-bottom:0">
+      <div class="panel-title">Distribution Chart</div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="distChart"></canvas></div>
+    </div>
+  </div>
+  ${buildTable(distList, `Approved & Distributed Assistance (${distList.length})`)}`;
+}
+
+function initDistChart() {
+  const ctx = document.getElementById('distChart');
+  if (!ctx) return;
+  const progs = PROGRAMS.slice(0,5);
+  const distAmounts = progs.map(p =>
+    records.filter(r => r.program === p && r.status === 'Distributed').reduce((s,r) => s + r.amount, 0) / 1000
+  );
+  const approvedAmounts = progs.map(p =>
+    records.filter(r => r.program === p && r.status === 'Approved').reduce((s,r) => s + r.amount, 0) / 1000
+  );
+  const labels = progs.map(p => p.replace(' Assistance','').replace(' Subsidy',''));
+  chartInstances.dist = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Distributed (₱k)', data: distAmounts, backgroundColor: '#27845B', borderRadius: 6 },
+        { label: 'Approved (₱k)', data: approvedAmounts, backgroundColor: '#E6B54B', borderRadius: 6 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#E2EBE4' },
+        ticks: { callback: v => '₱' + v + 'k', font: { size: 11 } } } }
+    }
+  });
+}
+
+// ── REPORTS PAGE ───────────────────────────────────────────
+function pageReports() {
+  const totalAmt = records.reduce((s,r) => s + r.amount, 0);
+  const distAmt  = records.filter(r => r.status==='Distributed').reduce((s,r) => s + r.amount, 0);
+  const appRate  = records.length ? Math.round(records.filter(r => ['Approved','Distributed'].includes(r.status)).length / records.length * 100) : 0;
+  const progCount = new Set(records.map(r => r.program)).size;
+
+  const progBarColors = ['#27845B','#E6B54B','#2A8E8E','#3B82F6','#164A35'];
+  const maxCount = Math.max(...PROGRAMS.map(p => records.filter(r => r.program === p).length), 1);
+
+  return `
+  ${pageHeader('Programs & Reports',
+    'Monitor assistance programs and generate summary reports',
+    `<button class="btn btn-secondary btn-sm" onclick="exportCSV()">${icons.export} Export Report</button>`
+  )}
+
+  <div class="program-grid mb-20">
+    ${PROGRAMS.slice(0,5).map((prog, i) => {
+      const cnt = records.filter(r => r.program === prog).length;
+      const distCnt = records.filter(r => r.program === prog && r.status === 'Distributed').length;
+      const amtTotal = records.filter(r => r.program === prog).reduce((s,r) => s + r.amount, 0);
+      const pct = Math.round(cnt / maxCount * 100);
+      return `<div class="program-card">
+        <div class="program-card-icon" style="background:${progBarColors[i]}22">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${progBarColors[i]}" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h3>${prog}</h3>
+        <p>Agricultural assistance program under Bongabong MAO.</p>
+        <div class="program-card-stats">
+          <div class="program-stat">
+            <span class="program-stat-val">${cnt}</span>
+            <span class="program-stat-lbl">Applications</span>
+          </div>
+          <div class="program-stat">
+            <span class="program-stat-val">${distCnt}</span>
+            <span class="program-stat-lbl">Distributed</span>
+          </div>
+          <div class="program-stat">
+            <span class="program-stat-val" style="font-size:14px">${money(amtTotal)}</span>
+            <span class="program-stat-lbl">Total Amount</span>
+          </div>
+        </div>
+        <div class="program-bar"><div class="program-bar-fill" style="width:${pct}%;background:${progBarColors[i]}"></div></div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <div class="stats-grid mb-20">
+    ${statCard('Total Assistance Value', money(totalAmt), icons.cash, 'All application amounts combined', 'neutral', 'gold')}
+    ${statCard('Distributed Value', money(distAmt), icons.check, 'Completed distributions', 'up', 'green')}
+    ${statCard('Approval Rate', appRate + '%', icons.chart, 'Approved or distributed', 'up', 'teal')}
+    ${statCard('Active Programs', progCount, icons.apps, 'Programs in current records', 'neutral', 'green')}
+  </div>
+
+  <div class="panel mb-20">
+    <div class="panel-header">
+      <div class="panel-title">Barangay Distribution Report</div>
+      <div class="panel-subtitle">Applications per barangay</div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="barangayChart"></canvas></div>
+    </div>
+  </div>
+
+  ${buildTable(records, `Full Report Data (${records.length} records)`)}`;
+}
+
+function initReportsCharts() {
+  const ctx = document.getElementById('barangayChart');
+  if (!ctx) return;
+  const barDict = {};
+  records.forEach(r => { barDict[r.barangay] = (barDict[r.barangay] || 0) + 1; });
+  const sorted = Object.entries(barDict).sort((a,b) => b[1]-a[1]).slice(0,10);
+  chartInstances.bar = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(x => x[0]),
+      datasets: [{ label: 'Applications', data: sorted.map(x => x[1]),
+        backgroundColor: '#27845B', borderRadius: 6 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#E2EBE4' }, ticks: { font: { size: 11 } } },
+                x: { grid: { display: false }, ticks: { font: { size: 11 } } } }
+    }
+  });
+}
+
+// ── SETTINGS PAGE ─────────────────────────────────────────
+function pageSettings() {
+  return `
+  ${pageHeader('System Settings', 'Manage office profile and prototype preferences')}
+  <div class="grid-2">
+    <div>
+      <div class="panel mb-20">
+        <div class="panel-header"><div class="panel-title">Office Profile</div></div>
+        <div class="panel-body">
+          <div class="form-grid-2">
+            <div class="form-group"><label class="form-label">System Name</label>
+              <input class="form-input" value="AgriConnect AASMS"></div>
+            <div class="form-group"><label class="form-label">Office</label>
+              <input class="form-input" value="Municipal Agriculture Office"></div>
+            <div class="form-group"><label class="form-label">Municipality</label>
+              <input class="form-input" value="Bongabong, Oriental Mindoro"></div>
+            <div class="form-group"><label class="form-label">Province</label>
+              <input class="form-input" value="Oriental Mindoro"></div>
+            <div class="form-group"><label class="form-label">Fiscal Year</label>
+              <input class="form-input" value="2026"></div>
+            <div class="form-group"><label class="form-label">Admin Display Name</label>
+              <input class="form-input" id="adminName" value="Admin"></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" onclick="showToast('Settings saved for this session.')">Save Settings</button></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Assistance Program Configuration</div></div>
+        <div class="panel-body">
+          <div class="notice notice-info mb-16">${icons.info} <span>Programs below are pre-configured for this prototype. In a live system, these can be managed via an admin interface.</span></div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${PROGRAMS.map((p,i) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--ivory);border-radius:var(--radius);font-size:13px">
+              <span class="fw-600">${p}</span>
+              <span class="pill pill-approved">Active</span>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel mb-20">
+        <div class="panel-header"><div class="panel-title">Data Management</div></div>
+        <div class="panel-body">
+          <p class="text-muted mb-16">This frontend prototype stores records in browser localStorage. For production use, connect a secure backend with authentication, role-based access, and an audit trail.</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-secondary" style="justify-content:flex-start" onclick="exportCSV()">${icons.export} Export all records to CSV</button>
+            <button class="btn btn-danger" style="justify-content:flex-start" onclick="if(confirm('Restore sample data? Your current records will be replaced.')){records=SEED.map(x=>({...x}));save();go('dashboard');showToast('Sample data restored.')}">${icons.trash} Restore sample data</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">System Information</div></div>
+        <div class="panel-body">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${[['System','AgriConnect AASMS v2.0'],['Module','Agricultural Assistance & Subsidy Management'],['Type','Frontend Prototype'],['Storage','Browser localStorage'],['Records',''+records.length+' total applications']].map(([k,v]) => `
+            <div style="display:flex;justify-content:space-between;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line)">
+              <span class="text-muted">${k}</span><span class="fw-600">${v}</span>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── VIEW / EDIT RECORD ────────────────────────────────────
+function viewRecord(id) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+
+  const statusOpts = STATUSES.map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('');
+  const progOpts = PROGRAMS.map(p => `<option value="${p}" ${r.program===p?'selected':''}>${p}</option>`).join('');
+  const barOpts = BARANGAYS.map(b => `<option value="${b}" ${r.barangay===b?'selected':''}>${b}</option>`).join('');
+
+  const timelineItems = [
+    { dot: '#E6B54B', bg: '#FFF4D6', label: 'Application Filed', time: r.date },
+    { dot: '#3B82F6', bg: '#E8F0FE', label: 'Under Review by MAO', time: r.date },
+    ...(r.status === 'Verified' || r.status === 'Approved' || r.status === 'Distributed'
+      ? [{ dot: '#2A8E8E', bg: '#E0F4F4', label: 'Beneficiary Verified', time: 'Recent' }] : []),
+    ...(r.status === 'Approved' || r.status === 'Distributed'
+      ? [{ dot: '#27845B', bg: 'var(--mint)', label: 'Application Approved', time: 'Recent' }] : []),
+    ...(r.status === 'Distributed'
+      ? [{ dot: '#18A45A', bg: '#EAFAF0', label: 'Subsidy Distributed', time: 'Recent' }] : []),
+    ...(r.status === 'Rejected'
+      ? [{ dot: '#D94F3D', bg: 'var(--red-bg)', label: 'Application Rejected', time: 'Recent' }] : []),
+  ];
+
+  document.getElementById('main').innerHTML = `
+  <div class="page-head">
+    <div class="page-head-text">
+      <div class="breadcrumb">
+        <button onclick="go('${currentPage}')" style="color:var(--muted);cursor:pointer;font-size:12px">
+          ${currentPage === 'applications' ? 'Applications' : currentPage === 'beneficiaries' ? 'Beneficiary Verification' : 'Distribution'}
+        </button>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span>${r.id}</span>
+      </div>
+      <h2>Manage Application</h2>
+      <p>Update application details, status, and distribution records</p>
+    </div>
+    <div class="page-head-actions">
+      <button class="btn btn-secondary" onclick="go('${currentPage}')">← Back</button>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <div class="panel mb-20">
+        <div class="panel-header"><div class="panel-title">Application Details</div><div>${statusPill(r.status)}</div></div>
+        <div class="panel-body">
+          <div class="record-meta mb-16">
+            <div class="record-meta-item"><span class="record-meta-label">App ID</span><span class="record-meta-val" style="color:var(--emerald)">${r.id}</span></div>
+            <div class="record-meta-item"><span class="record-meta-label">Date Filed</span><span class="record-meta-val">${r.date}</span></div>
+            <div class="record-meta-item"><span class="record-meta-label">Farmer ID</span><span class="record-meta-val">${r.farmerId}</span></div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group"><label class="form-label">Farmer Full Name *</label>
+              <input class="form-input" id="ed_name" value="${r.name}"></div>
+            <div class="form-group"><label class="form-label">Barangay *</label>
+              <select class="form-input" id="ed_barangay">${barOpts}</select></div>
+            <div class="form-group"><label class="form-label">Farmer / Registry ID</label>
+              <input class="form-input" id="ed_farmerId" value="${r.farmerId}"></div>
+            <div class="form-group"><label class="form-label">Contact Number</label>
+              <input class="form-input" id="ed_contact" value="${r.contact || ''}"></div>
+            <div class="form-group"><label class="form-label">Assistance Program *</label>
+              <select class="form-input" id="ed_program">${progOpts}</select></div>
+            <div class="form-group"><label class="form-label">Assistance Type</label>
+              <select class="form-input" id="ed_type">
+                <option ${r.type==='In-Kind'?'selected':''}>In-Kind</option>
+                <option ${r.type==='Cash'?'selected':''}>Cash</option>
+              </select></div>
+            <div class="form-group"><label class="form-label">Amount (₱) *</label>
+              <input class="form-input" type="number" id="ed_amount" value="${r.amount}" min="0"></div>
+            <div class="form-group"><label class="form-label">Application Status</label>
+              <select class="form-input" id="ed_status">${statusOpts}</select></div>
+            <div class="form-group full"><label class="form-label">Notes / Supporting Documents</label>
+              <textarea class="form-input" id="ed_notes">${r.notes || ''}</textarea></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-danger" onclick="if(confirm('Delete this record?')){records=records.filter(x=>x.id!=='${id}');save();go('${currentPage}');showToast('Record deleted.')}">
+              ${icons.trash} Delete
+            </button>
+            <button class="btn btn-secondary" onclick="go('${currentPage}')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveRecord('${id}')">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel mb-20">
+        <div class="panel-header"><div class="panel-title">Application Timeline</div></div>
+        <div class="panel-body">
+          <ul class="timeline">
+            ${timelineItems.map(t => `<li class="timeline-item">
+              <div class="timeline-dot" style="background:${t.bg};color:${t.dot}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${t.dot}" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/></svg>
+              </div>
+              <div>
+                <div class="timeline-text">${t.label}</div>
+                <div class="timeline-time">${t.time}</div>
+              </div>
+            </li>`).join('')}
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Quick Status Update</div></div>
+        <div class="panel-body">
+          <p class="text-muted mb-16">Change the status directly for quick processing.</p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${STATUSES.map(s => `<button onclick="quickStatus('${id}','${s}')"
+              class="btn ${r.status===s?'btn-primary':'btn-secondary'}"
+              style="justify-content:space-between">
+              ${s} ${r.status===s?'<span style=\'font-size:11px;opacity:.8\'>✓ Current</span>':''}
+            </button>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveRecord(id) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  r.name     = document.getElementById('ed_name').value;
+  r.barangay = document.getElementById('ed_barangay').value;
+  r.farmerId = document.getElementById('ed_farmerId').value;
+  r.contact  = document.getElementById('ed_contact').value;
+  r.program  = document.getElementById('ed_program').value;
+  r.type     = document.getElementById('ed_type').value;
+  r.amount   = Number(document.getElementById('ed_amount').value);
+  r.status   = document.getElementById('ed_status').value;
+  r.notes    = document.getElementById('ed_notes').value;
+  save();
+  go(currentPage);
+  showToast('Application record updated successfully.');
+}
+
+function quickStatus(id, status) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  r.status = status;
+  save();
+  viewRecord(id);
+  showToast(`Status updated to: ${status}`);
+}
+
+// ── NEW APPLICATION MODAL ─────────────────────────────────
+function showNewApplicationModal() {
+  const progOpts = PROGRAMS.map(p => `<option value="${p}">${p}</option>`).join('');
+  const barOpts = BARANGAYS.map(b => `<option value="${b}">${b}</option>`).join('');
+  const today = new Date().toISOString().slice(0,10);
+
+  let overlay = document.getElementById('modalOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modalOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal" id="modalBox"></div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+    document.body.appendChild(overlay);
+  }
+
+  document.getElementById('modalBox').innerHTML = `
+    <div class="modal-header">
+      <span class="modal-title">${icons.plus} &nbsp;New Assistance Application</span>
+      <button class="modal-close" onclick="closeModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="newAppForm">
+        <div class="form-grid-2">
+          <div class="form-group"><label class="form-label">Farmer Full Name *</label>
+            <input class="form-input" name="name" required placeholder="e.g. Juan Dela Cruz"></div>
+          <div class="form-group"><label class="form-label">Barangay *</label>
+            <select class="form-input" name="barangay" required><option value="">Select barangay</option>${barOpts}</select></div>
+          <div class="form-group"><label class="form-label">Farmer / Registry ID</label>
+            <input class="form-input" name="farmerId" placeholder="e.g. F-1020"></div>
+          <div class="form-group"><label class="form-label">Contact Number</label>
+            <input class="form-input" name="contact" placeholder="09XXXXXXXXX"></div>
+          <div class="form-group"><label class="form-label">Assistance Program *</label>
+            <select class="form-input" name="program" required><option value="">Select program</option>${progOpts}</select></div>
+          <div class="form-group"><label class="form-label">Assistance Type</label>
+            <select class="form-input" name="type"><option>In-Kind</option><option>Cash</option></select></div>
+          <div class="form-group"><label class="form-label">Requested Amount (₱) *</label>
+            <input class="form-input" name="amount" type="number" min="0" required placeholder="0"></div>
+          <div class="form-group"><label class="form-label">Date Filed *</label>
+            <input class="form-input" name="date" type="date" value="${today}" required></div>
+          <div class="form-group"><label class="form-label">Initial Status</label>
+            <select class="form-input" name="status"><option>Pending</option><option>Under Review</option></select></div>
+          <div class="form-group full"><label class="form-label">Notes / Supporting Documents</label>
+            <textarea class="form-input" name="notes" placeholder="Checklist: barangay cert, RSA ID, farm sketch..."></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">${icons.check} &nbsp;Save Application</button>
+        </div>
+      </form>
+    </div>`;
+
+  document.getElementById('newAppForm').onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const dateVal = f.get('date');
+    const dateLabel = new Date(dateVal + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'2-digit', year:'numeric' });
+    const newRec = {
+      id: 'AAS-' + new Date().getFullYear() + '-' + String(records.length + 1).padStart(3,'0'),
+      name: f.get('name'), barangay: f.get('barangay'),
+      farmerId: f.get('farmerId') || 'Not provided', contact: f.get('contact') || '',
+      program: f.get('program'), type: f.get('type'),
+      amount: Number(f.get('amount')), date: dateLabel,
+      status: f.get('status'), notes: f.get('notes') || ''
+    };
+    records.unshift(newRec);
+    save();
+    closeModal();
+    go('applications');
+    showToast('Application saved: ' + newRec.id);
+  };
+
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
+
+function closeModal() {
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) { overlay.classList.remove('open'); }
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────
+function exportCSV() {
+  const cols = ['id','name','barangay','farmerId','contact','program','type','date','amount','status','notes'];
+  const headers = ['Application ID','Farmer Name','Barangay','Farmer ID','Contact','Program','Type','Date Filed','Amount','Status','Notes'];
+  const csv = [
+    headers.join(','),
+    ...records.map(r => cols.map(k => `"${String(r[k]??'').replaceAll('"','""')}"`).join(','))
+  ].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = `agriconnect-assistance-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('CSV report exported successfully.');
+}
+
+// ── GLOBAL SEARCH ────────────────────────────────────────
+document.getElementById('globalSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    go('applications');
+    setTimeout(() => {
+      const f = document.getElementById('appSearch');
+      if (f) { f.value = e.target.value; filterApps(); }
+    }, 60);
+  }
+});
+
+// ── RENDER ────────────────────────────────────────────────
+function render() {
+  const main = document.getElementById('main');
+  const pages = { dashboard: pageDashboard, applications: pageApplications, beneficiaries: pageBeneficiaries, distribution: pageDistribution, reports: pageReports, settings: pageSettings };
+  main.innerHTML = (pages[currentPage] || pageDashboard)();
+
+  // Init charts after DOM update
+  requestAnimationFrame(() => {
+    if (currentPage === 'dashboard') initDashboardCharts();
+    if (currentPage === 'distribution') initDistChart();
+    if (currentPage === 'reports') initReportsCharts();
+  });
+}
+
+// render() is called by handleLogin() after successful sign-in
+</script>
+</body>
+</html>
