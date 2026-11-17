@@ -1,0 +1,23 @@
+```mermaid
+flowchart LR
+    Farmer[Verified farmer]
+    MAO[MAO reviewer / distributor]
+    subgraph AASMS["AASMS inside AgriConnect ERP"]
+        Programs((Manage assistance programs))
+        Apply((Submit eligible application))
+        Review((Approve / reject / return))
+        Allocate((Confirm approved quantity and item))
+        Distribute((Distribute approved assistance))
+        History((View status and distribution history))
+        Report((Export distribution report))
+    end
+    MAO --> Programs
+    Farmer --> Apply
+    Farmer --> History
+    MAO --> Review
+    MAO --> Allocate
+    MAO --> Distribute
+    MAO --> Report
+    FFRMS[Verified FFRMS record] --> Apply
+    AISMS[Available AISMS batch] --> Distribute
+```
