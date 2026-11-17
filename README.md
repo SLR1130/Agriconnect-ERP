@@ -53,6 +53,14 @@ agriconnect-erp/
     └── modules/                     # Module Route Files
 ```
 
+## Standalone AEAMS contribution
+
+The complete React/Express/PostgreSQL Agricultural Equipment and Asset Management
+System is available in [`standalone/aeams`](standalone/aeams/README.md). See the
+[standalone setup and integration notes](docs/aeams-standalone.md) before running
+it alongside this ERP. This contribution runs independently; it does not replace
+the Laravel AEAMS module or share its MySQL database and session authentication.
+
 ## Installation & Setup
 
 ### Prerequisites
