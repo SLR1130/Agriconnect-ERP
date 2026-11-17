@@ -69,25 +69,7 @@
                             <div><dt>Soil / irrigation</dt><dd>{{ $farm->soil_type ?: 'Not recorded' }} · {{ $farm->irrigation_type ?: 'Not recorded' }}</dd></div>
                             <div class="ffrms-farm-fact-wide"><dt>Agricultural activities</dt><dd>{{ count($farm->agricultural_activities ?: []) ? implode(', ', $farm->agricultural_activities) : 'Not recorded' }}</dd></div>
                             <div class="ffrms-farm-fact-wide"><dt>Farm categories</dt><dd>{{ count($farm->categories ?: []) ? implode(', ', $farm->categories) : 'Not recorded' }}</dd></div>
-                            <div class="ffrms-farm-fact-wide"><dt>Farm map pin</dt><dd>@if(! $farmLocationsReady)Waiting for database activation @elseif($farm->latitude !== null && $farm->longitude !== null){{ $farm->latitude }}, {{ $farm->longitude }} <span class="ffrms-muted-note">· farmer-provided, not MAO-verified</span> <a href="https://www.openstreetmap.org/?mlat={{ $farm->latitude }}&amp;mlon={{ $farm->longitude }}#map=17/{{ $farm->latitude }}/{{ $farm->longitude }}" target="_blank" rel="noopener noreferrer">Open map</a>@else Not recorded @endif</dd></div>
                         </dl>
-                        @if($farmLocationsReady)
-                            @php($farmMapPoint = $farm->latitude !== null && $farm->longitude !== null ? [[
-                                'latitude' => (float) $farm->latitude,
-                                'longitude' => (float) $farm->longitude,
-                                'farmer' => $farmer->user->name,
-                                'farmerCode' => $farmer->farmer_code,
-                                'farm' => $farm->name,
-                                'barangay' => $farm->barangay,
-                            ]] : [])
-                            <div class="ffrms-farm-map-panel">
-                                <div class="ffrms-farm-map" data-ffrms-map data-ffrms-map-points="{{ json_encode($farmMapPoint) }}" tabindex="0" role="region" aria-label="Map for {{ $farm->name }}"></div>
-                                @if($farmMapPoint === [])
-                                    <p class="ffrms-map-note" data-ffrms-map-empty role="status">No location pin is recorded for this farm.</p>
-                                @endif
-                                <p class="ffrms-map-attribution">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</p>
-                            </div>
-                        @endif
                         @if($canUpdate)
                             <details class="ffrms-edit-disclosure" @if(old('registry_form') === 'farm-'.$farm->id) open @endif>
                                 <summary><x-ui.icon name="action" size="sm" /> Edit farm record</summary>
@@ -100,13 +82,6 @@
                                     <div class="erp-field"><label for="farm-name-{{ $farm->id }}">Farm name</label><input id="farm-name-{{ $farm->id }}" class="erp-input" name="name" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('name', $farm->name) : $farm->name }}" maxlength="255" required></div>
                                     <div class="erp-field"><label for="farm-barangay-{{ $farm->id }}">Barangay</label><input id="farm-barangay-{{ $farm->id }}" class="erp-input" name="barangay" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('barangay', $farm->barangay) : $farm->barangay }}" maxlength="100" required></div>
                                     <div class="erp-field"><label for="farm-location-{{ $farm->id }}">Location details</label><input id="farm-location-{{ $farm->id }}" class="erp-input" name="location_details" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('location_details', $farm->location_details) : $farm->location_details }}" maxlength="255"></div>
-                                    @if($farmLocationsReady)
-                                        <div class="erp-field"><label for="farm-latitude-{{ $farm->id }}">Latitude</label><input id="farm-latitude-{{ $farm->id }}" class="erp-input" name="latitude" type="number" step="0.0000001" min="-90" max="90" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('latitude', $farm->latitude) : $farm->latitude }}"></div>
-                                        <div class="erp-field"><label for="farm-longitude-{{ $farm->id }}">Longitude</label><input id="farm-longitude-{{ $farm->id }}" class="erp-input" name="longitude" type="number" step="0.0000001" min="-180" max="180" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('longitude', $farm->longitude) : $farm->longitude }}"></div>
-                                        <input type="hidden" name="location_source" value="manual"><input type="hidden" name="location_accuracy_meters" value="">
-                                    @else
-                                        <p class="ffrms-muted-note ffrms-edit-wide">Exact map-pin editing will be available after the database update is activated. Other farm details can still be edited.</p>
-                                    @endif
                                     <div class="erp-field"><label for="farm-area-{{ $farm->id }}">Area</label><input id="farm-area-{{ $farm->id }}" class="erp-input" name="area" type="number" min=".01" step=".01" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('area', $farm->area) : $farm->area }}"></div>
                                     <div class="erp-field"><label for="farm-area-unit-{{ $farm->id }}">Area unit</label><select id="farm-area-unit-{{ $farm->id }}" class="erp-input" name="area_unit">@foreach(['hectare' => 'Hectare', 'square_meter' => 'Square meter'] as $value => $label)<option value="{{ $value }}" @selected((old('registry_form') === 'farm-'.$farm->id ? old('area_unit', $farm->area_unit) : $farm->area_unit) === $value)>{{ $label }}</option>@endforeach</select></div>
                                     <div class="erp-field"><label for="farm-ownership-{{ $farm->id }}">Ownership / tenure</label><select id="farm-ownership-{{ $farm->id }}" class="erp-input" name="ownership_type">@foreach(['owner', 'tenant', 'leaseholder', 'other'] as $value)<option value="{{ $value }}" @selected((old('registry_form') === 'farm-'.$farm->id ? old('ownership_type', $farm->ownership_type) : $farm->ownership_type) === $value)>{{ ucfirst($value) }}</option>@endforeach</select></div>

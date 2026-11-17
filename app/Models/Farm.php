@@ -10,8 +10,7 @@ class Farm extends Model
     protected $fillable = [
         'farmer_id', 'name', 'barangay', 'location_details', 'area', 'area_unit',
         'ownership_type', 'classification', 'tenancy_details', 'soil_type', 'irrigation_type',
-        'agricultural_activities', 'categories', 'status', 'latitude', 'longitude',
-        'location_accuracy_meters', 'location_source',
+        'agricultural_activities', 'categories', 'status',
     ];
 
     protected function casts(): array

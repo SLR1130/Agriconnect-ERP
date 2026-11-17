@@ -1,6 +1,3 @@
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('app-sidebar');
     const shell = document.querySelector('.erp-shell');
@@ -668,173 +665,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-farm-location]').forEach((section) => {
-        const latitude = section.querySelector('[data-farm-latitude]');
-        const longitude = section.querySelector('[data-farm-longitude]');
-        const source = section.querySelector('[data-farm-location-source]');
-        const accuracy = section.querySelector('[data-farm-location-accuracy]');
-        const status = section.querySelector('[data-farm-location-status]');
-        const mapLink = section.querySelector('[data-farm-map-link]');
-        const useLocation = section.querySelector('[data-farm-use-location]');
-        const clearPin = section.querySelector('[data-farm-clear-pin]');
-        const mapElement = section.querySelector('[data-farm-map]');
-        const form = section.closest('form');
-        const locationEnabled = section.dataset.locationEnabled === 'true';
-        if (!latitude || !longitude || !source || !accuracy || !status || !useLocation) return;
-
-        const updateMapLink = () => {
-            const lat = Number(latitude.value);
-            const lon = Number(longitude.value);
-            const valid = latitude.value !== '' && longitude.value !== '' && Number.isFinite(lat) && Number.isFinite(lon)
-                && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
-            if (!mapLink) return;
-            mapLink.hidden = !valid;
-            if (valid) {
-                mapLink.href = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=17/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}`;
-            }
-        };
-
-        const isValidPoint = (lat, lon) => Number.isFinite(lat) && Number.isFinite(lon)
-            && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
-        const readPoint = () => {
-            if (latitude.value === '' || longitude.value === '') return null;
-            const point = { lat: Number(latitude.value), lng: Number(longitude.value) };
-            return isValidPoint(point.lat, point.lng) ? point : null;
-        };
-        let map = null;
-        let marker = null;
-        const initializeMap = () => {
-            if (!mapElement || map) return map;
-            const bounds = mapElement.getBoundingClientRect();
-            if (bounds.width < 50 || bounds.height < 50) return null;
-
-            const savedPoint = readPoint();
-            const defaultCenter = [
-                Number(mapElement.dataset.defaultLatitude) || 12.74642,
-                Number(mapElement.dataset.defaultLongitude) || 121.48741,
-            ];
-            map = L.map(mapElement, { scrollWheelZoom: false, keyboard: true })
-                .setView(savedPoint ? [savedPoint.lat, savedPoint.lng] : defaultCenter, savedPoint ? 17 : 12);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-            }).addTo(map);
-
-            if (savedPoint) {
-                marker = L.marker(savedPoint, { draggable: locationEnabled, keyboard: true, title: 'Farm location pin', alt: 'Farm location pin' }).addTo(map);
-                marker.on('dragend', () => {
-                    const moved = marker.getLatLng();
-                    setPin(moved, 'manual', null, 'Pin moved on the map. The MAO has not verified this location.', false);
-                });
-            }
-            map.on('click', (event) => setPin(event.latlng));
-            map.on('tileerror', () => {
-                const mapMessage = section.querySelector('[data-farm-map-message]');
-                if (mapMessage) {
-                    mapMessage.hidden = false;
-                    mapMessage.textContent = 'Map tiles could not load. Check your internet connection; GPS and coordinate entry can still be used.';
-                }
-            });
-
-            return map;
-        };
-        const showMap = () => window.setTimeout(() => {
-            initializeMap();
-            map?.invalidateSize();
-        }, 80);
-        section.addEventListener('farm:visible', showMap);
-        section.closest('details')?.addEventListener('toggle', (event) => {
-            if (event.currentTarget.open) showMap();
-        });
-
-        const syncFormReview = () => form?.dispatchEvent(new Event('farm:coordinates-changed', { bubbles: true }));
-        const setPin = (point, pinSource = 'manual', pinAccuracy = null, message = null, pan = true) => {
-            if (!locationEnabled) {
-                status.textContent = 'Map preview only. Pin saving will be available after the database update is activated.';
-                return;
-            }
-            if (!point || !isValidPoint(point.lat, point.lng)) return;
-            latitude.value = point.lat.toFixed(7);
-            longitude.value = point.lng.toFixed(7);
-            source.value = pinSource;
-            accuracy.value = pinSource === 'gps' && Number.isFinite(pinAccuracy) ? pinAccuracy.toFixed(2) : '';
-            initializeMap();
-            if (map) {
-                if (!marker) {
-                    marker = L.marker(point, { draggable: true, keyboard: true, title: 'Farm location pin', alt: 'Draggable farm location pin' }).addTo(map);
-                    marker.on('dragend', () => {
-                        const moved = marker.getLatLng();
-                        setPin(moved, 'manual', null, 'Pin moved on the map. The MAO has not verified this location.', false);
-                    });
-                } else {
-                    marker.setLatLng(point);
-                }
-                if (pan) map.setView(point, Math.max(map.getZoom(), 16));
-            }
-            status.textContent = message || (pinSource === 'gps'
-                ? `Location captured. Device accuracy is about ${Math.round(pinAccuracy)} m; the MAO has not verified this pin.`
-                : 'Farm pin selected. The MAO has not verified this location.');
-            updateMapLink();
-            syncFormReview();
-        };
-
-        [latitude, longitude].forEach((field) => field.addEventListener('input', () => {
-            if (latitude.value !== '' && longitude.value !== '') {
-                const point = readPoint();
-                if (point) setPin(point, 'manual', null, 'Coordinates entered. The MAO has not verified this pin.');
-                else {
-                    if (marker && map) map.removeLayer(marker);
-                    marker = null;
-                    status.textContent = 'Enter valid latitude and longitude values.';
-                }
-            } else {
-                source.value = '';
-                accuracy.value = '';
-                if (marker && map) map.removeLayer(marker);
-                marker = null;
-                status.textContent = 'Select the farm location on the map or enter both coordinates.';
-            }
-            updateMapLink();
-        }));
-
-        clearPin?.addEventListener('click', () => {
-            latitude.value = '';
-            longitude.value = '';
-            source.value = '';
-            accuracy.value = '';
-            if (marker && map) map.removeLayer(marker);
-            marker = null;
-            status.textContent = 'Farm pin removed. The barangay and landmark are unchanged.';
-            updateMapLink();
-            syncFormReview();
-        });
-
-        useLocation.addEventListener('click', () => {
-            if (!window.isSecureContext || !navigator.geolocation) {
-                status.textContent = 'Your browser cannot access device location on this connection. Enter coordinates manually or use a secure HTTPS connection.';
-                return;
-            }
-
-            useLocation.disabled = true;
-            status.textContent = 'Waiting for your device location permission…';
-            navigator.geolocation.getCurrentPosition((position) => {
-                latitude.value = position.coords.latitude.toFixed(7);
-                longitude.value = position.coords.longitude.toFixed(7);
-                source.value = 'gps';
-                setPin({ lat: position.coords.latitude, lng: position.coords.longitude }, 'gps', position.coords.accuracy,
-                    `Location captured. Device accuracy is about ${Math.round(position.coords.accuracy)} m; the MAO has not verified this pin.`);
-                useLocation.disabled = false;
-            }, (error) => {
-                status.textContent = error.code === error.PERMISSION_DENIED
-                    ? 'Location permission was not granted. You can enter coordinates manually.'
-                    : 'Could not get a location fix. Try again outdoors or enter coordinates manually.';
-                useLocation.disabled = false;
-            }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-        });
-
-        updateMapLink();
-    });
-
     document.querySelectorAll('[data-farm-wizard]').forEach((wizard) => {
         const form = wizard.querySelector('[data-farm-wizard-form]');
         const panels = [...wizard.querySelectorAll('[data-farm-step-panel]')];
@@ -854,9 +684,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const setReview = () => {
             wizard.querySelector('[data-review-name]').textContent = text('name');
             wizard.querySelector('[data-review-barangay]').textContent = text('barangay');
-            const latitude = value('latitude');
-            const longitude = value('longitude');
-            wizard.querySelector('[data-review-coordinates]').textContent = latitude && longitude ? `${latitude}, ${longitude}` : 'Not added';
             const area = value('area');
             const unit = form.elements.namedItem('area_unit')?.selectedOptions?.[0]?.textContent?.trim() ?? '';
             wizard.querySelector('[data-review-area]').textContent = area ? `${area} ${unit.toLowerCase()}` : 'Not entered';
@@ -878,10 +705,6 @@ document.addEventListener('DOMContentLoaded', () => {
             next.hidden = step === 4;
             submit.hidden = step !== 4;
             if (step === 4) setReview();
-            if (step === 2) {
-                const mapElement = wizard.querySelector('[data-farm-map]');
-                if (mapElement) window.requestAnimationFrame(() => mapElement.closest('[data-farm-location]')?.dispatchEvent(new Event('farm:visible')));
-            }
             if (focus) wizard.querySelector(`[data-farm-step-panel="${step}"] [data-farm-step-heading]`)?.focus();
         };
         const validatePanel = (panel) => {
@@ -903,7 +726,6 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('input', (event) => {
             if (event.target.matches('input, select, textarea')) setReview();
         });
-        form.addEventListener('farm:coordinates-changed', setReview);
         form.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' || event.target.matches('textarea') || step === 4) return;
             event.preventDefault();
@@ -986,68 +808,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         syncEmpty();
-    });
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-ffrms-map]').forEach((mapElement) => {
-        const emptyMessage = mapElement.parentElement?.querySelector('[data-ffrms-map-empty]');
-        let points = [];
-
-        try {
-            points = JSON.parse(mapElement.dataset.ffrmsMapPoints || '[]');
-        } catch {
-            if (emptyMessage) {
-                emptyMessage.hidden = false;
-                emptyMessage.textContent = 'Farm map data could not be loaded. Refresh the page and try again.';
-            }
-        }
-
-        if (!Array.isArray(points)) points = [];
-        points = points.filter((point) => Number.isFinite(Number(point.latitude))
-            && Number.isFinite(Number(point.longitude))
-            && Number(point.latitude) >= -90 && Number(point.latitude) <= 90
-            && Number(point.longitude) >= -180 && Number(point.longitude) <= 180);
-
-        if (emptyMessage) emptyMessage.hidden = points.length > 0;
-
-        const map = L.map(mapElement, { scrollWheelZoom: false, keyboard: true });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-        }).addTo(map);
-
-        const markers = [];
-        points.forEach((point) => {
-            const coordinates = [Number(point.latitude), Number(point.longitude)];
-            const marker = L.marker(coordinates, { keyboard: true, title: `${point.farm || 'Farm'} location` }).addTo(map);
-            const popup = document.createElement('div');
-            const farmName = document.createElement('strong');
-            const farmerName = document.createElement('span');
-            const location = document.createElement('small');
-            farmName.textContent = point.farm || 'Registered farm';
-            farmerName.textContent = `${point.farmer || 'Farmer'}${point.farmerCode ? ` · ${point.farmerCode}` : ''}`;
-            location.textContent = point.barangay || 'Barangay not recorded';
-            popup.append(farmName, document.createElement('br'), farmerName, document.createElement('br'), location);
-            marker.bindPopup(popup);
-            markers.push(coordinates);
-        });
-
-        if (markers.length === 1) {
-            map.setView(markers[0], 15);
-        } else if (markers.length > 1) {
-            map.fitBounds(markers, { padding: [24, 24], maxZoom: 15 });
-        } else {
-            map.setView([12.74642, 121.48741], 10);
-        }
-
-        map.on('tileerror', () => {
-            if (emptyMessage) {
-                emptyMessage.hidden = false;
-                emptyMessage.textContent = 'Map tiles could not load. Check your internet connection; farm records are still available in the table.';
-            }
-        });
-
-        window.setTimeout(() => map.invalidateSize(), 100);
     });
 });
