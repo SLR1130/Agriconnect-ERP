@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\FarmerAssociation;
-use App\Models\Farm;
 use App\Services\FarmerRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class FFRMSController extends Controller
@@ -41,6 +43,20 @@ class FFRMSController extends Controller
             ->selectRaw('registration_status, COUNT(*) as aggregate')
             ->groupBy('registration_status')
             ->pluck('aggregate', 'registration_status');
+        $farmLocationsReady = collect(['latitude', 'longitude', 'location_accuracy_meters', 'location_source'])
+            ->every(fn (string $column): bool => Schema::hasColumn('farms', $column));
+        $farmMapPoints = $farmLocationsReady
+            ? $farmers->getCollection()->flatMap(fn (Farmer $farmer) => $farmer->farms
+                ->filter(fn (Farm $farm): bool => $farm->latitude !== null && $farm->longitude !== null)
+                ->map(fn (Farm $farm): array => [
+                    'latitude' => (float) $farm->latitude,
+                    'longitude' => (float) $farm->longitude,
+                    'farmer' => $farmer->user->name,
+                    'farmerCode' => $farmer->farmer_code,
+                    'farm' => $farm->name,
+                    'barangay' => $farm->barangay,
+                ]))->values()
+            : collect();
 
         return view('ffrms.registrations', compact('farmers', 'associations') + [
             'selectedFarmer' => $selectedFarmer,
@@ -51,6 +67,8 @@ class FFRMSController extends Controller
             'canManageAssociations' => $request->user()->canModuleAction('ffrms', 'update'),
             'canUpdate' => $request->user()->canModuleAction('ffrms', 'update'),
             'canExport' => $request->user()->canModuleAction('ffrms', 'export'),
+            'farmLocationsReady' => $farmLocationsReady,
+            'farmMapPoints' => $farmMapPoints,
         ]);
     }
 
@@ -130,6 +148,7 @@ class FFRMSController extends Controller
         $this->authorizeStaff($request, 'update');
         $data = $request->validate(['name' => ['required', 'string', 'max:150'], 'registration_reference' => ['nullable', 'string', 'max:100'], 'barangay' => ['nullable', 'string', 'max:100']]);
         FarmerAssociation::create($data + ['status' => 'active', 'created_by' => $request->user()->id]);
+
         return back()->with('status', 'Farmer association registered.');
     }
 
@@ -138,6 +157,7 @@ class FFRMSController extends Controller
         $this->authorizeStaff($request, 'update');
         $data = $request->validate(['farmer_id' => ['required', 'exists:farmers,id']]);
         $association->farmers()->syncWithoutDetaching([$data['farmer_id'] => ['membership_status' => 'active', 'joined_at' => now()]]);
+
         return back()->with('status', 'Farmer added to association.');
     }
 
@@ -195,7 +215,15 @@ class FFRMSController extends Controller
 
     private function farmData(Request $request): array
     {
-        $data = $request->validate([
+        $farmLocationsReady = collect(['latitude', 'longitude', 'location_accuracy_meters', 'location_source'])
+            ->every(fn (string $column): bool => Schema::hasColumn('farms', $column));
+        if (! $farmLocationsReady && ($request->filled('latitude') || $request->filled('longitude'))) {
+            throw ValidationException::withMessages([
+                'location' => 'Exact farm map pins are waiting for the approved database update. Other farm details can still be edited.',
+            ]);
+        }
+
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'barangay' => ['required', 'string', 'max:100'],
             'location_details' => ['nullable', 'string', 'max:255'],
@@ -208,10 +236,31 @@ class FFRMSController extends Controller
             'irrigation_type' => ['nullable', 'string', 'max:100'],
             'agricultural_activities' => ['nullable', 'string', 'max:1000'],
             'categories' => ['nullable', 'string', 'max:1000'],
-        ]);
+        ];
+        if ($farmLocationsReady) {
+            $rules += [
+                'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+                'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
+                'location_accuracy_meters' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+                'location_source' => ['nullable', 'required_with:latitude,longitude', Rule::in(['gps', 'manual'])],
+            ];
+        }
+        $data = $request->validate($rules);
         $csv = fn (?string $value) => collect(explode(',', (string) $value))->map(fn ($item) => trim($item))->filter()->values()->all();
         $data['agricultural_activities'] = $csv($data['agricultural_activities'] ?? null);
         $data['categories'] = $csv($data['categories'] ?? null);
+        if ($farmLocationsReady) {
+            $data['latitude'] = $data['latitude'] ?? null;
+            $data['longitude'] = $data['longitude'] ?? null;
+            $data['location_accuracy_meters'] = $data['location_accuracy_meters'] ?? null;
+            $data['location_source'] = $data['location_source'] ?? null;
+            if ($data['latitude'] === null && $data['longitude'] === null) {
+                $data['location_source'] = null;
+                $data['location_accuracy_meters'] = null;
+            } elseif ($data['location_source'] === 'manual') {
+                $data['location_accuracy_meters'] = null;
+            }
+        }
 
         return $data;
     }
