@@ -95,6 +95,18 @@ class PublicWebsiteExperienceTest extends TestCase
             ->assertDontSee('There are no records in the database');
     }
 
+    public function test_homepage_preserves_https_asset_urls_behind_the_render_forwarding_proxy(): void
+    {
+        $this->withHeaders([
+            'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Host' => 'agriconnect-erp.onrender.com',
+            'X-Forwarded-Port' => '443',
+        ])->get(route('home'))
+            ->assertOk()
+            ->assertSee('https://agriconnect-erp.onrender.com/build/assets/', false)
+            ->assertDontSee('http://agriconnect-erp.onrender.com/build/assets/', false);
+    }
+
     public function test_login_and_registration_pages_render_the_existing_csrf_protected_contracts(): void
     {
         $this->get(route('login'))
