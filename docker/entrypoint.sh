@@ -9,6 +9,9 @@ sed -ri "s/^Listen 80$/Listen ${port}/" /etc/apache2/ports.conf
 sed -ri "s/<VirtualHost \*:80>/<VirtualHost *:${port}>/" /etc/apache2/sites-available/000-default.conf
 
 php artisan storage:link --force >/dev/null 2>&1 || true
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+    php artisan migrate --force
+fi
 php artisan view:cache >/dev/null
 
 exec apache2-foreground

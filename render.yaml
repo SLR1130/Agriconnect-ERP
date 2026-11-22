@@ -11,6 +11,8 @@ services:
         sync: false
       - key: APP_URL
         sync: false
+      - key: RUN_MIGRATIONS
+        value: "false"
       - key: DB_CONNECTION
         value: mysql
       - key: DB_HOST
