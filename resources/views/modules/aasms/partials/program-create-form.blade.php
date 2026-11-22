@@ -25,10 +25,11 @@
 
     <fieldset class="aas-form-section">
         <legend>3. Eligibility <span>who may apply</span></legend>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div><label class="aas-inline-label" for="aasms-create-barangays">Eligible barangays</label><input id="aasms-create-barangays" class="aas-input" name="barangays" value="{{ old('_aasms_form') === 'create-program' ? old('barangays') : '' }}" placeholder="Blank means all barangays"></div>
-            <div><label class="aas-inline-label" for="aasms-create-activities">Eligible activities</label><input id="aasms-create-activities" class="aas-input" name="activities" value="{{ old('_aasms_form') === 'create-program' ? old('activities') : '' }}" placeholder="e.g. rice, fishing"></div>
-            <div><label class="aas-inline-label" for="aasms-create-categories">Farm categories</label><input id="aasms-create-categories" class="aas-input" name="farm_categories" value="{{ old('_aasms_form') === 'create-program' ? old('farm_categories') : '' }}" placeholder="Comma separated"></div>
+        <p class="aas-form-help">Choose the places and farm profiles this program serves. Leave a list blank when every barangay, activity, or category is eligible.</p>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            @include('modules.aasms.partials.eligibility-picker', ['id' => 'aasms-create-barangays', 'name' => 'barangays', 'label' => 'Eligible barangays', 'placeholder' => 'All Bongabong barangays', 'hint' => 'Select one or more barangays. Leave blank for all.', 'options' => array_fill_keys($barangays, null), 'selected' => old('_aasms_form') === 'create-program' ? old('barangays', []) : []])
+            @include('modules.aasms.partials.eligibility-picker', ['id' => 'aasms-create-activities', 'name' => 'activities', 'label' => 'Eligible activities', 'placeholder' => 'All farm activities', 'hint' => 'Select the work this program supports.', 'options' => $eligibilityOptions['activities'] ?? [], 'selected' => old('_aasms_form') === 'create-program' ? old('activities', []) : []])
+            @include('modules.aasms.partials.eligibility-picker', ['id' => 'aasms-create-categories', 'name' => 'farm_categories', 'label' => 'Farm categories', 'placeholder' => 'All farm categories', 'hint' => 'Select the farm type or classification.', 'options' => $eligibilityOptions['farm_categories'] ?? [], 'selected' => old('_aasms_form') === 'create-program' ? old('farm_categories', []) : []])
         </div>
         <div class="mt-3 flex flex-wrap gap-4 text-sm"><label class="flex items-center gap-2"><input type="checkbox" name="requires_farm" value="1" @checked(old('_aasms_form') === 'create-program' && old('requires_farm'))> Require a registered farm</label><label class="flex items-center gap-2"><input type="checkbox" name="previous_beneficiary_restricted" value="1" @checked(old('_aasms_form') === 'create-program' && old('previous_beneficiary_restricted'))> Restrict previous beneficiaries</label></div>
     </fieldset>

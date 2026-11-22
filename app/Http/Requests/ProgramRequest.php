@@ -22,8 +22,25 @@ class ProgramRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:2000'], 'opens_on' => ['nullable', 'date'],
             'closes_on' => ['nullable', 'date', 'after_or_equal:opens_on'], 'supply_item_id' => ['nullable', 'exists:supply_items,id'],
             'allocation_limit' => ['nullable', 'numeric', 'min:0.01'], 'requires_farm' => ['nullable', 'boolean'],
-            'barangays' => ['nullable', 'string', 'max:1000'], 'activities' => ['nullable', 'string', 'max:1000'],
-            'farm_categories' => ['nullable', 'string', 'max:1000'], 'previous_beneficiary_restricted' => ['nullable', 'boolean'],
+            'barangays' => ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_string($value) && ! is_array($value)) {
+                    $fail('Choose one or more barangays, or leave this field blank for all barangays.');
+                }
+            }],
+            'barangays.*' => ['string', 'max:100'],
+            'activities' => ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_string($value) && ! is_array($value)) {
+                    $fail('Choose one or more eligible activities.');
+                }
+            }],
+            'activities.*' => ['string', 'max:100'],
+            'farm_categories' => ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_string($value) && ! is_array($value)) {
+                    $fail('Choose one or more farm categories.');
+                }
+            }],
+            'farm_categories.*' => ['string', 'max:100'],
+            'previous_beneficiary_restricted' => ['nullable', 'boolean'],
             'requirements' => ['sometimes', 'array', 'max:12'],
             'requirements.*.key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'requirements.*.display_name' => ['nullable', 'string', 'max:150'],

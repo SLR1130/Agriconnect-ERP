@@ -124,6 +124,42 @@ class CoreOperationsCompletionTest extends TestCase
         $this->assertDatabaseHas('assistance_applications', ['id' => $application->id, 'program_id' => $program->id, 'status' => 'submitted']);
     }
 
+    public function test_aasms_program_form_uses_real_eligibility_options_and_saves_multiple_selections(): void
+    {
+        $staff = $this->staff('aasms');
+
+        $this->actingAs($staff)
+            ->get('/modules/aasms?workspace=programs')
+            ->assertOk()
+            ->assertSee('name="barangays[]"', false)
+            ->assertSee('name="activities[]"', false)
+            ->assertSee('name="farm_categories[]"', false)
+            ->assertSee('Poblacion')
+            ->assertSee('Rice / palay farming')
+            ->assertSee('Crop farm');
+
+        $this->actingAs($staff)
+            ->post('/modules/aasms/programs', [
+                'name' => 'Barangay Rice Support',
+                'category' => 'Crop support',
+                'description' => 'Support for rice farmers in selected barangays.',
+                'barangays' => ['Poblacion', 'Anilao'],
+                'activities' => ['rice', 'vegetables'],
+                'farm_categories' => ['crop', 'food_crop'],
+                'requires_farm' => '1',
+                'requirements' => [],
+            ])
+            ->assertRedirect();
+
+        $program = AssistanceProgram::query()->latest('id')->firstOrFail();
+        $rules = $program->eligibility_rules;
+
+        $this->assertSame(['Poblacion', 'Anilao'], data_get($rules, 'barangays'));
+        $this->assertSame(['rice', 'vegetables'], data_get($rules, 'activities'));
+        $this->assertSame(['crop', 'food_crop'], data_get($rules, 'farm_categories'));
+        $this->assertTrue((bool) data_get($rules, 'requires_farm'));
+    }
+
     public function test_aeams_asset_edit_archive_restore_and_utilization_report_are_authorized(): void
     {
         $staff = $this->staff('aeams');

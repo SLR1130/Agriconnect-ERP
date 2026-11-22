@@ -339,6 +339,31 @@ document.addEventListener('DOMContentLoaded', () => {
         applyUrlWorkspace();
     });
 
+    document.querySelectorAll('[data-aasms-picker]').forEach((picker) => {
+        const summary = picker.querySelector('[data-aasms-picker-summary]');
+        const choices = [...picker.querySelectorAll('[data-aasms-picker-choice]')];
+        if (!summary || !choices.length) return;
+
+        const emptyLabel = summary.dataset.emptyLabel || summary.textContent.trim();
+        const updateSummary = () => {
+            const selectedCount = choices.filter((choice) => choice.checked).length;
+            summary.textContent = selectedCount ? `${selectedCount} selected` : emptyLabel;
+        };
+
+        choices.forEach((choice) => choice.addEventListener('change', updateSummary));
+        updateSummary();
+    });
+
+    document.querySelectorAll('form.aas-program-form, form[action*="/aasms/programs/"]').forEach((form) => {
+        form.addEventListener('submit', () => {
+            const button = form.querySelector('button[type="submit"]');
+            if (!button) return;
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            button.textContent = 'Saving program...';
+        });
+    });
+
     const workspace = document.querySelector('[data-apms-workspace]');
 
     if (workspace) {

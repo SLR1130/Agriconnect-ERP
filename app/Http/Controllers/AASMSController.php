@@ -135,6 +135,7 @@ class AASMSController extends Controller
 
         return view('modules.aasms.dashboard', compact('programs', 'applications', 'batches', 'distributions', 'barangays', 'distributionBarangaySummary') + [
             'items' => SupplyItem::where('status', 'active')->orderBy('name')->get(),
+            'eligibilityOptions' => config('agricultural_options.eligibility', []),
             'pending' => (int) $applicationCounts->get('submitted', 0), 'approved' => (int) $applicationCounts->get('approved', 0), 'rejected' => (int) $applicationCounts->get('rejected', 0), 'completed' => (int) $applicationCounts->get('completed', 0),
             'canCreate' => $request->user()->canModuleAction('aasms', 'create'),
             'canUpdate' => $request->user()->canModuleAction('aasms', 'update'),
@@ -289,7 +290,12 @@ class AASMSController extends Controller
     private function programData(ProgramRequest $request): array
     {
         $data = $request->validated();
-        $split = fn ($key) => collect(explode(',', (string) ($data[$key] ?? '')))->map(fn ($v) => trim($v))->filter()->values()->all();
+        $split = fn ($key) => collect(is_array($data[$key] ?? null) ? $data[$key] : explode(',', (string) ($data[$key] ?? '')))
+            ->map(fn ($v) => trim((string) $v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
         $data['eligibility_rules'] = ['requires_verified_farmer' => true, 'requires_farm' => (bool) ($data['requires_farm'] ?? false), 'barangays' => $split('barangays'), 'activities' => $split('activities'), 'farm_categories' => $split('farm_categories'), 'previous_beneficiary_restricted' => (bool) ($data['previous_beneficiary_restricted'] ?? false)];
         unset($data['requires_farm'],$data['barangays'],$data['activities'],$data['farm_categories'],$data['previous_beneficiary_restricted']);
 
