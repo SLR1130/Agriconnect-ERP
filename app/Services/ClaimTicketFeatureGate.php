@@ -7,9 +7,14 @@ use Illuminate\Support\Facades\Schema;
 
 class ClaimTicketFeatureGate
 {
+    public function operational(): bool
+    {
+        return config('agricultural_claim_tickets.mode') === 'operational';
+    }
+
     public function enabled(): bool
     {
-        if (! config('agricultural_claim_tickets.enabled') || ! app()->environment(['local', 'testing'])) {
+        if (! config('agricultural_claim_tickets.enabled')) {
             return false;
         }
 
@@ -23,6 +28,24 @@ class ClaimTicketFeatureGate
         $connection = DB::connection($connectionName);
         $driver = $connection->getDriverName();
         $database = (string) $connection->getDatabaseName();
+
+        if ($this->operational()) {
+            if (app()->environment('testing') && $driver === 'sqlite' && $database === ':memory:') {
+                return Schema::connection($connectionName)->hasTable('assistance_claim_tickets')
+                    && Schema::connection($connectionName)->hasTable('assistance_handover_enrollments');
+            }
+
+            return $driver === 'mysql'
+                && (bool) config('agricultural_claim_tickets.live_enabled')
+                && $database !== ''
+                && hash_equals((string) config('agricultural_claim_tickets.live_database'), $database)
+                && Schema::connection($connectionName)->hasTable('assistance_claim_tickets')
+                && Schema::connection($connectionName)->hasTable('assistance_handover_enrollments');
+        }
+
+        if (! app()->environment(['local', 'testing'])) {
+            return false;
+        }
 
         if ($driver === 'sqlite') {
             if (app()->environment('testing') && $database === ':memory:') {

@@ -16,12 +16,12 @@
 
         <div class="farmer-service-grid">
             @foreach([
+                ['Borrow MAO equipment', 'Choose an available municipal asset, request the dates you need, and follow the MAO decision through return.', route('farmer.equipment'), 'equipment', 'Borrow equipment', $verified ? 'Available assets are subject to schedule review.' : 'Equipment requests open after farmer verification.'],
                 ['Assistance and subsidies', 'Find published programs, review requirements, apply when eligible, and track MAO decisions.', route('farmer.assistance'), 'assistance', 'Browse programs', 'Program dates and eligibility determine when you can apply.'],
                 ['Farmer and farm records', 'Keep your contact details and farm locations current and follow registration verification.', route('farmer.farms'), 'farms', 'Manage my farms', $verified ? 'Your farmer registration is verified.' : 'Applications for some services open after verification.'],
                 ['Crop and livestock', 'Send crop or livestock information to the MAO and review your submitted records.', route('farmer.production', ['section' => 'crops']), 'crop', 'Open production services', $verified ? 'Submit information for MAO review.' : 'Submission is available after farmer verification.'],
                 ['Fisheries', 'Submit fishery production details for your registered farm and track the review.', route('farmer.production', ['section' => 'fisheries']), 'fish', 'Open fisheries services', $verified ? 'Submit information for MAO review.' : 'Submission is available after farmer verification.'],
                 ['Farm monitoring and incident reports', 'Review monitoring records or report a pest, disease, or other farm incident.', route('farmer.production', ['section' => 'incidents']), 'monitoring', 'Open monitoring services', $verified ? 'Choose a registered farm when sending a report.' : 'Reporting forms require a verified farmer account.'],
-                ['Equipment services', 'See equipment offered to farmers, request an available asset, and track return details.', route('farmer.equipment'), 'equipment', 'Browse equipment', 'Requests depend on asset availability and MAO review.'],
             ] as [$name, $copy, $url, $icon, $action, $serviceNote])
                 <article class="farmer-card farmer-service-card">
                     <div class="farmer-service-card-top">

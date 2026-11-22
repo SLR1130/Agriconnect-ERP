@@ -22,7 +22,7 @@
         <section class="ae-card p-6">
             <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div><p class="text-xs font-bold uppercase tracking-[.16em] text-emerald-700">{{ $asset->asset_code }}</p><h1 class="mt-2 text-2xl font-bold text-forest-green">{{ $asset->name }}</h1><p class="mt-2 text-sm leading-6 text-slate-600">{{ $asset->description ?: 'No description recorded.' }}</p></div>
-                <span class="ae-pill {{ $asset->availability_status === 'available' ? 'ae-green' : ($asset->availability_status === 'maintenance' ? 'ae-red' : 'ae-yellow') }}">{{ str_replace('_', ' ', $asset->availability_status) }}</span>
+                <span class="ae-pill {{ $asset->availability_status === 'available' ? 'ae-green' : ($asset->availability_status === 'maintenance' ? 'ae-red' : 'ae-yellow') }}">{{ str($asset->availability_status)->replace('_', ' ')->headline() }}</span>
             </div>
             <div class="mt-6 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2 lg:grid-cols-4">
                 <div><p class="text-xs uppercase text-slate-500">Category</p><p class="mt-1 font-semibold text-slate-800">{{ $asset->category->name }}</p></div>
@@ -51,7 +51,7 @@
             <h2 class="text-lg font-bold text-forest-green">Asset transaction history</h2>
             <div class="ae-table-wrap mt-4"><table class="ae-table"><thead><tr><th>When</th><th>Action</th><th>Responsible personnel</th><th>Request</th><th>Notes</th></tr></thead><tbody>
                 @forelse($transactions as $transaction)
-                    <tr><td>{{ $transaction->created_at?->format('M d, Y H:i') }}</td><td><span class="ae-pill {{ in_array($transaction->action, ['returned', 'maintenance_completed']) ? 'ae-green' : ($transaction->action === 'rejected' ? 'ae-red' : 'ae-yellow') }}">{{ str_replace('_', ' ', $transaction->action) }}</span></td><td>{{ $transaction->performedBy->name }}</td><td>{{ $transaction->request?->reference ?: 'Asset record' }}</td><td>{{ $transaction->notes ?: '—' }}</td></tr>
+                    <tr><td>{{ $transaction->created_at?->format('M d, Y H:i') }}</td><td><span class="ae-pill {{ in_array($transaction->action, ['returned', 'maintenance_completed']) ? 'ae-green' : ($transaction->action === 'rejected' ? 'ae-red' : 'ae-yellow') }}">{{ str($transaction->action)->replace('_', ' ')->headline() }}</span></td><td>{{ $transaction->performedBy->name }}</td><td>{{ $transaction->request?->reference ?: 'Asset record' }}</td><td>{{ $transaction->notes ?: '—' }}</td></tr>
                 @empty
                     <tr><td colspan="5" class="py-8 text-center text-slate-500">No asset transactions have been recorded.</td></tr>
                 @endforelse

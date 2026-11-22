@@ -50,6 +50,115 @@ class AASMSAssistanceTest extends TestCase
         $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', ['supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 2])->assertRedirect();
         $this->assertDatabaseHas('assistance_distributions', ['application_id' => $x['app']->id, 'quantity' => 2]);
         $this->assertSame('3.00', (string) SupplyBatch::first()->fresh()->quantity_available);
+
+        $inventoryViewer = Role::create(['name' => 'AISMS History Viewer', 'slug' => 'aasms_inventory_history_viewer', 'permissions' => ['modules.aisms.view'], 'is_active' => true]);
+        $x['staff']->roles()->attach($inventoryViewer);
+        $this->actingAs($x['staff'])->get('/modules/aisms')
+            ->assertOk()
+            ->assertSee('Open AASMS application #'.$x['app']->id)
+            ->assertSee(route('modules.aasms.applications.show', $x['app']->id));
+    }
+
+    public function test_program_workspace_explains_authoring_flow_and_renders_a_clear_creator(): void
+    {
+        $x = $this->setupData();
+
+        $this->actingAs($x['staff'])->get('/modules/aasms?workspace=programs')
+            ->assertOk()
+            ->assertSee('Create assistance program')
+            ->assertSee('Run each assistance service from setup to handover')
+            ->assertSee('Define a service farmers can apply for')
+            ->assertSee('Create program draft')
+            ->assertSee('Service identity')
+            ->assertSee('Schedule and resource')
+            ->assertSee('Supporting documents')
+            ->assertSee('Save private program')
+            ->assertSee('Existing applications keep their original requirements version');
+    }
+
+    public function test_distribution_history_and_export_filter_by_the_farmers_current_barangay(): void
+    {
+        $x = $this->setupData();
+        $x['app']->farmer->update(['barangay' => 'Labasan']);
+        $secondUser = User::factory()->create(['name' => 'Second Farmer']);
+        $secondFarmer = Farmer::create(['user_id' => $secondUser->id, 'farmer_code' => 'F-2', 'registration_status' => 'verified', 'barangay' => 'Dayhagan']);
+        $secondApplication = AssistanceApplication::create(['program_id' => $x['program']->id, 'farmer_id' => $secondFarmer->id, 'status' => 'approved']);
+        $unknownUser = User::factory()->create(['name' => 'Barangay Not Recorded']);
+        $unknownFarmer = Farmer::create(['user_id' => $unknownUser->id, 'farmer_code' => 'F-3', 'registration_status' => 'verified']);
+        $unknownApplication = AssistanceApplication::create(['program_id' => $x['program']->id, 'farmer_id' => $unknownFarmer->id, 'status' => 'approved']);
+
+        foreach ([$x['app'], $secondApplication, $unknownApplication] as $application) {
+            $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$application->id.'/distribute', [
+                'supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 1,
+            ])->assertRedirect()->assertSessionHasNoErrors();
+        }
+
+        $page = $this->actingAs($x['staff'])->get('/modules/aasms?workspace=distributions&barangay=Labasan')
+            ->assertOk()->assertSee('Current barangay: Labasan')->assertSee('matching records')->assertSee('Open application #')
+            ->assertSee('name="barangay"', false);
+        $this->assertSame(1, $page->viewData('distributions')->total());
+        $this->assertSame($x['app']->id, $page->viewData('distributions')->first()->application_id);
+        $this->assertSame('at distribution', $page->viewData('distributionBarangaySummaryBasis'));
+        $this->assertSame(3, $page->viewData('distributionBarangaySummary')->sum('distribution_count'));
+        $this->assertSame(1, $page->viewData('distributionBarangaySummary')->where('barangay', 'Labasan')->first()->distribution_count);
+        $this->assertSame(1, $page->viewData('distributionBarangaySummary')->where('barangay', 'Not recorded')->first()->distribution_count);
+        $this->assertSame(1, $this->actingAs($x['staff'])
+            ->get('/modules/aasms?workspace=distributions&distribution_barangay=__not_recorded__')
+            ->assertOk()->viewData('distributions')->total());
+        $this->actingAs($x['staff'])->get('/modules/aasms?workspace=distributions&distribution_barangay=InventedBarangay')
+            ->assertSessionHasErrors('distribution_barangay');
+        $csv = $this->actingAs($x['staff'])->get('/modules/aasms/export?barangay=Labasan')
+            ->assertOk()->streamedContent();
+        $this->assertStringContainsString('Labasan', $csv);
+        $this->assertStringNotContainsString('Second Farmer', $csv);
+        $this->assertDatabaseCount('assistance_distributions', 3);
+
+        $this->actingAs($x['fu'])->get('/modules/aasms/export?barangay=Labasan')->assertForbidden();
+    }
+
+    public function test_distribution_preserves_farmer_barangay_at_the_time_of_handover(): void
+    {
+        $x = $this->setupData();
+        $farmer = $x['app']->farmer;
+        $farmer->update(['barangay' => 'Labasan']);
+
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', [
+            'supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 1,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $distribution = AssistanceDistribution::sole();
+        $this->assertSame('Labasan', $distribution->farmer_barangay_at_distribution);
+        $farmer->update(['barangay' => 'Dayhagan']);
+        $this->assertSame('Labasan', $distribution->fresh()->farmer_barangay_at_distribution);
+
+        $page = $this->actingAs($x['staff'])->get('/modules/aasms?workspace=distributions&distribution_barangay=Labasan')
+            ->assertOk()->assertSee('At distribution: Labasan')->assertSee('Current barangay: Dayhagan');
+        $this->assertSame(1, $page->viewData('distributions')->total());
+        $this->assertSame(0, $this->actingAs($x['staff'])
+            ->get('/modules/aasms?workspace=distributions&distribution_barangay=Dayhagan')
+            ->assertOk()->viewData('distributions')->total());
+        $csv = $this->actingAs($x['staff'])->get('/modules/aasms/export?distribution_barangay=Labasan')->assertOk()->streamedContent();
+        $this->assertStringContainsString('Labasan', $csv);
+        $this->assertStringContainsString('Dayhagan', $csv);
+    }
+
+    public function test_farmer_registration_assistance_history_requires_aasms_view_access(): void
+    {
+        $x = $this->setupData();
+        $this->actingAs($x['staff'])->post('/modules/aasms/applications/'.$x['app']->id.'/distribute', [
+            'supply_batch_id' => $x['batch']->supply_batch_id, 'quantity' => 1,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $ffrmsRole = Role::create(['name' => 'FFRMS Viewer', 'slug' => 'ffrms_history_viewer', 'permissions' => ['modules.ffrms.view'], 'is_active' => true]);
+        $x['staff']->roles()->attach($ffrmsRole);
+        $ffrmsOnly = User::factory()->create();
+        $ffrmsOnly->roles()->attach($ffrmsRole);
+        $url = '/modules/ffrms?workspace=farmers&record='.$x['app']->farmer_id;
+        $reference = AssistanceDistribution::sole()->reference;
+
+        $this->actingAs($x['staff'])->get($url)
+            ->assertOk()->assertSee('Assistance received')->assertSee($reference);
+        $this->actingAs($ffrmsOnly)->get($url)
+            ->assertOk()->assertDontSee('Assistance received')->assertDontSee($reference);
     }
 
     public function test_only_approved_application_can_be_distributed(): void

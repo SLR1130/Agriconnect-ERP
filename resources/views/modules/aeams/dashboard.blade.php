@@ -1,5 +1,5 @@
 <x-layouts.app>
-    <x-slot name="header">Agricultural Equipment &amp; Asset Management</x-slot>
+    <x-slot name="header">Agricultural Equipment & Asset Management</x-slot>
     <x-slot name="description">Manage shared equipment, farmer reservations, issue and return records, and maintenance.</x-slot>
 
     <style>
@@ -13,7 +13,8 @@
         .ae-pill{display:inline-flex;align-items:center;border-radius:999px;padding:.25rem .55rem;font-size:.65rem;font-weight:800;text-transform:capitalize;white-space:nowrap}.ae-green{background:#e7f0e8;color:#1c6a46}.ae-yellow{background:#fff5d8;color:#8a691e}.ae-red{background:#fee7e5;color:#a33e36}.ae-blue{background:#e7f0fb;color:#28618e}.ae-gray{background:#eef2f0;color:#58685e}
         .ae-disclosure{padding:.85rem;background:#f8faf7;border:1px solid #dfe9e1;border-radius:.75rem}.ae-disclosure>summary{list-style:none;cursor:pointer;color:#1c6a46;font-size:.75rem;font-weight:800}.ae-disclosure>summary::-webkit-details-marker{display:none}.ae-disclosure>summary:focus-visible{outline:3px solid #26865c88;outline-offset:2px}
         .ae-label{display:block;margin-bottom:.3rem;color:#53645a;font-size:.67rem;font-weight:750}.ae-stat{padding:.85rem}.ae-stat p{margin:0;color:#718177;font-size:.63rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase}.ae-stat strong{display:block;margin-top:.35rem;font-size:1.35rem;line-height:1.2}
-        @media(max-width:640px){.ae-stat{padding:.7rem}.ae-stat strong{font-size:1.15rem}.ae-table{min-width:760px}}
+        .ae-action-desk{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,minmax(0,1fr));gap:.75rem;padding:1rem}.ae-action-intro{padding:.45rem .35rem}.ae-action-intro h2{margin:.25rem 0;color:#153d2b;font-size:1.12rem;font-weight:850}.ae-action-intro p{margin:0;color:#5e7064;font-size:.8rem;line-height:1.55}.ae-action-card{display:flex;min-width:0;flex-direction:column;gap:.45rem;padding:.9rem;background:#f8faf7;border:1px solid #dfe9e1;border-radius:.85rem}.ae-action-card strong{color:#153d2b;font-size:.83rem}.ae-action-card span{color:#62736a;font-size:.73rem;line-height:1.45}.ae-action-card .ae-btn{margin-top:auto;align-self:flex-start}.ae-action-empty{align-self:center;padding:.9rem;background:#edf6ef;border-radius:.75rem;color:#365d45;font-size:.78rem;font-weight:700}
+        @media(max-width:900px){.ae-action-desk{grid-template-columns:repeat(2,minmax(0,1fr))}.ae-action-intro{grid-column:1/-1}}@media(max-width:640px){.ae-stat{padding:.7rem}.ae-stat strong{font-size:1.15rem}.ae-table{min-width:760px}.ae-action-desk{grid-template-columns:minmax(0,1fr);padding:.85rem}.ae-action-intro{grid-column:auto}.ae-action-card .ae-btn{width:100%}}
     </style>
 
     <div class="space-y-5">
@@ -32,6 +33,46 @@
                 <article class="ae-card ae-stat"><p>{{ $stat['label'] }}</p><strong class="{{ $stat['class'] }}">{{ $stat['value'] }}</strong></article>
             @endforeach
         </div>
+
+        <x-ui.workflow-strip
+            label="Equipment lifecycle"
+            description="A request reserves a schedule; an issue creates custody; a return or maintenance action closes the operational loop."
+            :steps="['Available', 'Request', 'Approve & reserve', 'Issue', 'Return or maintain']"
+        />
+
+        @if($isStaff)
+            <section class="ae-card ae-action-desk" aria-labelledby="aeams-next-actions-title">
+                <div class="ae-action-intro">
+                    <p class="erp-page-eyebrow">Today's equipment desk</p>
+                    <h2 id="aeams-next-actions-title">Complete the next accountable action.</h2>
+                    <p>Review a farmer request first. Only approved schedules can be physically issued, and only issued equipment can be returned.</p>
+                </div>
+                @if($canReview)
+                    <article class="ae-action-card">
+                        <strong>{{ $stats['pending'] }} pending {{ str('request')->plural($stats['pending']) }}</strong>
+                        <span>Check the farmer, requested dates, and equipment availability before reserving a schedule.</span>
+                        <a class="ae-btn ae-primary" href="{{ route('modules.aeams.dashboard', ['workspace' => 'requests', 'request_status' => 'pending']) }}">Review requests</a>
+                    </article>
+                @endif
+                @if($canIssue)
+                    <article class="ae-action-card">
+                        <strong>{{ $stats['reserved'] }} approved {{ str('request')->plural($stats['reserved']) }}</strong>
+                        <span>Record physical release only when the farmer collects the approved equipment.</span>
+                        <a class="ae-btn ae-gold" href="{{ route('modules.aeams.dashboard', ['workspace' => 'requests', 'request_status' => 'approved']) }}">Record equipment issue</a>
+                    </article>
+                @endif
+                @if($canReturn)
+                    <article class="ae-action-card">
+                        <strong>{{ $stats['issued'] }} issued {{ str('asset')->plural($stats['issued']) }}</strong>
+                        <span>Receive equipment back, record its condition, and send it to maintenance if needed.</span>
+                        <a class="ae-btn ae-muted" href="{{ route('modules.aeams.dashboard', ['workspace' => 'requests', 'request_status' => 'issued']) }}">Record returns</a>
+                    </article>
+                @endif
+                @if(!$canReview && !$canIssue && !$canReturn)
+                    <p class="ae-action-empty">Your role can view the equipment register. Operational review, issue, and return controls are assigned separately.</p>
+                @endif
+            </section>
+        @endif
 
         <div class="erp-workspace" data-erp-workspace data-workspace-param="workspace" data-workspace-default="{{ $isFarmer ? 'requests' : 'inventory' }}" data-workspace-initial="{{ old('_erp_workspace', old('_aeams_workspace', request('workspace', $isFarmer ? 'requests' : 'inventory'))) }}">
             <div class="erp-workspace-tabs" role="tablist" aria-label="Equipment management workspaces">
@@ -90,8 +131,8 @@
                         <form method="POST" action="{{ route('modules.aeams.requests.store') }}" class="mt-4 grid gap-3 md:grid-cols-2">@csrf<input type="hidden" name="_aeams_workspace" value="requests"><input type="hidden" name="_aeams_form" value="request">
                             <div><label class="ae-label" for="aeams-request-asset">Available equipment</label><select id="aeams-request-asset" class="ae-input" name="equipment_asset_id" required><option value="">Select equipment</option>@foreach($assets as $asset)<option value="{{ $asset->id }}" @selected(old('_aeams_form') === 'request' && old('equipment_asset_id') == $asset->id)>{{ $asset->asset_code }} · {{ $asset->name }} ({{ ucfirst($asset->condition) }})</option>@endforeach</select></div>
                             <div><label class="ae-label" for="aeams-request-key">Retry reference (optional)</label><input id="aeams-request-key" class="ae-input" name="idempotency_key" value="{{ old('_aeams_form') === 'request' ? old('idempotency_key') : '' }}"></div>
-                            <div><label class="ae-label" for="aeams-schedule-start">Schedule starts</label><input id="aeams-schedule-start" class="ae-input" name="schedule_start" type="datetime-local" value="{{ old('_aeams_form') === 'request' ? old('schedule_start') : '' }}" required></div>
-                            <div><label class="ae-label" for="aeams-schedule-end">Schedule ends</label><input id="aeams-schedule-end" class="ae-input" name="schedule_end" type="datetime-local" value="{{ old('_aeams_form') === 'request' ? old('schedule_end') : '' }}" required></div>
+                            <div><label class="ae-label" for="aeams-schedule-start">Schedule starts</label><input id="aeams-schedule-start" class="ae-input" name="schedule_start" type="datetime-local" value="{{ old('_aeams_form') === 'request' ? old('schedule_start') : '' }}" required><small class="text-xs text-slate-500">Philippine time</small></div>
+                            <div><label class="ae-label" for="aeams-schedule-end">Schedule ends</label><input id="aeams-schedule-end" class="ae-input" name="schedule_end" type="datetime-local" value="{{ old('_aeams_form') === 'request' ? old('schedule_end') : '' }}" required><small class="text-xs text-slate-500">Philippine time</small></div>
                             <div class="md:col-span-2"><label class="ae-label" for="aeams-intended-use">Intended agricultural use</label><textarea id="aeams-intended-use" class="ae-input" name="intended_use" rows="3" required>{{ old('_aeams_form') === 'request' ? old('intended_use') : '' }}</textarea></div>
                             <button class="ae-btn ae-primary md:col-span-2" type="submit">Submit equipment request</button>
                         </form>
@@ -112,8 +153,8 @@
                                 @php($requestStatusLabel = match($equipmentRequest->status) { 'approved' => 'Approved · reserved', default => ucfirst($equipmentRequest->status) })
                                 <tr>
                                     <td><strong>{{ $equipmentRequest->reference }}</strong><div class="text-xs text-slate-500">{{ $equipmentRequest->created_at?->format('M d, Y H:i') }}</div></td>
-                                    <td><strong>{{ $equipmentRequest->asset->name }}</strong><div class="text-xs text-slate-500">{{ $equipmentRequest->farmer->user->name }} · {{ $equipmentRequest->farmer->farmer_code }}</div></td>
-                                    <td>{{ $equipmentRequest->schedule_start?->format('M d, Y H:i') }}<br><span class="text-xs text-slate-500">to {{ $equipmentRequest->schedule_end?->format('M d, Y H:i') }}</span></td>
+                                    <td><strong>{{ $equipmentRequest->asset->name }}</strong><div class="text-xs text-slate-500">@if($canViewFarmerRegistry)<a class="font-semibold text-emerald-green underline underline-offset-2" href="{{ route('modules.ffrms.dashboard', ['workspace' => 'farmers', 'record' => $equipmentRequest->farmer_id]) }}" aria-label="Open FFRMS record for {{ $equipmentRequest->farmer->user->name }}">{{ $equipmentRequest->farmer->user->name }}</a>@else{{ $equipmentRequest->farmer->user->name }}@endif · {{ $equipmentRequest->farmer->farmer_code }}</div></td>
+                                    <td>{{ $equipmentRequest->schedule_start?->timezone(config('agriculture.business_timezone'))->format('M d, Y H:i') }}<br><span class="text-xs text-slate-500">to {{ $equipmentRequest->schedule_end?->timezone(config('agriculture.business_timezone'))->format('M d, Y H:i') }} Philippine time</span></td>
                                     <td><span class="ae-pill {{ in_array($equipmentRequest->status, ['approved', 'returned']) ? 'ae-green' : (in_array($equipmentRequest->status, ['rejected','cancelled']) ? 'ae-red' : ($equipmentRequest->status === 'issued' ? 'ae-blue' : 'ae-yellow')) }}">{{ $requestStatusLabel }}</span></td>
                                     <td class="max-w-xs">{{ $equipmentRequest->intended_use }}@if($equipmentRequest->review_notes)<div class="mt-1 text-xs text-slate-500">Note: {{ $equipmentRequest->review_notes }}</div>@endif</td>
                                     @if($canReview || $canIssue || $canReturn || $isFarmer)

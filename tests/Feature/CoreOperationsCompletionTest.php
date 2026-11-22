@@ -56,13 +56,13 @@ class CoreOperationsCompletionTest extends TestCase
             ->assertSee('Correct farmer information')
             ->assertSee('Edit farm record');
         $this->actingAs($staff)->patch('/modules/ffrms/registrations/'.$data['farmer']->id, [
-            'name' => 'Corrected Farmer', 'email' => $data['farmerUser']->email, 'phone' => '09170000000', 'address' => 'Updated address', 'barangay' => 'East Barangay',
+            'name' => 'Corrected Farmer', 'email' => $data['farmerUser']->email, 'phone' => '09170000000', 'address' => 'Updated address', 'barangay' => 'San Isidro',
         ])->assertRedirect();
         $this->actingAs($staff)->patch('/modules/ffrms/farms/'.$data['farm']->id, [
-            'name' => 'Updated Farm', 'barangay' => 'East Barangay', 'location_details' => 'Block 2', 'area' => 2, 'area_unit' => 'hectare', 'ownership_type' => 'owner', 'classification' => 'Rice', 'tenancy_details' => '', 'soil_type' => 'Loam', 'irrigation_type' => 'Canal', 'agricultural_activities' => 'rice, vegetables', 'categories' => 'crop',
+            'name' => 'Updated Farm', 'barangay' => 'San Isidro', 'location_details' => 'Block 2', 'area' => 2, 'area_unit' => 'hectare', 'ownership_type' => 'owner', 'classification' => 'Rice', 'tenancy_details' => '', 'soil_type' => 'Loam', 'irrigation_type' => 'Canal', 'agricultural_activities' => 'rice, vegetables', 'categories' => 'crop',
         ])->assertRedirect();
 
-        $this->assertDatabaseHas('farmers', ['id' => $data['farmer']->id, 'phone' => '09170000000', 'barangay' => 'East Barangay']);
+        $this->assertDatabaseHas('farmers', ['id' => $data['farmer']->id, 'phone' => '09170000000', 'barangay' => 'San Isidro']);
         $this->assertDatabaseHas('farms', ['id' => $data['farm']->id, 'name' => 'Updated Farm', 'area' => 2]);
         $this->assertDatabaseHas('activity_logs', ['module' => 'ffrms', 'action_type' => 'updated']);
         $this->actingAs($staff)->get('/modules/ffrms/export')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');

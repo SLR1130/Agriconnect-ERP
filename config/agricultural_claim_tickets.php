@@ -3,6 +3,18 @@
 return [
     'enabled' => (bool) env('AGRICULTURAL_CLAIM_TICKETS_ENABLED', false),
 
+    // QA preserves the original isolated-preview restrictions. Operational mode
+    // is available only for the explicitly configured live ERP database.
+    'mode' => env('AGRICULTURAL_CLAIM_TICKETS_MODE', 'qa'),
+    'live_enabled' => (bool) env('AGRICULTURAL_CLAIM_TICKETS_LIVE_ENABLED', false),
+    'live_database' => env('AGRICULTURAL_CLAIM_TICKETS_LIVE_DATABASE', 'agriconnect_erp'),
+
+    // This is consulted only while the pending schema is being installed. It
+    // requires a verified, private backup outside the project before live DDL.
+    'live_schema_activation_approved' => (bool) env('AGRICULTURAL_CLAIM_TICKETS_LIVE_SCHEMA_APPROVED', false),
+    'live_backup_path' => env('AGRICULTURAL_CLAIM_TICKETS_LIVE_BACKUP_PATH'),
+    'live_backup_sha256' => env('AGRICULTURAL_CLAIM_TICKETS_LIVE_BACKUP_SHA256'),
+
     // Local SQLite preview is restricted to this file. PHPUnit uses :memory:.
     'qa_sqlite_path' => env(
         'AGRICULTURAL_CLAIM_TICKETS_QA_SQLITE_PATH',

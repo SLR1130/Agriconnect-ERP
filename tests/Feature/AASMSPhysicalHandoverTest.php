@@ -42,6 +42,9 @@ class AASMSPhysicalHandoverTest extends TestCase
 
         config([
             'agricultural_claim_tickets.enabled' => true,
+            // The test suite uses disposable SQLite fixtures; operational mode
+            // is exercised explicitly by the dedicated test below.
+            'agricultural_claim_tickets.mode' => 'qa',
             'agricultural_claim_tickets.qa_mysql_database' => null,
             'agricultural_claim_handover.enabled' => true,
         ]);
@@ -57,6 +60,7 @@ class AASMSPhysicalHandoverTest extends TestCase
 
     public function test_authorized_physical_handover_commits_one_inventory_distribution_ticket_application_history_ack_and_notification(): void
     {
+        $this->data['application']->farmer->update(['barangay' => 'Labasan']);
         $originalAcknowledgment = $this->createApplicationAcknowledgment($this->data['application']);
         [$ticket, $confirmation] = $this->issueAndConfirm($this->data['application'], $this->data['staff']);
         $before = (string) $this->data['batch']->fresh()->quantity_available;
@@ -70,6 +74,9 @@ class AASMSPhysicalHandoverTest extends TestCase
         $this->assertDatabaseHas('inventory_movements', ['movement_type' => 'release', 'quantity' => '12.00', 'idempotency_key' => 'aasms-claim-ticket:'.$ticket->id]);
         $this->assertDatabaseCount('assistance_distributions', 1);
         $distribution = AssistanceDistribution::sole();
+        $this->assertSame('Labasan', $distribution->farmer_barangay_at_distribution);
+        $this->data['application']->farmer->update(['barangay' => 'Dayhagan']);
+        $this->assertSame('Labasan', $distribution->fresh()->farmer_barangay_at_distribution);
         $this->assertSame($ticket->id, (int) $distribution->claim_ticket_id);
         $this->assertSame('redeemed', $ticket->fresh()->status);
         $this->assertSame($distribution->id, (int) $ticket->fresh()->redeemed_distribution_id);
@@ -81,6 +88,42 @@ class AASMSPhysicalHandoverTest extends TestCase
         $this->assertStringContainsString('SYNTHETIC QA ONLY', $ack->environment_label);
         $this->assertSame($originalAcknowledgment->id, $this->data['application']->fresh()->acknowledgment->id);
         $this->assertDatabaseCount('notifications', 1);
+    }
+
+    public function test_operational_mode_requires_staff_attestation_and_records_an_in_person_handover(): void
+    {
+        config([
+            'agricultural_claim_tickets.mode' => 'operational',
+            'agricultural_claim_tickets.live_enabled' => true,
+        ]);
+
+        $ticket = $this->issueTicket($this->data['application'], $this->data['staff']);
+        $token = Crypt::decryptString($ticket->token_ciphertext);
+        $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.verify'), ['ticket_input' => 'AGC1:'.$token])
+            ->assertRedirect();
+        $event = AssistanceClaimTicketEvent::query()
+            ->where('ticket_id', $ticket->id)->where('outcome', 'valid')->latest('id')->firstOrFail();
+
+        $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.identity-confirm', $ticket), [
+            'verification_event_id' => $event->id,
+            'outcome' => 'confirmed',
+        ])->assertSessionHasErrors('identity_attestation');
+
+        $this->actingAs($this->data['staff'])->post(route('modules.aasms.claim-tickets.identity-confirm', $ticket), [
+            'verification_event_id' => $event->id,
+            'outcome' => 'confirmed',
+            'identity_attestation' => '1',
+        ])->assertRedirect();
+
+        $confirmation = AssistanceIdentityConfirmation::query()->where('verification_event_id', $event->id)->firstOrFail();
+        $this->assertSame(AssistanceIdentityConfirmation::IN_PERSON_METHOD, $confirmation->method);
+        $this->assertSame('in_person_match', data_get($confirmation->evidence_metadata, 'scenario'));
+
+        $this->postHandover($this->data['application'], $ticket, $confirmation, $this->data['batch'], 12);
+        $acknowledgment = AssistanceHandoverAcknowledgment::sole();
+        $this->assertSame(AssistanceIdentityConfirmation::IN_PERSON_METHOD, $acknowledgment->confirmation_method);
+        $this->assertSame('MAO-authorized physical assistance handover', $acknowledgment->environment_label);
+        $this->assertSame('18.00', (string) $this->data['batch']->fresh()->quantity_available);
     }
 
     public function test_identical_retry_returns_existing_distribution_and_conflicting_retries_do_not_release_more_stock(): void
@@ -458,9 +501,13 @@ class AASMSPhysicalHandoverTest extends TestCase
         $event = AssistanceClaimTicketEvent::query()
             ->where('ticket_id', $ticket->id)->where('outcome', 'valid')->whereIn('verification_method', ['token', 'qr'])
             ->latest('id')->firstOrFail();
-        $this->actingAs($actor)->post(route('modules.aasms.claim-tickets.identity-confirm', $ticket), [
+        $payload = [
             'verification_event_id' => $event->id, 'outcome' => 'confirmed',
-        ])->assertRedirect();
+        ];
+        if (config('agricultural_claim_tickets.mode') === 'operational') {
+            $payload['identity_attestation'] = '1';
+        }
+        $this->actingAs($actor)->post(route('modules.aasms.claim-tickets.identity-confirm', $ticket), $payload)->assertRedirect();
         $confirmation = AssistanceIdentityConfirmation::query()->where('verification_event_id', $event->id)->firstOrFail();
         return [$ticket, $confirmation];
     }

@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\ActivityLog;
+use App\Models\EquipmentAsset;
+use App\Models\EquipmentCategory;
+use App\Models\EquipmentRequest;
 use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\FarmerAssociation;
@@ -88,11 +91,36 @@ class FFRMSWorkspaceTest extends TestCase
             ->assertSee('Back to filtered registry')
             ->assertSee('Santos Rice Farm')
             ->assertSee('Sitio Riverside')
+            ->assertSee('Usual farm products')
+            ->assertSee('Food Crop')
             ->assertSee('Registration documents received.')
             ->assertSee('Edit farm record')
             ->assertSee('Available decision')
             ->assertDontSee('ffrms-record-content')
             ->assertSee(e(route('modules.ffrms.dashboard', ['workspace' => 'farmers', 'search' => 'Belen', 'status' => 'pending', 'page' => 1])), false);
+    }
+
+    public function test_farmer_equipment_history_is_owner_scoped_and_requires_equipment_permission(): void
+    {
+        $record = $this->farmer('verified');
+        $other = $this->farmer('verified');
+        $category = EquipmentCategory::create(['name' => 'Equipment for history', 'is_active' => true]);
+        $asset = EquipmentAsset::create(['asset_code' => 'HISTORY-1', 'name' => 'History tractor', 'category_id' => $category->id, 'condition' => 'good', 'availability_status' => 'available']);
+        foreach ([[$record, 'OWNER-LOAN'], [$other, 'OTHER-LOAN']] as [$owner, $reference]) {
+            EquipmentRequest::create([
+                'reference' => $reference, 'farmer_id' => $owner['farmer']->id,
+                'requested_by' => $owner['user']->id, 'equipment_asset_id' => $asset->id,
+                'intended_use' => 'Farm work', 'schedule_start' => now()->subDays(3),
+                'schedule_end' => now()->subDay(), 'status' => 'returned',
+                'issued_at' => now()->subDays(3), 'returned_at' => now()->subDay(),
+            ]);
+        }
+
+        $url = '/modules/ffrms?workspace=farmers&record='.$record['farmer']->id;
+        $this->actingAs($this->staff(['modules.ffrms.view', 'modules.aeams.view']))->get($url)
+            ->assertOk()->assertSee('Equipment borrowing history')->assertSee('OWNER-LOAN')->assertDontSee('OTHER-LOAN');
+        $this->actingAs($this->staff(['modules.ffrms.view']))->get($url)
+            ->assertOk()->assertDontSee('Equipment borrowing history')->assertDontSee('OWNER-LOAN');
     }
 
     public function test_module_titles_are_escaped_once_in_the_shared_topbar(): void
@@ -101,12 +129,12 @@ class FFRMSWorkspaceTest extends TestCase
 
         foreach ([
             ['/modules/ffrms', 'Farmer & Farm Registration'],
-            ['/modules/apms', 'Agricultural Production & Monitoring'],
+            ['/modules/apms', 'Agricultural Production & Field Operations'],
         ] as [$url, $title]) {
             $html = $this->actingAs($staff)->get($url)->assertOk()->getContent();
-            $topbarTitle = '<div class="erp-context-title" aria-live="polite">'.e($title).'</div>';
-
-            $this->assertStringContainsString($topbarTitle, $html);
+            $this->assertStringContainsString('<div class="erp-context-title" aria-live="polite">', $html);
+            $this->assertStringContainsString('<span class="erp-context-title-icon" aria-hidden="true">', $html);
+            $this->assertStringContainsString(e($title), $html);
             $this->assertStringNotContainsString(e(e($title)), $html);
         }
     }

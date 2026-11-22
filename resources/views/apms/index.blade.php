@@ -1,19 +1,19 @@
 ﻿<x-layouts.app>
-    <x-slot name="header">Agricultural Production & Monitoring</x-slot>
-    <x-slot name="description">Manage agricultural production, field assessments and monitoring records.</x-slot>
+    <x-slot name="header">Agricultural Production & Field Operations</x-slot>
+    <x-slot name="description">Review seasonal production reported by verified farmers, maintain official crop, livestock and fisheries records, and manage separate MAO field visits and incident follow-up.</x-slot>
     @if($pendingSubmissionCount !== null)
         <a class="apms-review-callout" href="{{ route('modules.apms.submissions') }}">
             <span class="apms-review-callout-icon"><x-ui.icon name="action" size="md" /></span>
-            <span class="apms-review-callout-copy"><strong>Farmer production submissions</strong><small>Review verified farmer entries before they become official APMS records.</small></span>
-            <span class="apms-review-callout-action"><span>{{ number_format($pendingSubmissionCount) }} pending</span><x-ui.icon name="next" size="sm" /></span>
+            <span class="apms-review-callout-copy"><strong>Review farmer production reports</strong><small>Farmers submit seasonal crop, livestock or fisheries output. MAO review happens before it becomes an official APMS record.</small></span>
+            <span class="apms-review-callout-action"><span>{{ number_format($pendingSubmissionCount) }} {{ $pendingSubmissionCount === 1 ? 'report' : 'reports' }} to review</span><x-ui.icon name="next" size="sm" /></span>
         </a>
     @endif
 
     @php
         $tabs = [
-            'overview' => 'Overview',
-            'production' => 'Production records',
-            'monitoring' => 'Field monitoring',
+            'overview' => 'Workflow overview',
+            'production' => 'Official records',
+            'monitoring' => 'Visits & incidents',
             'seasons' => 'Seasons & reports',
         ];
         $recordTypes = ['crops' => 'Crops', 'livestock' => 'Livestock', 'fisheries' => 'Fisheries'];
@@ -37,20 +37,6 @@
             </div>
         @endif
 
-        <section class="apms-stat-grid" aria-label="Production summary">
-            @foreach([
-                ['label' => 'Crop records', 'value' => $stats['crops'], 'icon' => 'crop'],
-                ['label' => 'Livestock records', 'value' => $stats['livestock'], 'icon' => 'livestock'],
-                ['label' => 'Fisheries records', 'value' => $stats['fisheries'], 'icon' => 'fish'],
-                ['label' => 'Open incidents', 'value' => $stats['incidents'], 'icon' => 'warning', 'alert' => true],
-            ] as $stat)
-                <article class="apms-stat">
-                    <span class="apms-stat-mark {{ ($stat['alert'] ?? false) ? 'apms-stat-mark--alert' : '' }}" aria-hidden="true"><x-ui.icon :name="$stat['icon']" size="sm" /></span>
-                    <div><p>{{ $stat['label'] }}</p><strong>{{ number_format($stat['value']) }}</strong></div>
-                </article>
-            @endforeach
-        </section>
-
         <nav class="apms-tabs" role="tablist" aria-label="APMS workspaces">
             @foreach($tabs as $key => $label)
                 <a id="apms-tab-{{ $key }}" class="apms-tab {{ $selectedTab === $key ? 'is-active' : '' }}"
@@ -62,15 +48,45 @@
         </nav>
 
         <section id="apms-panel-overview" class="apms-panel" role="tabpanel" aria-labelledby="apms-tab-overview" tabindex="0" @if($selectedTab !== 'overview') hidden @endif>
+            <section class="apms-process erp-surface" aria-labelledby="apms-process-title">
+                <div class="apms-section-heading">
+                    <div><p class="apms-kicker">Who does what?</p><h2 id="apms-process-title">From farm profile to official production record</h2><p>Farmer registration, seasonal reporting and MAO monitoring are related, but they are different steps.</p></div>
+                </div>
+                <ol class="apms-process-list">
+                    <li class="apms-process-step">
+                        <span class="apms-process-number" aria-hidden="true">1</span>
+                        <div><h3>Farmer registers the farm</h3><p>In FFRMS, the farmer records farm details and location. Crop or livestock categories describe usual farm activities. They are not a seasonal harvest report.</p></div>
+                    </li>
+                    <li class="apms-process-step">
+                        <span class="apms-process-number" aria-hidden="true">2</span>
+                        <div><h3>Farmer submits seasonal production</h3><p>After verification, the farmer chooses their registered farm and reports crop, livestock or fisheries information for a particular season, including quantities when known.</p></div>
+                    </li>
+                    <li class="apms-process-step">
+                        <span class="apms-process-number" aria-hidden="true">3</span>
+                        <div><h3>MAO reviews it in APMS</h3><p>Approve to create the linked official record, or return/reject it with review feedback. The farmer can track the decision and history.</p><a href="{{ route('modules.apms.submissions') }}">Open the farmer report review queue <x-ui.icon name="next" size="sm" /></a></div>
+                    </li>
+                </ol>
+                <p class="apms-process-note"><x-ui.icon name="info" size="sm" /> Production information supports agricultural planning and services. Reporting a harvest is not an offer or guarantee that the government will buy it.</p>
+            </section>
+
+            <section class="apms-stat-grid" aria-label="Official production and incident summary">
+                @foreach([
+                    ['label' => 'Crop records', 'value' => $stats['crops'], 'icon' => 'crop'],
+                    ['label' => 'Livestock records', 'value' => $stats['livestock'], 'icon' => 'livestock'],
+                    ['label' => 'Fisheries records', 'value' => $stats['fisheries'], 'icon' => 'fish'],
+                    ['label' => 'Open incidents', 'value' => $stats['incidents'], 'icon' => 'warning', 'alert' => true],
+                ] as $stat)
+                    <article class="apms-stat">
+                        <span class="apms-stat-mark {{ ($stat['alert'] ?? false) ? 'apms-stat-mark--alert' : '' }}" aria-hidden="true"><x-ui.icon :name="$stat['icon']" size="sm" /></span>
+                        <div><p>{{ $stat['label'] }}</p><strong>{{ number_format($stat['value']) }}</strong></div>
+                    </article>
+                @endforeach
+            </section>
+
             <div class="apms-overview-grid">
                 <section class="erp-surface apms-surface">
-                    <div class="apms-section-heading"><div><p class="apms-kicker">At a glance</p><h2>Production overview</h2><p>Recent records linked to verified farmers and farms.</p></div></div>
-                    <div class="apms-overview-metrics">
-                        <div><span>Production records</span><strong>{{ number_format($stats['crops'] + $stats['livestock'] + $stats['fisheries']) }}</strong></div>
-                        <div><span>Monitoring records</span><strong>{{ number_format($stats['monitoring']) }}</strong></div>
-                        <div><span>Open incidents</span><strong>{{ number_format($stats['incidents']) }}</strong></div>
-                    </div>
-                    <div class="apms-activity-heading"><h3>Recent activity</h3><a href="{{ route('modules.apms.dashboard', ['tab' => 'monitoring']) }}" data-apms-primary-tab="monitoring">View monitoring</a></div>
+                    <div class="apms-section-heading"><div><p class="apms-kicker">Official register</p><h2>Recent APMS activity</h2><p>Approved farmer reports and MAO field records linked to verified farms.</p></div></div>
+                    <div class="apms-activity-heading"><h3>Latest updates</h3><a href="{{ route('modules.apms.dashboard', ['tab' => 'production']) }}" data-apms-primary-tab="production">View official records</a></div>
                     @forelse($recentActivity as $activity)
                         <article class="apms-activity-row">
                             <span class="apms-activity-dot" aria-hidden="true"></span>
@@ -78,16 +94,16 @@
                             <time datetime="{{ $activity['date']?->toDateString() }}">{{ $activity['date']?->format('M j, Y') ?: 'Date not recorded' }}</time>
                         </article>
                     @empty
-                        <div class="erp-empty-state apms-empty-state"><strong>No production activity yet</strong><p>Production and monitoring records appear here as staff enter verified field information.</p>@if($canCreate)<button class="erp-button erp-button-primary" type="button" data-apms-open-editor="crop" data-apms-title="Add crop record">Add a crop record</button>@endif</div>
+                        <div class="erp-empty-state apms-empty-state"><strong>No APMS activity recorded yet</strong><p>Approved farmer reports and MAO-confirmed production, field visits or incident updates will appear here.</p><a class="erp-button erp-button-secondary" href="{{ route('modules.apms.submissions') }}">Check farmer reports</a></div>
                     @endforelse
                 </section>
 
                 <aside class="apms-overview-aside">
                     <section class="erp-surface apms-surface">
-                        <div class="apms-section-heading"><div><p class="apms-kicker">Shortcuts</p><h2>Common tasks</h2><p>Open only the editor you need.</p></div></div>
+                        <div class="apms-section-heading"><div><p class="apms-kicker">Other field actions</p><h2>MAO field work</h2><p>Use these for verified field observations, not to re-enter a farmer report.</p></div></div>
                         <div class="apms-quick-actions">
                             @if($canCreate)
-                                <button type="button" class="apms-quick-action" data-apms-open-editor="crop" data-apms-title="Add crop record"><span class="apms-quick-action-icon"><x-ui.icon name="crop" size="sm" /></span><span><strong>Record crop production</strong><small>Crop, area, planting and yield</small></span><x-ui.icon name="next" size="sm" /></button>
+                                <button type="button" class="apms-quick-action" data-apms-open-editor="crop" data-apms-title="Add crop record"><span class="apms-quick-action-icon"><x-ui.icon name="crop" size="sm" /></span><span><strong>Add field-confirmed crop record</strong><small>Only if the information is not already in a farmer report</small></span><x-ui.icon name="next" size="sm" /></button>
                                 <button type="button" class="apms-quick-action" data-apms-open-editor="incident" data-apms-title="Report pest or disease incident"><span class="apms-quick-action-icon"><x-ui.icon name="monitoring" size="sm" /></span><span><strong>Report an incident</strong><small>Capture severity and affected crop</small></span><x-ui.icon name="next" size="sm" /></button>
                                 <button type="button" class="apms-quick-action" data-apms-open-editor="monitoring" data-apms-title="Add farm monitoring visit"><span class="apms-quick-action-icon"><x-ui.icon name="farms" size="sm" /></span><span><strong>Log a farm visit</strong><small>Record findings and recommendations</small></span><x-ui.icon name="next" size="sm" /></button>
                             @else
@@ -95,16 +111,12 @@
                             @endif
                         </div>
                     </section>
-                    <section class="apms-guidance">
-                        <span class="apms-guidance-icon" aria-hidden="true">i</span>
-                        <div><strong>Verified records</strong><p>New production entries must reference a verified farmer and one of that farmer’s registered farms.</p></div>
-                    </section>
                 </aside>
             </div>
         </section>
 
         <section id="apms-panel-production" class="apms-panel" role="tabpanel" aria-labelledby="apms-tab-production" tabindex="0" @if($selectedTab !== 'production') hidden @endif>
-            <div class="apms-workspace-heading"><div><p class="apms-kicker">Production data</p><h2>Production records</h2><p>Choose a record type to review, search, edit or add entries.</p></div>
+            <div class="apms-workspace-heading"><div><p class="apms-kicker">Approved and field-confirmed data</p><h2>Official production register</h2><p>Seasonal reports enter this register after MAO approval. Direct entries are for authorized, field-confirmed information not already reported by a farmer.</p></div>
                 @if($canExport)<a class="erp-button erp-button-secondary" href="{{ route('modules.apms.dashboard', ['tab' => 'seasons']) }}" data-apms-primary-tab="seasons">Reports &amp; export</a>@endif
             </div>
             <nav class="apms-subtabs" role="tablist" aria-label="Production record type">
@@ -187,7 +199,7 @@
         </section>
 
         <section id="apms-panel-monitoring" class="apms-panel" role="tabpanel" aria-labelledby="apms-tab-monitoring" tabindex="0" @if($selectedTab !== 'monitoring') hidden @endif>
-            <div class="apms-workspace-heading"><div><p class="apms-kicker">Field operations</p><h2>Field monitoring</h2><p>Review pest and disease events alongside farm visit records.</p></div></div>
+            <div class="apms-workspace-heading"><div><p class="apms-kicker">Separate from seasonal output</p><h2>Farm visits &amp; incident follow-up</h2><p>Use this area for MAO observations during farm visits and pest or disease response. It does not replace the farmer's seasonal production report.</p></div></div>
             <nav class="apms-subtabs" role="tablist" aria-label="Field monitoring record type">
                 @foreach($monitoringTypes as $key => $label)
                     <a id="apms-monitoring-tab-{{ $key }}" class="apms-subtab {{ $selectedMonitoringType === $key ? 'is-active' : '' }}" role="tab" aria-controls="apms-monitoring-panel-{{ $key }}" aria-selected="{{ $selectedMonitoringType === $key ? 'true' : 'false' }}" tabindex="{{ $selectedMonitoringType === $key ? '0' : '-1' }}" href="{{ route('modules.apms.dashboard', array_merge(request()->query(), ['tab' => 'monitoring', 'monitoring_type' => $key])) }}" data-apms-monitoring-tab="{{ $key }}">{{ $label }}</a>
@@ -239,7 +251,7 @@
         </section>
 
         <section id="apms-panel-seasons" class="apms-panel" role="tabpanel" aria-labelledby="apms-tab-seasons" tabindex="0" @if($selectedTab !== 'seasons') hidden @endif>
-            <div class="apms-workspace-heading"><div><p class="apms-kicker">Planning &amp; reporting</p><h2>Seasons &amp; reports</h2><p>Maintain production seasons and export records for a selected date range.</p></div>
+            <div class="apms-workspace-heading"><div><p class="apms-kicker">Planning &amp; reporting</p><h2>Seasons &amp; reports</h2><p>Maintain the seasons farmers report against, then export official records for a selected date range.</p></div>
                 @if($canCreate)<button class="erp-button erp-button-primary" type="button" data-apms-open-editor="season" data-apms-title="Add agricultural season">Add season</button>@endif
             </div>
             <div class="apms-season-grid">
@@ -276,7 +288,7 @@
 
     <dialog id="apms-editor-dialog" class="apms-dialog" aria-labelledby="apms-editor-title" aria-describedby="apms-editor-description">
         <div class="apms-dialog-shell">
-            <header class="apms-dialog-header"><div><p class="apms-kicker">APMS record editor</p><h2 id="apms-editor-title">Add record</h2><p id="apms-editor-description">Enter the details for this operational record.</p></div><button type="button" class="apms-dialog-close" data-apms-close aria-label="Close editor">×</button></header>
+            <header class="apms-dialog-header"><div><p class="apms-kicker">APMS record editor</p><h2 id="apms-editor-title">Add record</h2><p id="apms-editor-description">Choose the verified farmer and registered farm this record belongs to.</p></div><button type="button" class="apms-dialog-close" data-apms-close aria-label="Close editor">×</button></header>
             <div id="apms-editor-content" class="apms-dialog-content"></div>
         </div>
     </dialog>
@@ -284,7 +296,7 @@
     <template id="apms-form-crop">
         <form method="POST" action="{{ route('modules.apms.crops.store', ['tab' => 'production', 'record_type' => 'crops']) }}" data-apms-editor-form data-store-action="{{ route('modules.apms.crops.store', ['tab' => 'production', 'record_type' => 'crops']) }}">
             @csrf<input type="hidden" name="_method" value=""><input type="hidden" name="_apms_form" value="crop"><input type="hidden" name="_apms_record_id" value="">
-            <section class="apms-form-section"><h3>Farmer and farm</h3><p>Choose a verified farmer and one of their registered farms.</p><div class="apms-field-grid">@include('apms.farm-fields', ['formKey' => 'crop-editor'])
+            <section class="apms-form-section"><h3>Farmer and farm</h3><p>This staff-entered crop record is linked to the selected farmer and farm. If the farmer already submitted these details online, review that submission instead to preserve its review history.</p><div class="apms-field-grid">@include('apms.farm-fields', ['formKey' => 'crop-editor'])
                 <div class="erp-field"><label for="crop-season_id">Agricultural season</label><select id="crop-season_id" class="erp-input" name="season_id"><option value="">No season selected</option>@foreach($seasons as $season)<option value="{{ $season->id }}" @selected((string) old('season_id') === (string) $season->id)>{{ $season->name }}</option>@endforeach</select>@error('season_id')<span class="apms-field-error">{{ $message }}</span>@enderror</div></div></section>
             <section class="apms-form-section"><h3>Production details</h3><div class="apms-field-grid"><div class="erp-field"><label for="crop-crop_type">Crop type <span aria-hidden="true">*</span></label><input id="crop-crop_type" class="erp-input" name="crop_type" value="{{ old('crop_type') }}" maxlength="120" required>@error('crop_type')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="crop-variety">Variety</label><input id="crop-variety" class="erp-input" name="variety" value="{{ old('variety') }}" maxlength="120">@error('variety')<span class="apms-field-error">{{ $message }}</span>@enderror</div>
                 <div class="erp-field"><label for="crop-area_planted">Area planted</label><input id="crop-area_planted" class="erp-input" name="area_planted" type="number" min="0.01" step="0.01" value="{{ old('area_planted') }}">@error('area_planted')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="crop-area_unit">Area unit <span aria-hidden="true">*</span></label><select id="crop-area_unit" class="erp-input" name="area_unit" required><option value="hectare" @selected(old('area_unit', 'hectare') === 'hectare')>Hectare</option><option value="square_meter" @selected(old('area_unit') === 'square_meter')>Square meter</option></select>@error('area_unit')<span class="apms-field-error">{{ $message }}</span>@enderror</div>
@@ -299,7 +311,7 @@
     <template id="apms-form-livestock">
         <form method="POST" action="{{ route('modules.apms.livestock.store', ['tab' => 'production', 'record_type' => 'livestock']) }}" data-apms-editor-form data-store-action="{{ route('modules.apms.livestock.store', ['tab' => 'production', 'record_type' => 'livestock']) }}">
             @csrf<input type="hidden" name="_method" value=""><input type="hidden" name="_apms_form" value="livestock"><input type="hidden" name="_apms_record_id" value="">
-            <section class="apms-form-section"><h3>Farmer and farm</h3><p>Choose a verified farmer and one of their registered farms.</p><div class="apms-field-grid">@include('apms.farm-fields', ['formKey' => 'livestock-editor'])</div></section>
+            <section class="apms-form-section"><h3>Farmer and farm</h3><p>This staff-entered livestock record is linked to the selected farmer and farm. If the farmer already submitted these details online, review that submission instead to preserve its review history.</p><div class="apms-field-grid">@include('apms.farm-fields', ['formKey' => 'livestock-editor'])</div></section>
             <section class="apms-form-section"><h3>Livestock details</h3><div class="apms-field-grid"><div class="erp-field"><label for="livestock-animal_type">Animal type <span aria-hidden="true">*</span></label><input id="livestock-animal_type" class="erp-input" name="animal_type" value="{{ old('animal_type') }}" maxlength="120" required>@error('animal_type')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="livestock-breed">Breed</label><input id="livestock-breed" class="erp-input" name="breed" value="{{ old('breed') }}" maxlength="120">@error('breed')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="livestock-quantity">Quantity <span aria-hidden="true">*</span></label><input id="livestock-quantity" class="erp-input" name="quantity" type="number" min="1" value="{{ old('quantity') }}" required>@error('quantity')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="livestock-recorded_on">Record date <span aria-hidden="true">*</span></label><input id="livestock-recorded_on" class="erp-input" name="recorded_on" type="date" value="{{ old('recorded_on') }}" required>@error('recorded_on')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="livestock-status">Status</label><select id="livestock-status" class="erp-input" name="status">@foreach(['active','sold','deceased'] as $status)<option value="{{ $status }}" @selected(old('status', 'active') === $status)>{{ ucfirst($status) }}</option>@endforeach</select>@error('status')<span class="apms-field-error">{{ $message }}</span>@enderror</div></div><div class="erp-field mt-4"><label for="livestock-notes">Notes</label><textarea id="livestock-notes" class="erp-input" name="notes" rows="3" maxlength="2000">{{ old('notes') }}</textarea>@error('notes')<span class="apms-field-error">{{ $message }}</span>@enderror</div></section>
             <footer class="apms-form-footer"><button type="button" class="erp-button erp-button-secondary" data-apms-close>Cancel</button><button type="submit" class="erp-button erp-button-primary" data-apms-submit>Save livestock record</button></footer>
         </form>
@@ -308,7 +320,7 @@
     <template id="apms-form-fishery">
         <form method="POST" action="{{ route('modules.apms.fisheries.store', ['tab' => 'production', 'record_type' => 'fisheries']) }}" data-apms-editor-form data-store-action="{{ route('modules.apms.fisheries.store', ['tab' => 'production', 'record_type' => 'fisheries']) }}">
             @csrf<input type="hidden" name="_method" value=""><input type="hidden" name="_apms_form" value="fishery"><input type="hidden" name="_apms_record_id" value="">
-            <section class="apms-form-section"><h3>Farmer and farm</h3><p>Choose a verified farmer and one of their registered farms.</p><div class="apms-field-grid">@include('apms.farm-fields', ['formKey' => 'fishery-editor'])</div></section>
+            <section class="apms-form-section"><h3>Farmer and farm</h3><p>This staff-entered fishery record is linked to the selected farmer and farm. If the farmer already submitted these details online, review that submission instead to preserve its review history.</p><div class="apms-field-grid">@include('apms.farm-fields', ['formKey' => 'fishery-editor'])</div></section>
             <section class="apms-form-section"><h3>Fisheries details</h3><div class="apms-field-grid"><div class="erp-field"><label for="fishery-fishery_type">Fishery type <span aria-hidden="true">*</span></label><input id="fishery-fishery_type" class="erp-input" name="fishery_type" value="{{ old('fishery_type') }}" maxlength="120" required>@error('fishery_type')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="fishery-species">Species</label><input id="fishery-species" class="erp-input" name="species" value="{{ old('species') }}" maxlength="120">@error('species')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="fishery-production_quantity">Production quantity</label><input id="fishery-production_quantity" class="erp-input" name="production_quantity" type="number" min="0" step="0.01" value="{{ old('production_quantity') }}">@error('production_quantity')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="fishery-production_unit">Production unit <span aria-hidden="true">*</span></label><input id="fishery-production_unit" class="erp-input" name="production_unit" value="{{ old('production_unit', 'kilogram') }}" maxlength="30" required>@error('production_unit')<span class="apms-field-error">{{ $message }}</span>@enderror</div><div class="erp-field"><label for="fishery-recorded_on">Record date <span aria-hidden="true">*</span></label><input id="fishery-recorded_on" class="erp-input" name="recorded_on" type="date" value="{{ old('recorded_on') }}" required>@error('recorded_on')<span class="apms-field-error">{{ $message }}</span>@enderror</div></div><div class="erp-field mt-4"><label for="fishery-notes">Notes</label><textarea id="fishery-notes" class="erp-input" name="notes" rows="3" maxlength="2000">{{ old('notes') }}</textarea>@error('notes')<span class="apms-field-error">{{ $message }}</span>@enderror</div></section>
             <footer class="apms-form-footer"><button type="button" class="erp-button erp-button-secondary" data-apms-close>Cancel</button><button type="submit" class="erp-button erp-button-primary" data-apms-submit>Save fisheries record</button></footer>
         </form>

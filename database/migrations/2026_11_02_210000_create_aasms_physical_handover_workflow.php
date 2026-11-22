@@ -17,7 +17,7 @@ return new class extends Migration
 
     public function up(): void
     {
-        $this->assertIsolatedTarget();
+        $activationMode = $this->assertActivationTarget();
 
         if (! DB::connection()->pretending()) {
             if (! Schema::hasTable('migrations')
@@ -29,19 +29,21 @@ return new class extends Migration
             }
         }
 
-        Schema::create('agricultural_qa_environment_attestations', function (Blueprint $table): void {
-            $table->id();
-            $table->string('driver', 16);
-            $table->string('database_name', 128)->unique('agri_qa_attest_database_uq');
-            $table->string('server_hostname', 128)->nullable();
-            $table->unsignedInteger('server_port')->nullable();
-            $table->string('server_uuid', 64)->nullable();
-            $table->char('source_backup_sha256', 64)->nullable();
-            $table->unsignedInteger('source_table_count')->default(0);
-            $table->string('attestation_kind', 40)->default('restored_disposable_qa_clone');
-            $table->timestamp('attested_at');
-            $table->timestamps();
-        });
+        if ($activationMode === 'qa') {
+            Schema::create('agricultural_qa_environment_attestations', function (Blueprint $table): void {
+                $table->id();
+                $table->string('driver', 16);
+                $table->string('database_name', 128)->unique('agri_qa_attest_database_uq');
+                $table->string('server_hostname', 128)->nullable();
+                $table->unsignedInteger('server_port')->nullable();
+                $table->string('server_uuid', 64)->nullable();
+                $table->char('source_backup_sha256', 64)->nullable();
+                $table->unsignedInteger('source_table_count')->default(0);
+                $table->string('attestation_kind', 40)->default('restored_disposable_qa_clone');
+                $table->timestamp('attested_at');
+                $table->timestamps();
+            });
+        }
 
         Schema::table('assistance_distributions', function (Blueprint $table): void {
             $table->foreignId('claim_ticket_id')->nullable()->unique('aasms_distribution_ticket_uq')
@@ -158,7 +160,7 @@ return new class extends Migration
             }
         }
 
-        if (DB::connection()->getDriverName() === 'mysql') {
+        if ($activationMode === 'qa' && DB::connection()->getDriverName() === 'mysql') {
             $identity = (array) DB::selectOne('SELECT DATABASE() AS database_name, @@hostname AS hostname, @@port AS port, @@server_uuid AS server_uuid');
             $tableCount = (int) DB::selectOne(
                 'SELECT COUNT(*) AS aggregate FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = \'BASE TABLE\''
@@ -214,23 +216,27 @@ return new class extends Migration
         Schema::dropIfExists('agricultural_qa_environment_attestations');
     }
 
-    private function assertIsolatedTarget(): void
+    private function assertActivationTarget(): string
     {
-        if (! app()->environment(['local', 'testing'])) {
-            throw new LogicException('Phase 6E handover schema is restricted to isolated local/testing databases.');
-        }
-
         $connection = DB::connection();
         $connectionName = (string) config('database.default');
         $connectionConfig = config('database.connections.'.$connectionName, []);
         if (filled($connectionConfig['url'] ?? null)) {
-            throw new LogicException('A DB URL is not accepted for isolated Phase 6E schema activation.');
+            throw new LogicException('A DB URL is not accepted for physical-handover schema activation.');
         }
         $driver = $connection->getDriverName();
         $database = (string) $connection->getDatabaseName();
 
+        if ($this->liveActivationAllowed($driver, $database)) {
+            return 'operational';
+        }
+
+        if (! app()->environment(['local', 'testing'])) {
+            throw new LogicException('Phase 6E handover schema is restricted to an explicitly approved operational database or isolated local/testing database.');
+        }
+
         if ($driver === 'sqlite' && app()->environment('testing') && $database === ':memory:') {
-            return;
+            return 'qa';
         }
 
         if ($driver === 'sqlite') {
@@ -238,7 +244,7 @@ return new class extends Migration
             if ($expectedPath !== ''
                 && ClaimTicketFeatureGate::normalizedPath($database) === $expectedPath
                 && str_contains($expectedPath, '/storage/app/qa/')) {
-                return;
+                return 'qa';
             }
             throw new LogicException('Only the designated disposable Phase 6E SQLite QA file may receive this schema.');
         }
@@ -269,7 +275,7 @@ return new class extends Migration
         // config and external backup checksum; actual execution below verifies
         // the server-reported identity before issuing any DDL.
         if ($connection->pretending()) {
-            return;
+            return 'qa';
         }
 
         $identity = (array) $connection->selectOne('SELECT DATABASE() AS database_name, @@hostname AS hostname, @@port AS port, @@server_uuid AS server_uuid');
@@ -279,6 +285,30 @@ return new class extends Migration
             || ! hash_equals($expectedUuid, (string) $identity['server_uuid'])) {
             throw new LogicException('Resolved MySQL host, port, UUID, or database does not match the verified disposable QA restoration.');
         }
+
+        return 'qa';
+    }
+
+    private function liveActivationAllowed(string $driver, string $database): bool
+    {
+        $expectedDatabase = (string) config('agricultural_claim_tickets.live_database');
+        $expectedHash = strtolower((string) config('agricultural_claim_tickets.live_backup_sha256'));
+        $backupPath = realpath((string) config('agricultural_claim_tickets.live_backup_path'));
+        $projectPath = realpath(base_path());
+
+        return $driver === 'mysql'
+            && config('agricultural_claim_tickets.mode') === 'operational'
+            && (bool) config('agricultural_claim_tickets.enabled')
+            && (bool) config('agricultural_claim_tickets.live_enabled')
+            && (bool) config('agricultural_claim_tickets.live_schema_activation_approved')
+            && $database !== ''
+            && $database === $expectedDatabase
+            && preg_match('/\A[a-f0-9]{64}\z/i', $expectedHash) === 1
+            && $backupPath !== false
+            && is_file($backupPath)
+            && $projectPath !== false
+            && ! str_starts_with(strtolower($backupPath), strtolower($projectPath.DIRECTORY_SEPARATOR))
+            && hash_equals($expectedHash, strtolower((string) hash_file('sha256', $backupPath)));
     }
 
     private function assertTransactionalEngines(): void

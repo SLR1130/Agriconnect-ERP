@@ -26,7 +26,7 @@
             @if($ticket->supersedes)<div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Replaces</dt><dd class="mt-1">{{ $ticket->supersedes->ticket_reference }}</dd></div>@endif
             @if($ticket->successor)<div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Replaced by</dt><dd class="mt-1"><a class="font-semibold text-emerald-800 underline" href="{{ route('modules.aasms.claim-tickets.show', $ticket->successor) }}">{{ $ticket->successor->ticket_reference }}</a></dd></div>@endif
         </dl>
-        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>Not a redemption or distribution.</strong> This QA ticket does not reserve inventory. Confirm identity separately in person. Inventory availability must be checked again at any future authorized handover. No inventory changes occurred during ticket operations in this phase.</div>
+        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>Not a redemption or distribution.</strong> This ticket does not reserve inventory. Confirm identity separately in person. Inventory availability is rechecked under lock before an authorized handover. No inventory changes occurred during ticket issuance, verification, revocation, or reissue.</div>
     </section>
 
     @if($canRevoke && $effectiveStatus === 'issued')

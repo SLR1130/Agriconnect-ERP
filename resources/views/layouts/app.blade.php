@@ -32,7 +32,7 @@
                 @if(isset($header))
                     <header class="erp-page-heading">
                         <div>
-                            <p class="erp-page-eyebrow">AgriConnect ERP</p>
+                            <p class="erp-page-eyebrow erp-page-eyebrow-with-icon"><x-ui.icon name="office" size="sm" />AgriConnect ERP</p>
                             <h1 class="erp-page-title">{{ $header }}</h1>
                             @isset($description)<p class="erp-page-description">{{ $description }}</p>@endisset
                         </div>

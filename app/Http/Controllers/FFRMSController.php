@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\AssistanceDistribution;
+use App\Models\EquipmentRequest;
 use App\Models\Farm;
 use App\Models\Farmer;
 use App\Models\FarmerAssociation;
+use App\Services\BongabongGeography;
 use App\Services\FarmerRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +20,7 @@ use Illuminate\View\View;
 
 class FFRMSController extends Controller
 {
-    public function registrations(Request $request): View
+    public function registrations(Request $request, BongabongGeography $geography): View
     {
         $this->authorizeStaff($request, 'view');
         $status = $request->string('status')->toString();
@@ -38,6 +41,15 @@ class FFRMSController extends Controller
         $associations = FarmerAssociation::query()->withCount('members')->latest()->get();
         $selectedFarmer = $request->filled('record')
             ? Farmer::query()->with(['user', 'verifier', 'farms', 'registrationHistory' => fn ($query) => $query->with('processor')->latest(), 'associations'])->withCount('farms')->findOrFail($request->integer('record'))
+            : null;
+        $assistanceHistory = $selectedFarmer && $request->user()->canModuleAction('aasms', 'view')
+            ? AssistanceDistribution::query()->with(['application.program', 'batch.item'])
+                ->whereHas('application', fn ($query) => $query->where('farmer_id', $selectedFarmer->id))
+                ->orderByDesc('distributed_at')->orderByDesc('id')->paginate(10, ['*'], 'assistance_history_page')->withQueryString()
+            : null;
+        $equipmentHistory = $selectedFarmer && $request->user()->canModuleAction('aeams', 'view')
+            ? EquipmentRequest::query()->with('asset')->where('farmer_id', $selectedFarmer->id)
+                ->latest()->paginate(10, ['*'], 'equipment_history_page')->withQueryString()
             : null;
         $registrationCounts = Farmer::query()
             ->selectRaw('registration_status, COUNT(*) as aggregate')
@@ -60,6 +72,8 @@ class FFRMSController extends Controller
 
         return view('ffrms.registrations', compact('farmers', 'associations') + [
             'selectedFarmer' => $selectedFarmer,
+            'assistanceHistory' => $assistanceHistory,
+            'equipmentHistory' => $equipmentHistory,
             'registrationCounts' => $registrationCounts,
             'canVerify' => $request->user()->canModuleAction('ffrms', 'approve') || $request->user()->canErp('farmer.verify'),
             'canReturn' => $request->user()->canModuleAction('ffrms', 'review'),
@@ -69,10 +83,11 @@ class FFRMSController extends Controller
             'canExport' => $request->user()->canModuleAction('ffrms', 'export'),
             'farmLocationsReady' => $farmLocationsReady,
             'farmMapPoints' => $farmMapPoints,
+            'barangays' => $geography->barangays(),
         ]);
     }
 
-    public function updateFarmer(Request $request, Farmer $farmer): RedirectResponse
+    public function updateFarmer(Request $request, Farmer $farmer, BongabongGeography $geography): RedirectResponse
     {
         $this->authorizeStaff($request, 'update');
         $data = $request->validate([
@@ -80,7 +95,7 @@ class FFRMSController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($farmer->user_id)],
             'phone' => ['nullable', 'string', 'max:30'],
             'address' => ['nullable', 'string', 'max:255'],
-            'barangay' => ['required', 'string', 'max:100'],
+            'barangay' => ['required', 'string', 'max:100', Rule::in(array_values(array_unique([$farmer->barangay, ...$geography->barangays()])))],
         ]);
 
         DB::transaction(function () use ($farmer, $data, $request) {
@@ -102,10 +117,10 @@ class FFRMSController extends Controller
         return $this->redirectToFarmer($request, $farmer, 'Farmer information updated and audited.');
     }
 
-    public function updateFarm(Request $request, Farm $farm): RedirectResponse
+    public function updateFarm(Request $request, Farm $farm, BongabongGeography $geography): RedirectResponse
     {
         $this->authorizeStaff($request, 'update');
-        $data = $this->farmData($request);
+        $data = $this->farmData($request, $geography, $farm);
         DB::transaction(function () use ($farm, $data, $request) {
             $old = $farm->only(array_keys($data));
             $farm->update($data);
@@ -213,7 +228,7 @@ class FFRMSController extends Controller
         abort_unless($allowed, 403);
     }
 
-    private function farmData(Request $request): array
+    private function farmData(Request $request, BongabongGeography $geography, Farm $farm): array
     {
         $farmLocationsReady = collect(['latitude', 'longitude', 'location_accuracy_meters', 'location_source'])
             ->every(fn (string $column): bool => Schema::hasColumn('farms', $column));
@@ -225,7 +240,7 @@ class FFRMSController extends Controller
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'barangay' => ['required', 'string', 'max:100'],
+            'barangay' => ['required', 'string', 'max:100', Rule::in(array_values(array_unique([$farm->barangay, ...$geography->barangays()])))],
             'location_details' => ['nullable', 'string', 'max:255'],
             'area' => ['nullable', 'numeric', 'min:0.01'],
             'area_unit' => ['required', Rule::in(['hectare', 'square_meter'])],
@@ -259,6 +274,9 @@ class FFRMSController extends Controller
                 $data['location_accuracy_meters'] = null;
             } elseif ($data['location_source'] === 'manual') {
                 $data['location_accuracy_meters'] = null;
+            }
+            if ($data['latitude'] !== null && ! $geography->containsPoint((float) $data['latitude'], (float) $data['longitude'])) {
+                throw ValidationException::withMessages(['latitude' => 'Choose a point inside the mapped Bongabong municipal area. The outline is approximate; the MAO will verify the location.']);
             }
         }
 

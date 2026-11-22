@@ -1,6 +1,6 @@
 <x-layouts.app>
     <x-slot name="title">AISMS Inventory</x-slot>
-    <x-slot name="header">Agricultural Inventory &amp; Supply Management</x-slot>
+    <x-slot name="header">Agricultural Inventory & Supply Management</x-slot>
     <x-slot name="description">Agricultural supply stock, movement control, and batch monitoring.</x-slot>
 
     <style>
@@ -10,11 +10,16 @@
         .inv-btn{display:inline-flex;justify-content:center;align-items:center;border-radius:10px;padding:.65rem 1rem;font-size:.8rem;font-weight:700}
         .inv-primary{background:#153d2b;color:#fff}.inv-gold{background:#d5ad55;color:#153d2b}.inv-sage{background:#e7f0e8;color:#153d2b}
         .inv-table{width:100%;border-collapse:collapse}.inv-table th{padding:.7rem;text-align:left;color:#718177;font-size:.66rem;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid #e1e9e2}.inv-table td{padding:.75rem;color:#405048;font-size:.8rem;vertical-align:top;border-bottom:1px solid #edf2ee}
-        .inv-pill{display:inline-flex;border-radius:999px;padding:.25rem .6rem;font-size:.68rem;font-weight:800;white-space:nowrap}.inv-green{background:#e7f0e8;color:#1c6a46}.inv-yellow{background:#fff5d8;color:#8a691e}.inv-red{background:#fee7e5;color:#a33e36}.inv-gray{background:#eef1ee;color:#53615a}
-        @media(max-width:900px){.inv-forms,.inv-panels{grid-template-columns:1fr!important}.inv-table-wrap{overflow-x:auto}.inv-table{min-width:1000px}}
+        .inv-pill{display:inline-flex;border-radius:999px;padding:.25rem .6rem;font-size:.68rem;font-weight:800;white-space:nowrap}.inv-green{background:#e7f0e8;color:#1c6a46}.inv-yellow{background:#fff5d8;color:#8a691e}.inv-red{background:#fee7e5;color:#a33e36}.inv-gray{background:#eef1ee;color:#53615a}.inv-action-desk{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr));gap:.75rem;padding:1rem}.inv-action-intro{padding:.35rem}.inv-action-intro h2{margin:.25rem 0;color:#153d2b;font-size:1.1rem;font-weight:850}.inv-action-intro p{margin:0;color:#5e7064;font-size:.78rem;line-height:1.5}.inv-action-card{display:flex;min-width:0;flex-direction:column;gap:.4rem;padding:.85rem;background:#f8faf7;border:1px solid #dfe9e1;border-radius:.8rem}.inv-action-card strong{color:#153d2b;font-size:.8rem}.inv-action-card span{color:#62736a;font-size:.72rem;line-height:1.45}.inv-action-card .inv-btn{margin-top:auto}.inv-action-empty{align-self:center;padding:.8rem;background:#edf6ef;border-radius:.7rem;color:#365d45;font-size:.76rem;font-weight:700}
+        @media(max-width:900px){.inv-forms,.inv-panels{grid-template-columns:1fr!important}.inv-action-desk{grid-template-columns:repeat(2,minmax(0,1fr))}.inv-action-intro{grid-column:1/-1}.inv-table-wrap{overflow-x:auto}.inv-table{min-width:1000px}}@media(max-width:640px){.inv-action-desk{grid-template-columns:minmax(0,1fr);padding:.85rem}.inv-action-intro{grid-column:auto}.inv-action-card .inv-btn{width:100%}}
     </style>
 
     <div class="space-y-6">
+        <x-ui.workflow-strip
+            label="Stock control flow"
+            description="Keep every movement traceable from the supply catalog to the saved transaction history."
+            :steps="['Supply catalog', 'Receive stock', 'Release or adjust', 'Monitor batches', 'Review history']"
+        />
         @if(session('status'))
             <div role="status" class="inv-card border-l-4 border-emerald-green px-5 py-4 text-sm text-emerald-green">{{ session('status') }}</div>
         @endif
@@ -31,6 +36,26 @@
             <div class="inv-card p-5"><p class="text-xs font-bold uppercase text-gray-500">Low stock items</p><p data-aisms-stat="low-stock" class="mt-2 text-3xl font-bold text-agricultural-gold">{{ $lowStock }}</p></div>
             <div class="inv-card p-5"><p class="text-xs font-bold uppercase text-gray-500">Expiry watch</p><p class="mt-2 text-3xl font-bold text-red-600">{{ $expiring->count() + $expired->count() }}</p><p class="mt-1 text-xs text-gray-500">{{ $expiring->count() }} expiring soon · {{ $expired->count() }} expired</p></div>
         </div>
+
+        <section class="inv-card inv-action-desk" aria-labelledby="inventory-next-actions-title">
+            <div class="inv-action-intro">
+                <p class="text-xs font-bold uppercase tracking-wider text-emerald-green">Inventory desk</p>
+                <h2 id="inventory-next-actions-title">Choose the stock action you are performing.</h2>
+                <p>Receive goods into a location, release usable stock for an approved purpose, or correct a physical count with a reason.</p>
+            </div>
+            @if($canReceive)
+                <article class="inv-action-card"><strong>Goods arrived</strong><span>Create a batch, record quantity and expiry, then post the receipt.</span><button class="inv-btn inv-gold" type="button" data-aisms-open-form="receive-stock" aria-controls="receive-stock">Receive stock</button></article>
+            @endif
+            @if($canRelease)
+                <article class="inv-action-card"><strong>Stock is being released</strong><span>Choose an unexpired batch and record the recipient and purpose.</span><button class="inv-btn inv-primary" type="button" data-aisms-open-form="release-stock" aria-controls="release-stock">Release stock</button></article>
+            @endif
+            @if($canAdjust)
+                <article class="inv-action-card"><strong>Count needs correction</strong><span>Use a signed adjustment only when the physical count differs from the ledger.</span><button class="inv-btn inv-sage" type="button" data-aisms-open-form="adjust-stock" aria-controls="adjust-stock">Adjust balance</button></article>
+            @endif
+            @unless($canReceive || $canRelease || $canAdjust)
+                <p class="inv-action-empty">Read-only access: this account can inspect inventory and history, but cannot change stock.</p>
+            @endunless
+        </section>
 
         <section class="inv-card p-5">
             <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -139,7 +164,8 @@
                 </form>
                 <div class="inv-table-wrap mt-4"><table class="inv-table"><thead><tr><th>Reference / supply</th><th>Movement</th><th>Quantity</th><th>Batch / location</th><th>Responsible / time</th><th>Details</th></tr></thead><tbody>
                     @forelse($movements as $movement)
-                        <tr><td><b>{{ $movement->reference }}</b><div class="text-xs text-gray-500">{{ $movement->batch?->item?->name }}</div></td><td><span class="inv-pill {{ $movement->movement_type === 'adjustment' ? 'inv-yellow' : 'inv-green' }}">{{ ucfirst($movement->movement_type) }}</span></td><td>{{ number_format((float)$movement->quantity, 2) }}</td><td>{{ $movement->batch?->batch_number }}<div class="text-xs text-gray-500">{{ $movement->batch?->location?->name }}</div></td><td>{{ $movement->user?->name ?? 'Unknown' }}<div class="text-xs text-gray-500">{{ $movement->created_at?->format('M d, Y H:i') }}</div></td><td class="max-w-xs">@if($movement->adjustment_reason)<b>Reason:</b> {{ $movement->adjustment_reason }}<br>@endif @if($movement->recipient)<b>Recipient:</b> {{ $movement->recipient }}<br>@endif @if($movement->purpose)<b>Purpose:</b> {{ $movement->purpose }}<br>@endif{{ $movement->notes }}</td></tr>
+                        @php($physicalReceiptDate = $movement->received_on ?? $movement->procurementReceiptItem?->receipt?->received_on)
+                        <tr><td><b>{{ $movement->reference }}</b><div class="text-xs text-gray-500">{{ $movement->batch?->item?->name }}</div></td><td><span class="inv-pill {{ $movement->movement_type === 'adjustment' ? 'inv-yellow' : 'inv-green' }}">{{ ucfirst($movement->movement_type) }}</span></td><td>{{ number_format((float)$movement->quantity, 2) }}</td><td>{{ $movement->batch?->batch_number }}<div class="text-xs text-gray-500">{{ $movement->batch?->location?->name }}</div></td><td>{{ $movement->user?->name ?? 'Unknown' }}<div class="text-xs text-gray-500">Recorded {{ $movement->created_at?->format('M d, Y H:i') }}</div>@if($movement->movement_type === 'receipt')<div class="text-xs text-gray-500">Physical receipt: {{ $physicalReceiptDate?->format('M d, Y') ?? 'date not separately recorded' }}</div>@endif</td><td class="max-w-xs">@if($movement->adjustment_reason)<b>Reason:</b> {{ $movement->adjustment_reason }}<br>@endif @if($movement->recipient)<b>Recipient:</b> {{ $movement->recipient }}<br>@endif @if($movement->purpose)<b>Purpose:</b> {{ $movement->purpose }}<br>@endif{{ $movement->notes }}@if($movement->assistanceDistribution)<div class="mt-2">@if($canViewAasms)<a class="font-semibold text-emerald-green underline underline-offset-2" href="{{ route('modules.aasms.applications.show', $movement->assistanceDistribution->application_id) }}">Open AASMS application #{{ $movement->assistanceDistribution->application_id }}</a>@else<span>AASMS assistance distribution</span>@endif</div>@endif @if($movement->procurementReceiptItem?->receipt)<div class="mt-2">@if($canViewAbpms)<a class="font-semibold text-emerald-green underline underline-offset-2" href="{{ route('modules.abpms.dashboard', ['workspace' => 'orders']) }}">Open ABPMS receipt {{ $movement->procurementReceiptItem->receipt->receipt_reference }}</a>@else<span>ABPMS physical goods receipt</span>@endif</div>@endif</td></tr>
                     @empty<tr><td colspan="6" class="py-6 text-center text-gray-500">No movements match these filters.</td></tr>@endforelse
                 </tbody></table></div>
                 <div class="mt-4">{{ $movements->links() }}</div>

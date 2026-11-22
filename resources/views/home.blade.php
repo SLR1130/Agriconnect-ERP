@@ -3,31 +3,33 @@
     description="Explore official agricultural programs, announcements, and farmer services from the Bongabong Municipal Agriculture Office."
 >
     <section class="public-home-hero" aria-labelledby="public-home-title">
-        <div class="public-home-hero-copy">
-            <p class="public-home-kicker"><span class="public-home-kicker-mark"><x-ui.icon name="crop" size="sm" /></span> Bongabong Municipal Agriculture Office</p>
+        <div class="public-home-hero-copy" data-home-reveal>
+            <p class="public-home-kicker"><span class="public-home-kicker-mark"><x-ui.icon name="office" size="sm" /></span> Official services from Bongabong MAO</p>
             <h1 id="public-home-title" lang="fil">Serbisyong pang-agrikultura, mas malinaw at mas madaling maabot.</h1>
-            <p class="public-home-lede">Empowering Agriculture Through Connected Digital Services. AgriConnect brings farmer registration, agricultural programs, and official updates together in one accessible place.</p>
+            <p class="public-home-tagline">Empowering Agriculture Through Connected Digital Services</p>
+            <p class="public-home-lede">Find published assistance programs, register your farm, and read official agricultural updates. Sign in when you need to submit a request or follow its review.</p>
             <div class="public-home-actions">
-                <a class="public-button public-button-primary" href="{{ route('public.agricultural-services.index') }}">Explore programs and services <x-ui.icon name="next" size="sm" /></a>
-                <a class="public-button public-button-light" href="{{ route('farmer.register') }}">Create a farmer account</a>
+                <a class="public-button public-button-primary" href="{{ route('public.agricultural-services.index') }}"><x-ui.icon name="search" size="sm" /> Find a program</a>
+                <a class="public-button public-button-outline" href="{{ route('farmer.register') }}"><x-ui.icon name="users" size="sm" /> Register as a farmer</a>
             </div>
-            <p class="public-home-signin">Already have an account? <a href="{{ route('login') }}">Sign in to AgriConnect</a></p>
+            <p class="public-home-signin">Already have an account? <a href="{{ route('login') }}">Sign in to your Farmer Portal</a></p>
+            <p class="public-home-location"><x-ui.icon name="location" size="sm" /> For farmers and fisherfolk in Bongabong, Oriental Mindoro</p>
         </div>
-        <figure class="public-home-hero-photo">
+        <figure class="public-home-hero-photo" data-home-reveal data-home-reveal-delay="1">
             <img src="{{ asset('images/philippine-rice-field-farmer-960.jpg') }}" srcset="{{ asset('images/philippine-rice-field-farmer-960.jpg') }} 960w, {{ asset('images/philippine-rice-field-farmer.jpg') }} 1280w" sizes="(max-width: 800px) calc(100vw - 2rem), 46vw" width="1280" height="853" alt="A farmer standing among green rice plants in Bohol, Philippines. This is an illustrative photograph, not an MAO event photo." fetchpriority="high">
             <figcaption>Illustrative photo from Bohol, Philippines. <a href="https://commons.wikimedia.org/wiki/File:A_farmer_woman_in_the_middle_of_her_rice_fields_in_Bohol_-_Philippines.jpg" target="_blank" rel="noopener noreferrer">Photo by &Oslash;yvind Holmstad</a>, Wikimedia Commons, CC BY-SA 4.0.</figcaption>
             <span class="public-home-photo-label"><x-ui.icon name="location" size="xs" /> Philippine agriculture</span>
         </figure>
     </section>
 
-    <section class="public-home-about" aria-labelledby="about-title">
+    <section class="public-home-about" aria-labelledby="about-title" data-home-reveal>
         <div class="public-home-about-mark"><x-ui.icon name="office" size="lg" /></div>
         <div><p class="public-agri-eyebrow">About AgriConnect</p><h2 id="about-title">One connected place for Bongabong agricultural services</h2><p>AgriConnect is the digital service portal of the Bongabong Municipal Agriculture Office. It helps farmers find official information, submit service requests, and follow updates through their Farmer Portal account.</p></div>
         <p class="public-home-about-note">Program eligibility, farmer verification, and approval decisions remain subject to MAO review and the published requirements.</p>
     </section>
 
-    <section class="public-home-service-section" id="services" aria-labelledby="services-title">
-        <div class="public-home-section-heading"><div><p class="public-agri-eyebrow">Agricultural Services</p><h2 id="services-title">Start with the service you need</h2></div><a class="public-home-section-link" href="{{ route('public.agricultural-services.index') }}">Browse programs and notices <x-ui.icon name="next" size="sm" /></a></div>
+    <section class="public-home-service-section" id="services" aria-labelledby="services-title" data-home-reveal>
+        <div class="public-home-section-heading"><div><p class="public-agri-eyebrow">Agricultural services</p><h2 id="services-title">What do you need help with?</h2><p>Choose a service to see the next step. Some services ask you to sign in first.</p></div><a class="public-home-section-link" href="{{ route('public.agricultural-services.index') }}">Browse programs and notices <x-ui.icon name="next" size="sm" /></a></div>
         <div class="public-home-service-grid">
             <a class="public-home-service-card" href="{{ route('public.agricultural-services.index') }}"><span class="public-home-service-icon"><x-ui.icon name="assistance" /></span><span class="public-home-service-copy"><strong>Assistance and subsidies</strong><small>Explore published programs, eligibility, and application schedules.</small><span class="public-home-card-action">View programs <x-ui.icon name="next" size="xs" /></span></span></a>
             <a class="public-home-service-card" href="{{ route('farmer.register') }}"><span class="public-home-service-icon"><x-ui.icon name="users" /></span><span class="public-home-service-copy"><strong>Farmer registration</strong><small>Create an account and submit your details for MAO verification.</small><span class="public-home-card-action">Register <x-ui.icon name="next" size="xs" /></span></span></a>
@@ -38,7 +40,7 @@
         </div>
     </section>
 
-    <section class="public-home-program-section" aria-labelledby="programs-title">
+    <section class="public-home-program-section" aria-labelledby="programs-title" data-home-reveal>
         <div class="public-home-section-heading"><div><p class="public-agri-eyebrow">Official opportunities</p><h2 id="programs-title">Agricultural programs</h2><p>Published programs from the Municipal Agriculture Office. Availability follows each program's stated schedule.</p></div><a class="public-home-section-link" href="{{ route('public.agricultural-services.index') }}">View all programs <x-ui.icon name="next" size="sm" /></a></div>
         @if($programs->isNotEmpty())
             <div class="public-home-program-grid">
@@ -70,7 +72,7 @@
         @endif
     </section>
 
-    <section class="public-home-announcement-section" id="announcements" aria-labelledby="announcements-title">
+    <section class="public-home-announcement-section" id="announcements" aria-labelledby="announcements-title" data-home-reveal>
         <div class="public-home-section-heading"><div><p class="public-agri-eyebrow">From the MAO</p><h2 id="announcements-title">Latest official updates</h2></div><a class="public-home-section-link" href="{{ route('public.agricultural-services.index') }}">All programs and notices <x-ui.icon name="next" size="sm" /></a></div>
         @if($announcements->isNotEmpty())
             <div class="public-home-announcement-list">
@@ -84,16 +86,16 @@
         @endif
     </section>
 
-    <section class="public-home-steps-section" id="how-it-works" aria-labelledby="how-title">
+    <section class="public-home-steps-section" id="how-it-works" aria-labelledby="how-title" data-home-reveal>
         <div class="public-home-steps-intro"><p class="public-agri-eyebrow">A clear path to service</p><h2 id="how-title">How AgriConnect works</h2><p>Follow the steps that apply to the service you need. Program requirements and decisions are handled by the Municipal Agriculture Office.</p></div>
         <ol class="public-home-steps">
-            <li><span>01</span><div><h3>Explore</h3><p>Review official services, program details, and application schedules.</p></div></li>
-            <li><span>02</span><div><h3>Register</h3><p>Create your account and provide farmer and farm information when requested.</p></div></li>
-            <li><span>03</span><div><h3>Complete requirements</h3><p>Farmer verification or supporting documents may be required for a service.</p></div></li>
-            <li><span>04</span><div><h3>Track updates</h3><p>Sign in to review your submission status and official MAO feedback.</p></div></li>
+            <li><span>01</span><div><h3>Explore</h3><p>Read official program details, eligibility, and application dates.</p></div></li>
+            <li><span>02</span><div><h3>Create your account</h3><p>Register your contact details and Bongabong barangay.</p></div></li>
+            <li><span>03</span><div><h3>Add your farm</h3><p>After sign-in, register your farm and place its location pin in My Farms.</p></div></li>
+            <li><span>04</span><div><h3>Submit and track</h3><p>Send service information when requested, then check MAO review updates.</p></div></li>
         </ol>
         <p class="public-home-steps-note">Submitting an application does not guarantee approval or assistance. Each program follows its published eligibility rules and review process.</p>
     </section>
 
-    <section class="public-home-final-cta" aria-labelledby="final-cta-title"><div><p class="public-agri-eyebrow">AgriConnect Farmer Portal</p><h2 id="final-cta-title">Ready to access your agricultural services?</h2><p>Start with official program information or create an account to manage your farmer services.</p></div><div class="public-home-actions"><a class="public-button public-button-primary" href="{{ route('farmer.register') }}">Create an account</a><a class="public-button public-button-outline" href="{{ route('public.agricultural-services.index') }}">Explore programs</a></div></section>
+    <section class="public-home-final-cta" aria-labelledby="final-cta-title" data-home-reveal><div><p class="public-agri-eyebrow">AgriConnect Farmer Portal</p><h2 id="final-cta-title">Ready to manage your farmer services?</h2><p>Create a farmer account to add farm details, submit eligible requests, and track official updates.</p></div><div class="public-home-actions"><a class="public-button public-button-primary" href="{{ route('farmer.register') }}"><x-ui.icon name="users" size="sm" /> Create an account</a><a class="public-button public-button-outline" href="{{ route('public.agricultural-services.index') }}">Explore programs</a></div></section>
 </x-layouts.public-agricultural>

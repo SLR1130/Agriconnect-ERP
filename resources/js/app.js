@@ -1,5 +1,31 @@
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { farmOutlineSquareMeters, farmOutlineInteriorPoint } from './farm-area.js';
+
+let googleMapsPromise;
+function loadGoogleMaps(key) {
+    if (window.google?.maps?.Map) return Promise.resolve(window.google.maps);
+    if (googleMapsPromise) return googleMapsPromise;
+    googleMapsPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const timer = window.setTimeout(() => reject(new Error('Google Maps timed out. Check the connection and try again.')), 15000);
+        window.agriconnectGoogleMapsReady = () => {
+            window.clearTimeout(timer);
+            resolve(window.google.maps);
+        };
+        window.gm_authFailure = () => {
+            window.clearTimeout(timer);
+            reject(new Error('Google Maps rejected the key. Check its API and website restrictions.'));
+        };
+        script.onerror = () => {
+            window.clearTimeout(timer);
+            reject(new Error('Google Maps could not load. Check your connection.'));
+        };
+        const params = new URLSearchParams({ key, loading: 'async', callback: 'agriconnectGoogleMapsReady' });
+        script.src = `https://maps.googleapis.com/maps/api/js?${params}`;
+        script.async = true;
+        document.head.append(script);
+    });
+    return googleMapsPromise;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('app-sidebar');
@@ -588,6 +614,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.querySelectorAll('form').forEach((form) => {
+        form.querySelectorAll('[data-production-type-select]').forEach((select) => {
+            const customInput = document.getElementById(select.dataset.customId || '');
+            const customDetails = customInput?.closest('[data-production-custom-details]');
+            if (!customInput || !customDetails) return;
+
+            const syncCustomType = (focusInput = false) => {
+                const otherSelected = select.value === '__other__';
+                customDetails.open = otherSelected || customInput.value.trim() !== '';
+                customInput.required = select.required && otherSelected;
+                if (focusInput && otherSelected) customInput.focus();
+            };
+
+            select.addEventListener('change', () => syncCustomType(true));
+            syncCustomType();
+        });
+
         const stage = form.querySelector('[data-crop-stage]');
         const planted = form.querySelector('[data-crop-planted]');
         const harvested = form.querySelector('#crop-harvested');
@@ -641,6 +683,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
     }
 
+    const homeRevealTargets = [...document.querySelectorAll('[data-home-reveal]')];
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (homeRevealTargets.length && 'IntersectionObserver' in window && !prefersReducedMotion) {
+        document.documentElement.classList.add('public-home-motion');
+        const homeRevealObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                observer.unobserve(entry.target);
+            });
+        }, { threshold: 0.12, rootMargin: '0px 0px -24px 0px' });
+
+        homeRevealTargets.forEach((target) => homeRevealObserver.observe(target));
+    }
+
     document.querySelectorAll('[data-password-toggle]').forEach((button) => {
         const input = document.getElementById(button.getAttribute('aria-controls'));
         if (!input) return;
@@ -653,10 +711,129 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    document.querySelectorAll('form[data-registration-wizard]').forEach((form) => {
+        const shell = form.closest('.public-auth-panel-register');
+        if (!shell) return;
+        const panels = [...form.querySelectorAll('[data-registration-panel]')];
+        const indicators = [...shell.querySelectorAll('[data-registration-indicator]')];
+        const status = shell.querySelector('[data-registration-status]');
+        const back = form.querySelector('[data-registration-back]');
+        const next = form.querySelector('[data-registration-next]');
+        const submit = form.querySelector('[data-registration-submit]');
+        if (!shell || panels.length !== 3 || indicators.length !== 3 || !status || !back || !next || !submit) return;
+
+        const stepNames = ['Your details', 'Farm location', 'Password'];
+        let step = Math.min(3, Math.max(1, Number(form.dataset.initialStep) || 1));
+        form.noValidate = true;
+        form.dataset.enhanced = 'true';
+
+        const render = (focusHeading = false) => {
+            panels.forEach((panel) => {
+                panel.hidden = Number(panel.dataset.registrationPanel) !== step;
+            });
+            indicators.forEach((indicator) => {
+                const number = Number(indicator.dataset.registrationIndicator);
+                indicator.dataset.state = number < step ? 'complete' : (number === step ? 'current' : 'upcoming');
+                if (number === step) indicator.setAttribute('aria-current', 'step');
+                else indicator.removeAttribute('aria-current');
+            });
+
+            status.textContent = `Step ${step} of 3: ${stepNames[step - 1]}`;
+            back.hidden = step === 1;
+            next.hidden = step === 3;
+            submit.hidden = step !== 3;
+
+            if (step === 2) {
+                window.requestAnimationFrame(() => panels[1].querySelector('[data-farm-location]')?.dispatchEvent(new Event('farm:visible')));
+            }
+
+            if (focusHeading) panels[step - 1].querySelector('[data-registration-heading]')?.focus();
+        };
+
+        const validatePanel = (panel) => {
+            const fields = [...panel.querySelectorAll('input:not([type="hidden"]), select, textarea')]
+                .filter((field) => !field.disabled);
+            for (const field of fields) {
+                if (field.checkValidity()) continue;
+                field.setAttribute('aria-invalid', 'true');
+                return field;
+            }
+            return null;
+        };
+
+        const password = form.querySelector('#password');
+        const confirmation = form.querySelector('#password_confirmation');
+        const syncPasswordConfirmation = () => {
+            if (!password || !confirmation) return;
+            confirmation.setCustomValidity(confirmation.value && confirmation.value !== password.value ? 'The passwords do not match.' : '');
+        };
+
+        [password, confirmation].filter(Boolean).forEach((field) => {
+            field.addEventListener('input', () => {
+                syncPasswordConfirmation();
+                if (field.checkValidity()) field.removeAttribute('aria-invalid');
+            });
+        });
+
+        form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach((field) => {
+            field.addEventListener('input', () => {
+                if (field.checkValidity()) field.removeAttribute('aria-invalid');
+            });
+            field.addEventListener('change', () => {
+                if (field.checkValidity()) field.removeAttribute('aria-invalid');
+            });
+        });
+
+        next.addEventListener('click', () => {
+            const invalidField = validatePanel(panels[step - 1]);
+            if (invalidField) {
+                invalidField.focus();
+                invalidField.reportValidity();
+                return;
+            }
+            step = Math.min(3, step + 1);
+            render(true);
+        });
+
+        back.addEventListener('click', () => {
+            step = Math.max(1, step - 1);
+            render(true);
+        });
+
+        form.addEventListener('submit', (event) => {
+            syncPasswordConfirmation();
+            for (let index = 0; index < panels.length; index += 1) {
+                const invalidField = validatePanel(panels[index]);
+                if (!invalidField) continue;
+                event.preventDefault();
+                step = index + 1;
+                render();
+                invalidField.focus();
+                invalidField.reportValidity();
+                return;
+            }
+        });
+
+        shell.querySelectorAll('#registration-errors a[href^="#"]').forEach((link) => {
+            link.addEventListener('click', (event) => {
+                const target = document.querySelector(link.getAttribute('href'));
+                const targetPanel = target?.closest('[data-registration-panel]');
+                if (!targetPanel) return;
+                event.preventDefault();
+                step = Number(targetPanel.dataset.registrationPanel);
+                render();
+                target.focus();
+            });
+        });
+
+        render();
+        shell.querySelector('#registration-errors')?.focus();
+    });
+
     document.querySelectorAll('form[data-public-loading]').forEach((form) => {
         let submitting = false;
-        form.addEventListener('submit', () => {
-            if (submitting) return;
+        form.addEventListener('submit', (event) => {
+            if (event.defaultPrevented || submitting) return;
             submitting = true;
             const submit = form.querySelector('button[type="submit"]');
             if (!submit) return;
@@ -674,23 +851,62 @@ document.addEventListener('DOMContentLoaded', () => {
         const source = section.querySelector('[data-farm-location-source]');
         const accuracy = section.querySelector('[data-farm-location-accuracy]');
         const status = section.querySelector('[data-farm-location-status]');
+        const locationSearchButton = section.querySelector('[data-farm-location-search]');
+        const locationSearchLabel = section.querySelector('[data-farm-location-search-label]');
+        const locationSearchStatus = section.querySelector('[data-farm-location-search-status]');
+        const locationSearchResults = section.querySelector('[data-farm-location-search-results]');
         const mapLink = section.querySelector('[data-farm-map-link]');
         const useLocation = section.querySelector('[data-farm-use-location]');
         const clearPin = section.querySelector('[data-farm-clear-pin]');
         const mapElement = section.querySelector('[data-farm-map]');
+        const boundaryInput = section.querySelector('[data-farm-boundary-coordinates]');
+        const boundaryStatus = section.querySelector('[data-farm-boundary-status]');
+        const boundaryEnabled = section.dataset.boundaryEnabled === 'true';
+        const modeButtons = [...section.querySelectorAll('[data-farm-map-mode]')];
+        const undoBoundary = section.querySelector('[data-farm-boundary-undo]');
+        const saveBoundary = section.querySelector('[data-farm-boundary-save]');
+        const clearBoundary = section.querySelector('[data-farm-boundary-clear]');
+        const manualBoundaryControls = section.querySelector('[data-farm-boundary-manual-controls]');
+        const manualBoundaryLatitude = section.querySelector('[data-farm-boundary-latitude]');
+        const manualBoundaryLongitude = section.querySelector('[data-farm-boundary-longitude]');
+        const addBoundaryPointButton = section.querySelector('[data-farm-boundary-add-point]');
         const form = section.closest('form');
+        const farmArea = form?.elements.namedItem('area');
+        const farmAreaUnit = form?.elements.namedItem('area_unit');
+        const farmAreaFeedback = form?.querySelector('[data-farm-area-feedback]');
+        let estimatedAreaSquareMeters = null;
+        const locationDetails = form?.querySelector('[data-farm-location-details]');
+        const farmBarangay = form?.querySelector('[data-farm-location-barangay]');
         const locationEnabled = section.dataset.locationEnabled === 'true';
         if (!latitude || !longitude || !source || !accuracy || !status || !useLocation) return;
+
+        let municipalityBoundary = [];
+        try {
+            municipalityBoundary = JSON.parse(atob(mapElement?.dataset.bongabongBoundary || 'W10='));
+        } catch {
+            municipalityBoundary = [];
+        }
+        const containsMunicipality = (lat, lon) => {
+            let inside = false;
+            for (let i = 0, j = municipalityBoundary.length - 1; i < municipalityBoundary.length; j = i++) {
+                const a = municipalityBoundary[i];
+                const b = municipalityBoundary[j];
+                if ((a.latitude > lat) !== (b.latitude > lat)
+                    && lon < ((b.longitude - a.longitude) * (lat - a.latitude) / ((b.latitude - a.latitude) || 1e-12)) + a.longitude) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        };
 
         const updateMapLink = () => {
             const lat = Number(latitude.value);
             const lon = Number(longitude.value);
             const valid = latitude.value !== '' && longitude.value !== '' && Number.isFinite(lat) && Number.isFinite(lon)
                 && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
-            if (!mapLink) return;
-            mapLink.hidden = !valid;
+            if (mapLink) mapLink.hidden = !valid;
             if (valid) {
-                mapLink.href = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=17/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}`;
+                if (mapLink) mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lon}`)}`;
             }
         };
 
@@ -703,44 +919,80 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         let map = null;
         let marker = null;
-        const initializeMap = () => {
-            if (!mapElement || map) return map;
+        let mapsApi = null;
+        let initializingMap = false;
+        let outlineLayer = null;
+        let mapMode = 'pin';
+        let savedOutline = [];
+        let draftOutline = [];
+        try {
+            savedOutline = boundaryInput?.value ? JSON.parse(boundaryInput.value) : [];
+            if (!Array.isArray(savedOutline)) savedOutline = [];
+        } catch {
+            savedOutline = [];
+        }
+        const outlineLatLngs = (points) => points.map((point) => ({ lat: Number(point.latitude), lng: Number(point.longitude) }));
+        const renderOutline = (points, draft = false) => {
+            if (!map) return;
+            if (outlineLayer) outlineLayer.setMap(null);
+            outlineLayer = null;
+            if (points.length < 2) return;
+            outlineLayer = points.length >= 3
+                ? new mapsApi.Polygon({ map, paths: outlineLatLngs(points),
+                    strokeColor: draft ? '#d5ad55' : '#153d2b',
+                    strokeWeight: 3,
+                    strokeOpacity: 0.95,
+                    fillColor: draft ? '#d5ad55' : '#26865c',
+                    fillOpacity: draft ? 0.18 : 0.16,
+                    clickable: false,
+                })
+                : new mapsApi.Polyline({ map, path: outlineLatLngs(points), strokeColor: '#d5ad55', strokeWeight: 3, clickable: false });
+        };
+        const updateBoundaryControls = () => {
+            if (undoBoundary) undoBoundary.disabled = !boundaryEnabled || draftOutline.length === 0;
+            if (saveBoundary) saveBoundary.disabled = !boundaryEnabled || draftOutline.length < 3;
+            if (clearBoundary) clearBoundary.disabled = !boundaryEnabled || (savedOutline.length === 0 && draftOutline.length === 0);
+        };
+        const addBoundaryPoint = (lat, lon) => {
+            if (!boundaryEnabled || !Number.isFinite(lat) || !Number.isFinite(lon) || !containsMunicipality(lat, lon)) {
+                if (boundaryStatus) boundaryStatus.textContent = 'Enter a valid coordinate inside the mapped Bongabong outline.';
+                return false;
+            }
+            draftOutline.push({ latitude: Number(lat.toFixed(7)), longitude: Number(lon.toFixed(7)) });
+            renderOutline(draftOutline, true);
+            if (boundaryStatus) boundaryStatus.textContent = `${draftOutline.length} outline point${draftOutline.length === 1 ? '' : 's'} added. Add at least three, then save the outline.`;
+            updateBoundaryControls();
+            return true;
+        };
+        const initializeMap = async () => {
+            if (!mapElement || map || initializingMap) return map;
             const bounds = mapElement.getBoundingClientRect();
             if (bounds.width < 50 || bounds.height < 50) return null;
-
-            const savedPoint = readPoint();
-            const defaultCenter = [
-                Number(mapElement.dataset.defaultLatitude) || 12.74642,
-                Number(mapElement.dataset.defaultLongitude) || 121.48741,
-            ];
-            map = L.map(mapElement, { scrollWheelZoom: false, keyboard: true })
-                .setView(savedPoint ? [savedPoint.lat, savedPoint.lng] : defaultCenter, savedPoint ? 17 : 12);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-            }).addTo(map);
-
-            if (savedPoint) {
-                marker = L.marker(savedPoint, { draggable: locationEnabled, keyboard: true, title: 'Farm location pin', alt: 'Farm location pin' }).addTo(map);
-                marker.on('dragend', () => {
-                    const moved = marker.getLatLng();
-                    setPin(moved, 'manual', null, 'Pin moved on the map. The MAO has not verified this location.', false);
+            initializingMap = true;
+            try {
+                if (!mapElement.dataset.googleKey) throw new Error('Google Maps key is not configured. Enter coordinates below.');
+                mapsApi = await loadGoogleMaps(mapElement.dataset.googleKey);
+                const savedPoint = readPoint();
+                map = new mapsApi.Map(mapElement, { center: savedPoint || { lat: 12.74642, lng: 121.48741 }, zoom: savedPoint ? 17 : 15, mapTypeId: 'hybrid', mapTypeControl: true, streetViewControl: false });
+                if (municipalityBoundary.length >= 3) new mapsApi.Polygon({ map, paths: outlineLatLngs(municipalityBoundary), strokeColor: '#26865c', strokeWeight: 2, fillOpacity: 0, clickable: false });
+                if (savedPoint) setPin(savedPoint, source.value || 'manual', null, null, false);
+                renderOutline(savedOutline);
+                map.addListener('click', (event) => {
+                    const point = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                    if (mapMode === 'boundary') addBoundaryPoint(point.lat, point.lng);
+                    else setPin(point);
                 });
-            }
-            map.on('click', (event) => setPin(event.latlng));
-            map.on('tileerror', () => {
+            } catch (error) {
                 const mapMessage = section.querySelector('[data-farm-map-message]');
                 if (mapMessage) {
                     mapMessage.hidden = false;
-                    mapMessage.textContent = 'Map tiles could not load. Check your internet connection; GPS and coordinate entry can still be used.';
+                    mapMessage.textContent = error.message || 'Google Maps could not load. GPS and coordinate entry can still be used.';
                 }
-            });
-
+            } finally { initializingMap = false; }
             return map;
         };
         const showMap = () => window.setTimeout(() => {
             initializeMap();
-            map?.invalidateSize();
         }, 80);
         section.addEventListener('farm:visible', showMap);
         section.closest('details')?.addEventListener('toggle', (event) => {
@@ -754,6 +1006,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (!point || !isValidPoint(point.lat, point.lng)) return;
+            if (!containsMunicipality(point.lat, point.lng)) {
+                status.textContent = 'That point appears outside the mapped Bongabong area. Check the farm barangay and choose a point within the outline.';
+                const previousPoint = readPoint();
+                if (marker && previousPoint) marker.setPosition(previousPoint);
+                return;
+            }
             latitude.value = point.lat.toFixed(7);
             longitude.value = point.lng.toFixed(7);
             source.value = pinSource;
@@ -761,15 +1019,14 @@ document.addEventListener('DOMContentLoaded', () => {
             initializeMap();
             if (map) {
                 if (!marker) {
-                    marker = L.marker(point, { draggable: true, keyboard: true, title: 'Farm location pin', alt: 'Draggable farm location pin' }).addTo(map);
-                    marker.on('dragend', () => {
-                        const moved = marker.getLatLng();
-                        setPin(moved, 'manual', null, 'Pin moved on the map. The MAO has not verified this location.', false);
+                    marker = new mapsApi.Marker({ map, position: point, draggable: true, title: 'Farm location pin' });
+                    marker.addListener('dragend', (event) => {
+                        setPin({ lat: event.latLng.lat(), lng: event.latLng.lng() }, 'manual', null, 'Pin moved on the map. The MAO has not verified this location.', false);
                     });
                 } else {
-                    marker.setLatLng(point);
+                    marker.setPosition(point);
                 }
-                if (pan) map.setView(point, Math.max(map.getZoom(), 16));
+                if (pan) { map.setCenter(point); map.setZoom(Math.max(map.getZoom(), 16)); }
             }
             status.textContent = message || (pinSource === 'gps'
                 ? `Location captured. Device accuracy is about ${Math.round(pinAccuracy)} m; the MAO has not verified this pin.`
@@ -778,19 +1035,150 @@ document.addEventListener('DOMContentLoaded', () => {
             syncFormReview();
         };
 
+        const applyOutlineEstimate = (points) => {
+            const normalized = points.map((p) => ({ latitude: Number(p.latitude), longitude: Number(p.longitude) }));
+            const area = farmOutlineSquareMeters(normalized);
+            const center = farmOutlineInteriorPoint(normalized);
+            if (!center || !containsMunicipality(center.lat, center.lng) || area <= 0) return;
+            setPin(center, 'manual', null, 'Pin placed inside the farm outline. Save this form to keep changes.');
+            if (!farmArea || !farmAreaUnit) return;
+            estimatedAreaSquareMeters = area;
+            if (farmAreaUnit.value === 'hectare' && area < 100) farmAreaUnit.value = 'square_meter';
+            farmArea.value = (farmAreaUnit.value === 'hectare' ? area / 10000 : area).toFixed(2);
+            farmArea.dispatchEvent(new Event('input', { bubbles: true }));
+            if (farmAreaFeedback) farmAreaFeedback.textContent = `Estimated from the outline: ${farmArea.value} ${farmAreaUnit.value === 'hectare' ? 'hectares' : 'square meters'}. Save this form to keep it. Not an official land survey.`;
+        };
+        if (savedOutline.length >= 3 && farmArea && farmAreaUnit) applyOutlineEstimate(savedOutline);
+
+        const clearLocationSearchResults = (message = '') => {
+            if (locationSearchResults) {
+                locationSearchResults.replaceChildren();
+                locationSearchResults.hidden = true;
+            }
+            if (locationSearchStatus) locationSearchStatus.textContent = message;
+        };
+
+        const searchFarmLocation = async () => {
+            const details = locationDetails?.value.trim() || '';
+            const barangay = farmBarangay?.value || '';
+            if (!details) {
+                clearLocationSearchResults('Enter the farm sitio or a public nearby landmark first.');
+                locationDetails?.focus();
+                return;
+            }
+            if (!barangay) {
+                clearLocationSearchResults('Choose the farm barangay before searching.');
+                farmBarangay?.focus();
+                return;
+            }
+
+            const csrfToken = form?.querySelector('input[name="_token"]')?.value;
+            if (!csrfToken || !locationSearchButton || !locationSearchResults || !locationSearchStatus) {
+                clearLocationSearchResults('Map search could not start. Refresh this page and try again.');
+                return;
+            }
+
+            clearLocationSearchResults('Searching named places inside Bongabong…');
+            locationSearchButton.disabled = true;
+            locationSearchButton.setAttribute('aria-busy', 'true');
+            if (locationSearchLabel) locationSearchLabel.textContent = 'Searching map…';
+
+            const payload = new URLSearchParams({
+                _token: csrfToken,
+                location_details: details,
+                barangay,
+            });
+
+            try {
+                let response;
+                try {
+                    response = await fetch(section.dataset.locationSearchUrl, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        },
+                        body: payload,
+                        credentials: 'same-origin',
+                    });
+                } catch {
+                    throw new Error('Could not reach map search. Check your connection, or place the pin directly on the map.');
+                }
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error('Map search returned an unreadable response. Place the pin directly or try again later.');
+                }
+                if (!response.ok) throw new Error(result.message || 'Map search could not be completed. Try the map pin or coordinates instead.');
+
+                if (!Array.isArray(result.results) || result.results.length === 0) {
+                    locationSearchStatus.textContent = 'No matching named place was found inside Bongabong. Try another public landmark, or place the pin on the map.';
+                    return;
+                }
+
+                locationSearchResults.replaceChildren();
+                result.results.forEach((place, index) => {
+                    const item = document.createElement('li');
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'ui-farm-location-result';
+                    button.textContent = place.label;
+                    button.setAttribute('aria-pressed', 'false');
+                    button.addEventListener('click', () => {
+                        locationSearchResults.querySelectorAll('button[aria-pressed="true"]').forEach((selected) => selected.setAttribute('aria-pressed', 'false'));
+                        button.setAttribute('aria-pressed', 'true');
+                        setPin(
+                            { lat: Number(place.latitude), lng: Number(place.longitude) },
+                            'manual',
+                            null,
+                            `Map moved to result ${index + 1}. Check the pin and adjust it to your farm location. This is not a land survey.`
+                        );
+                        locationSearchStatus.textContent = 'Suggested place selected. Confirm the marker is on your farm, then move it if needed.';
+                    });
+                    item.append(button);
+                    locationSearchResults.append(item);
+                });
+                locationSearchResults.hidden = false;
+                locationSearchResults.querySelector('button')?.click();
+                locationSearchStatus.textContent = result.results.length > 1
+                    ? 'Map moved to the first match. Check the pin, or choose another result below.'
+                    : 'Map moved to the matching place. Check the pin and adjust it to your farm.';
+            } catch (error) {
+                locationSearchStatus.textContent = error instanceof Error
+                    ? error.message
+                    : 'Map search could not be completed. Place the pin directly, use GPS, or enter coordinates instead.';
+            } finally {
+                locationSearchButton.disabled = false;
+                locationSearchButton.removeAttribute('aria-busy');
+                if (locationSearchLabel) locationSearchLabel.textContent = 'Find this place on the map';
+            }
+        };
+
+        locationSearchButton?.addEventListener('click', searchFarmLocation);
+        locationDetails?.addEventListener('input', () => {
+            clearLocationSearchResults(locationDetails.value.trim()
+                ? 'Farm location text changed. Search again to move the pin to this place.'
+                : 'Enter a public farm sitio or nearby landmark to search the map.');
+        });
+        farmBarangay?.addEventListener('change', () => {
+            clearLocationSearchResults('Farm barangay changed. Search again to use the selected barangay.');
+        });
+
         [latitude, longitude].forEach((field) => field.addEventListener('input', () => {
             if (latitude.value !== '' && longitude.value !== '') {
                 const point = readPoint();
-                if (point) setPin(point, 'manual', null, 'Coordinates entered. The MAO has not verified this pin.');
+                if (point && containsMunicipality(point.lat, point.lng)) setPin(point, 'manual', null, 'Coordinates entered. The MAO has not verified this pin.');
+                else if (point) status.textContent = 'Enter coordinates inside the mapped Bongabong area.';
                 else {
-                    if (marker && map) map.removeLayer(marker);
+                    if (marker && map) marker.setMap(null);
                     marker = null;
                     status.textContent = 'Enter valid latitude and longitude values.';
                 }
             } else {
                 source.value = '';
                 accuracy.value = '';
-                if (marker && map) map.removeLayer(marker);
+                if (marker && map) marker.setMap(null);
                 marker = null;
                 status.textContent = 'Select the farm location on the map or enter both coordinates.';
             }
@@ -802,12 +1190,93 @@ document.addEventListener('DOMContentLoaded', () => {
             longitude.value = '';
             source.value = '';
             accuracy.value = '';
-            if (marker && map) map.removeLayer(marker);
+            if (marker && map) marker.setMap(null);
             marker = null;
             status.textContent = 'Farm pin removed. The barangay and landmark are unchanged.';
             updateMapLink();
             syncFormReview();
         });
+
+        modeButtons.forEach((button) => button.addEventListener('click', () => {
+            const requestedMode = button.dataset.farmMapMode;
+            if (requestedMode === 'boundary' && !boundaryEnabled) return;
+            mapMode = requestedMode;
+            modeButtons.forEach((candidate) => {
+                const active = candidate === button;
+                candidate.classList.toggle('is-selected', active);
+                candidate.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            mapElement?.classList.toggle('is-drawing-boundary', mapMode === 'boundary');
+            if (manualBoundaryControls) manualBoundaryControls.hidden = mapMode !== 'boundary';
+            if (boundaryStatus) boundaryStatus.textContent = mapMode === 'boundary'
+                ? 'Drawing mode is on. Click around the edge of your farm, moving in one direction.'
+                : (savedOutline.length ? 'Saved farm outline is shown. Select Draw farm outline to replace it.' : 'Farm outline is optional. Use Draw farm outline to mark the approximate farm area.');
+        }));
+        undoBoundary?.addEventListener('click', () => {
+            draftOutline.pop();
+            renderOutline(draftOutline.length ? draftOutline : savedOutline, draftOutline.length > 0);
+            if (boundaryStatus) boundaryStatus.textContent = `${draftOutline.length} draft point${draftOutline.length === 1 ? '' : 's'} remain.`;
+            updateBoundaryControls();
+        });
+        saveBoundary?.addEventListener('click', () => {
+            if (draftOutline.length < 3 || draftOutline.some((point) => !containsMunicipality(point.latitude, point.longitude))) {
+                if (boundaryStatus) boundaryStatus.textContent = 'Add at least three points inside the Bongabong outline before saving.';
+                return;
+            }
+            savedOutline = [...draftOutline];
+            draftOutline = [];
+            if (boundaryInput) boundaryInput.value = JSON.stringify(savedOutline);
+            renderOutline(savedOutline);
+            applyOutlineEstimate(savedOutline);
+            if (boundaryStatus) boundaryStatus.textContent = 'Farm outline saved with this form. It is an approximate farmer-provided shape, not a land survey.';
+            updateBoundaryControls();
+        });
+        clearBoundary?.addEventListener('click', () => {
+            estimatedAreaSquareMeters = null;
+            if (farmAreaFeedback) farmAreaFeedback.textContent = 'Outline removed. Check the farm area before saving.';
+            savedOutline = [];
+            draftOutline = [];
+            if (boundaryInput) boundaryInput.value = '';
+            if (outlineLayer && map) outlineLayer.setMap(null);
+            outlineLayer = null;
+            if (boundaryStatus) boundaryStatus.textContent = 'Farm outline cleared. The farm pin is unchanged.';
+            updateBoundaryControls();
+        });
+        farmAreaUnit?.addEventListener('change', () => {
+            if (estimatedAreaSquareMeters === null || !farmArea) return;
+            const value = farmAreaUnit.value === 'hectare' ? estimatedAreaSquareMeters / 10000 : estimatedAreaSquareMeters;
+            if (value < 0.01) {
+                farmAreaUnit.value = 'square_meter';
+                if (farmAreaFeedback) farmAreaFeedback.textContent = 'This outline is too small to display in hectares. Square meters are shown instead.';
+                farmArea.value = Math.max(0.01, estimatedAreaSquareMeters).toFixed(2);
+            } else {
+                farmArea.value = value.toFixed(2);
+                if (farmAreaFeedback) farmAreaFeedback.textContent = `Estimated from the outline: ${farmArea.value} ${farmAreaUnit.value === 'hectare' ? 'hectares' : 'square meters'}. Not an official land survey.`;
+            }
+            farmArea.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        farmArea?.addEventListener('input', (event) => {
+            if (event.isTrusted) {
+                estimatedAreaSquareMeters = null;
+                if (farmAreaFeedback) farmAreaFeedback.textContent = 'Area entered manually. It may differ from the outline estimate.';
+            }
+        });
+        addBoundaryPointButton?.addEventListener('click', () => {
+            const latitudeValue = Number(manualBoundaryLatitude?.value);
+            const longitudeValue = Number(manualBoundaryLongitude?.value);
+            if (addBoundaryPoint(latitudeValue, longitudeValue)) {
+                if (manualBoundaryLatitude) manualBoundaryLatitude.value = '';
+                if (manualBoundaryLongitude) manualBoundaryLongitude.value = '';
+                manualBoundaryLatitude?.focus();
+            }
+        });
+        [manualBoundaryLatitude, manualBoundaryLongitude].filter(Boolean).forEach((field) => field.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                event.stopPropagation();
+                addBoundaryPointButton?.click();
+            }
+        }));
 
         useLocation.addEventListener('click', () => {
             if (!window.isSecureContext || !navigator.geolocation) {
@@ -818,9 +1287,6 @@ document.addEventListener('DOMContentLoaded', () => {
             useLocation.disabled = true;
             status.textContent = 'Waiting for your device location permission…';
             navigator.geolocation.getCurrentPosition((position) => {
-                latitude.value = position.coords.latitude.toFixed(7);
-                longitude.value = position.coords.longitude.toFixed(7);
-                source.value = 'gps';
                 setPin({ lat: position.coords.latitude, lng: position.coords.longitude }, 'gps', position.coords.accuracy,
                     `Location captured. Device accuracy is about ${Math.round(position.coords.accuracy)} m; the MAO has not verified this pin.`);
                 useLocation.disabled = false;
@@ -992,6 +1458,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-ffrms-map]').forEach((mapElement) => {
         const emptyMessage = mapElement.parentElement?.querySelector('[data-ffrms-map-empty]');
+        const mapMessage = mapElement.parentElement?.querySelector('[data-ffrms-map-message]');
         let points = [];
 
         try {
@@ -1004,50 +1471,124 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!Array.isArray(points)) points = [];
+        let outline = [];
+        try {
+            const parsed = JSON.parse(mapElement.dataset.ffrmsMapOutline || '[]');
+            if (Array.isArray(parsed) && parsed.length >= 3 && parsed.length <= 80 && parsed.every((p) => Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) && Math.abs(Number(p.latitude)) <= 90 && Math.abs(Number(p.longitude)) <= 180)) {
+                outline = parsed.map((p) => [Number(p.latitude), Number(p.longitude)]);
+            }
+        } catch { outline = []; }
         points = points.filter((point) => Number.isFinite(Number(point.latitude))
             && Number.isFinite(Number(point.longitude))
             && Number(point.latitude) >= -90 && Number(point.latitude) <= 90
             && Number(point.longitude) >= -180 && Number(point.longitude) <= 180);
 
-        if (emptyMessage) emptyMessage.hidden = points.length > 0;
+        if (emptyMessage) emptyMessage.hidden = points.length > 0 || outline.length > 0;
 
-        const map = L.map(mapElement, { scrollWheelZoom: false, keyboard: true });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-        }).addTo(map);
+        const renderGoogleMap = async () => {
+            mapElement.setAttribute('aria-busy', 'true');
+            if (!mapElement.dataset.googleKey) {
+                throw new Error('Google Maps is not configured for this application. Farm records remain available in the registration details.');
+            }
 
-        const markers = [];
-        points.forEach((point) => {
-            const coordinates = [Number(point.latitude), Number(point.longitude)];
-            const marker = L.marker(coordinates, { keyboard: true, title: `${point.farm || 'Farm'} location` }).addTo(map);
-            const popup = document.createElement('div');
-            const farmName = document.createElement('strong');
-            const farmerName = document.createElement('span');
-            const location = document.createElement('small');
-            farmName.textContent = point.farm || 'Registered farm';
-            farmerName.textContent = `${point.farmer || 'Farmer'}${point.farmerCode ? ` · ${point.farmerCode}` : ''}`;
-            location.textContent = point.barangay || 'Barangay not recorded';
-            popup.append(farmName, document.createElement('br'), farmerName, document.createElement('br'), location);
-            marker.bindPopup(popup);
-            markers.push(coordinates);
-        });
+            const mapsApi = await loadGoogleMaps(mapElement.dataset.googleKey);
+            const map = new mapsApi.Map(mapElement, {
+                center: { lat: 12.74642, lng: 121.48741 },
+                zoom: 13,
+                mapTypeId: mapsApi.MapTypeId.HYBRID,
+                mapTypeControl: true,
+                mapTypeControlOptions: { style: mapsApi.MapTypeControlStyle.DROPDOWN_MENU },
+                fullscreenControl: true,
+                streetViewControl: false,
+                zoomControl: true,
+                gestureHandling: 'cooperative',
+            });
+            const bounds = new mapsApi.LatLngBounds();
+            const mapPoints = [];
 
-        if (markers.length === 1) {
-            map.setView(markers[0], 15);
-        } else if (markers.length > 1) {
-            map.fitBounds(markers, { padding: [24, 24], maxZoom: 15 });
-        } else {
-            map.setView([12.74642, 121.48741], 10);
-        }
+            if (outline.length >= 3) {
+                const outlinePath = outline.map(([latitude, longitude]) => ({ lat: latitude, lng: longitude }));
+                new mapsApi.Polygon({
+                    map,
+                    paths: outlinePath,
+                    strokeColor: '#153d2b',
+                    strokeOpacity: 0.95,
+                    strokeWeight: 3,
+                    fillColor: '#26865c',
+                    fillOpacity: 0.2,
+                    clickable: false,
+                });
+                outlinePath.forEach((point) => bounds.extend(point));
+            }
 
-        map.on('tileerror', () => {
-            if (emptyMessage) {
-                emptyMessage.hidden = false;
-                emptyMessage.textContent = 'Map tiles could not load. Check your internet connection; farm records are still available in the table.';
+            points.forEach((point) => {
+                const position = { lat: Number(point.latitude), lng: Number(point.longitude) };
+                const marker = new mapsApi.Marker({
+                    map,
+                    position,
+                    title: `${point.farm || 'Farm'} location`,
+                });
+                const content = document.createElement('div');
+                const farmName = document.createElement('strong');
+                const farmerName = document.createElement('div');
+                const barangay = document.createElement('small');
+                farmName.textContent = point.farm || 'Registered farm';
+                farmerName.textContent = `${point.farmer || 'Farmer'}${point.farmerCode ? ` / ${point.farmerCode}` : ''}`;
+                barangay.textContent = point.barangay || 'Barangay not recorded';
+                content.append(farmName, farmerName, barangay);
+
+                const infoWindow = new mapsApi.InfoWindow({ content });
+                marker.addListener('click', () => infoWindow.open({ map, anchor: marker }));
+                bounds.extend(position);
+                mapPoints.push(position);
+            });
+
+            if (!bounds.isEmpty()) {
+                map.fitBounds(bounds, 36);
+                if (mapPoints.length === 1 && outline.length === 0) {
+                    map.setCenter(mapPoints[0]);
+                    map.setZoom(16);
+                }
+            }
+
+            if (mapMessage) {
+                mapMessage.classList.remove('is-error');
+                mapMessage.textContent = points.length || outline.length
+                    ? 'Google Maps loaded. Farm pins and any saved outline are shown on the satellite map.'
+                    : 'Google Maps loaded. No farm pins are recorded for this view yet.';
+            }
+            mapElement.setAttribute('aria-busy', 'false');
+        };
+
+        renderGoogleMap().catch((error) => {
+            mapElement.setAttribute('aria-busy', 'false');
+            if (mapMessage) {
+                mapMessage.classList.add('is-error');
+                mapMessage.textContent = error.message || 'Google Maps could not load. Farm records remain available in the registration details.';
             }
         });
+    });
+});
 
-        window.setTimeout(() => map.invalidateSize(), 100);
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-open-disclosure]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            const disclosure = document.getElementById(trigger.dataset.openDisclosure);
+            if (!disclosure) return;
+            disclosure.open = true;
+            window.setTimeout(() => disclosure.querySelector('summary')?.focus({ preventScroll: true }), 0);
+        });
+    });
+
+    document.querySelectorAll('form[data-submit-feedback]').forEach((form) => {
+        form.addEventListener('submit', () => {
+            if (!form.checkValidity()) return;
+            const submit = form.querySelector('button[type="submit"]');
+            const label = form.querySelector('[data-submit-label]');
+            if (!submit || submit.disabled) return;
+            submit.disabled = true;
+            submit.setAttribute('aria-busy', 'true');
+            if (label) label.textContent = 'Sending request…';
+        });
     });
 });

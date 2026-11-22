@@ -18,7 +18,7 @@
     $moduleSections = [
         'Agricultural operations' => [
             ['slug' => 'ffrms', 'label' => 'Farmer & Farm Registration', 'icon' => 'users'],
-            ['slug' => 'apms', 'label' => 'Production & Monitoring', 'icon' => 'chart'],
+            ['slug' => 'apms', 'label' => 'Production & Field Operations', 'icon' => 'chart'],
         ],
         'Programs & resources' => [
             ['slug' => 'aisms', 'label' => 'Inventory & Supply', 'icon' => 'inventory'],

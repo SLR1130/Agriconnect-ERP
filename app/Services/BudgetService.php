@@ -112,7 +112,12 @@ class BudgetService
         return DB::transaction(function () use ($allocation, $data, $actor, $amount) {
             $existing = BudgetTransaction::where('reference', $data['reference'])->first();
             if ($existing) {
-                if ((int) $existing->budget_allocation_id !== (int) $allocation->id || $existing->entry_type !== 'expenditure') {
+                if ((int) $existing->budget_allocation_id !== (int) $allocation->id
+                    || $existing->entry_type !== 'expenditure'
+                    || $existing->direction !== 'debit'
+                    || $this->cents($existing->amount) !== $amount
+                    || (int) $existing->performed_by !== (int) $actor->id
+                    || (string) $existing->description !== (string) $data['description']) {
                     throw ValidationException::withMessages(['reference' => 'This transaction reference is already in use.']);
                 }
 

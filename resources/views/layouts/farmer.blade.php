@@ -22,6 +22,7 @@
                 <a href="{{ route('farmer.portal') }}" @if(request()->routeIs('farmer.portal')) aria-current="page" @endif><x-ui.icon name="home" size="sm"/>Home</a>
                 <a href="{{ route('farmer.services') }}" @if(request()->routeIs('farmer.services', 'farmer.programs.show', 'farmer.assistance')) aria-current="page" @endif><x-ui.icon name="services" size="sm"/>Explore services</a>
                 <a href="{{ route('farmer.farms') }}" @if(request()->routeIs('farmer.farms', 'farmer.production')) aria-current="page" @endif><x-ui.icon name="farms" size="sm"/>My farms</a>
+                <a href="{{ route('farmer.equipment') }}" @if(request()->routeIs('farmer.equipment', 'farmer.equipment.*', 'farmer.equipment-requests.*')) aria-current="page" @endif><x-ui.icon name="equipment" size="sm"/>Borrow equipment</a>
                 <a href="{{ route('farmer.activities') }}" @if(request()->routeIs('farmer.activities', 'farmer.applications.show', 'farmer.equipment-requests.show')) aria-current="page" @endif><x-ui.icon name="activity" size="sm"/>My activities</a>
             </nav>
             <div class="farmer-header-actions">
@@ -48,7 +49,25 @@
     </header>
 
     <main id="main-content" class="farmer-container farmer-main" tabindex="-1">
-        @if(isset($title))<div class="farmer-page-heading"><p class="farmer-eyebrow">Bongabong agricultural services</p><h1>{{ $title }}</h1>@isset($description)<p>{{ $description }}</p>@endisset</div>@endif
+        <?php
+            $farmerPageContext = match (true) {
+                request()->routeIs('farmer.services', 'farmer.assistance', 'farmer.programs.show') => ['label' => 'Service directory', 'icon' => 'services'],
+                request()->routeIs('farmer.farms', 'farmer.production', 'farmer.production.*') => ['label' => 'My farm records', 'icon' => 'farms'],
+                request()->routeIs('farmer.equipment', 'farmer.equipment.*', 'farmer.equipment-requests.*') => ['label' => 'Equipment services', 'icon' => 'equipment'],
+                request()->routeIs('farmer.activities', 'farmer.applications.*', 'farmer.claim-tickets.*', 'farmer.handovers.*') => ['label' => 'Service tracking', 'icon' => 'activity'],
+                request()->routeIs('farmer.notifications') => ['label' => 'Updates and notifications', 'icon' => 'notifications'],
+                request()->routeIs('farmer.announcements', 'farmer.announcements.*') => ['label' => 'Official MAO notices', 'icon' => 'notifications'],
+                request()->routeIs('farmer.profile') => ['label' => 'Account and profile', 'icon' => 'profile'],
+                default => ['label' => 'Farmer services', 'icon' => 'home'],
+            };
+        ?>
+        @if(isset($title))
+            <div class="farmer-page-heading">
+                <p class="farmer-eyebrow farmer-context-label"><x-ui.icon :name="$farmerPageContext['icon']" size="sm" />{{ $farmerPageContext['label'] }}</p>
+                <h1>{{ $title }}</h1>
+                @isset($description)<p>{{ $description }}</p>@endisset
+            </div>
+        @endif
         @if(session('status'))<div class="farmer-message farmer-message-success" role="status">{{ session('status') }}</div>@endif
         @if($errors->any())<div class="farmer-message farmer-message-error" role="alert"><strong>Please check your information.</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
         {{ $slot }}
@@ -59,6 +78,7 @@
         <a href="{{ route('farmer.portal') }}" @if(request()->routeIs('farmer.portal')) aria-current="page" @endif><x-ui.icon name="home" size="sm"/>Home</a>
         <a href="{{ route('farmer.services') }}" @if(request()->routeIs('farmer.services', 'farmer.programs.show', 'farmer.assistance')) aria-current="page" @endif><x-ui.icon name="services" size="sm"/>Services</a>
         <a href="{{ route('farmer.farms') }}" @if(request()->routeIs('farmer.farms', 'farmer.production')) aria-current="page" @endif><x-ui.icon name="farms" size="sm"/>Farms</a>
+        <a href="{{ route('farmer.equipment') }}" @if(request()->routeIs('farmer.equipment', 'farmer.equipment.*', 'farmer.equipment-requests.*')) aria-current="page" @endif><x-ui.icon name="equipment" size="sm"/>Equipment</a>
         <a href="{{ route('farmer.activities') }}" @if(request()->routeIs('farmer.activities', 'farmer.applications.show', 'farmer.equipment-requests.show')) aria-current="page" @endif><x-ui.icon name="activity" size="sm"/>Activity</a>
     </nav>
 </body>

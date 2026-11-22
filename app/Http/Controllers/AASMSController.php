@@ -20,9 +20,12 @@ use App\Services\ProgramEligibilityService;
 use App\Services\AgriculturalSchemaCapabilities;
 use App\Services\AssistanceApplicationDocumentService;
 use App\Services\ClaimTicketFeatureGate;
+use App\Services\BongabongGeography;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class AASMSController extends Controller
@@ -32,19 +35,37 @@ class AASMSController extends Controller
         abort_unless($request->user()->canModuleAction('aasms', $action), 403);
     }
 
-    private function filters(Request $request)
+    private function filters(Request $request, array $barangays)
     {
+        $filter = $request->validate([
+            'barangay' => ['nullable', 'string', Rule::in($barangays)],
+            'distribution_barangay' => ['nullable', 'string', Rule::in([...$barangays, '__not_recorded__'])],
+        ]);
+        $barangay = trim($filter['barangay'] ?? '');
+        $distributionBarangay = trim($filter['distribution_barangay'] ?? '');
+        if ($distributionBarangay !== '' && ! Schema::hasColumn('assistance_distributions', 'farmer_barangay_at_distribution')) {
+            abort(503, 'Historical distribution barangay is not yet available.');
+        }
+
         return AssistanceDistribution::with(['application.farmer.user', 'application.program', 'batch.item', 'processor'])
             ->when($request->filled('reference'), fn ($q) => $q->where('reference', 'like', '%'.$request->reference.'%'))
             ->when($request->filled('application'), fn ($q) => $q->where('application_id', $request->application))
             ->when($request->filled('program_id'), fn ($q) => $q->whereHas('application', fn ($a) => $a->where('program_id', $request->program_id)))
             ->when($request->filled('farmer'), fn ($q) => $q->whereHas('application.farmer.user', fn ($u) => $u->where('name', 'like', '%'.$request->farmer.'%')))
+            ->when($barangay !== '', fn ($q) => $q->whereHas('application.farmer', fn ($farmers) => $farmers->where('barangay', $barangay)))
+            ->when($distributionBarangay !== '', function ($q) use ($distributionBarangay): void {
+                if ($distributionBarangay === '__not_recorded__') {
+                    $q->where(fn ($unknown) => $unknown->whereNull('farmer_barangay_at_distribution')->orWhere('farmer_barangay_at_distribution', ''));
+                } else {
+                    $q->where('farmer_barangay_at_distribution', $distributionBarangay);
+                }
+            })
             ->when($request->filled('supply_item_id'), fn ($q) => $q->whereHas('batch', fn ($b) => $b->where('supply_item_id', $request->supply_item_id)))
             ->when($request->filled('from'), fn ($q) => $q->whereDate('distributed_at', '>=', $request->from))
             ->when($request->filled('to'), fn ($q) => $q->whereDate('distributed_at', '<=', $request->to));
     }
 
-    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema, \App\Services\StaffAssistedIntakePolicy $intakePolicy, ClaimTicketFeatureGate $claimTickets): View
+    public function index(Request $request, AgriculturalBusinessCalendar $calendar, AgriculturalSchemaCapabilities $schema, \App\Services\StaffAssistedIntakePolicy $intakePolicy, ClaimTicketFeatureGate $claimTickets, BongabongGeography $geography): View
     {
         $this->staff($request, 'view');
         $requirementsReady = $schema->requirementVersionsReady();
@@ -94,9 +115,25 @@ class AASMSController extends Controller
         $batches = SupplyBatch::with('item')->where('status', 'available')->where('quantity_available', '>', 0)
             ->where(fn ($query) => $query->whereNull('expires_on')->orWhereDate('expires_on', '>=', today()))
             ->get();
-        $distributions = $this->filters($request)->latest()->paginate(15, ['*'], 'distribution_page')->withQueryString();
+        $barangays = $geography->barangays();
+        $distributionBarangayReady = Schema::hasColumn('assistance_distributions', 'farmer_barangay_at_distribution');
+        $distributions = $this->filters($request, $barangays)->latest()->paginate(15, ['*'], 'distribution_page')->withQueryString();
+        $barangayExpression = $distributionBarangayReady
+            ? "COALESCE(NULLIF(ad.farmer_barangay_at_distribution, ''), 'Not recorded')"
+            : "COALESCE(NULLIF(f.barangay, ''), 'Not recorded')";
+        $barangaySummaryQuery = DB::table('assistance_distributions as ad')
+            ->selectRaw($barangayExpression.' as barangay, COUNT(*) as distribution_count, SUM(ad.quantity) as quantity_total');
+        if (! $distributionBarangayReady) {
+            $barangaySummaryQuery
+                ->join('assistance_applications as aa', 'aa.id', '=', 'ad.application_id')
+                ->join('farmers as f', 'f.id', '=', 'aa.farmer_id');
+        }
+        $distributionBarangaySummary = $barangaySummaryQuery
+            ->groupByRaw($barangayExpression)
+            ->orderBy('barangay')
+            ->get();
 
-        return view('modules.aasms.dashboard', compact('programs', 'applications', 'batches', 'distributions') + [
+        return view('modules.aasms.dashboard', compact('programs', 'applications', 'batches', 'distributions', 'barangays', 'distributionBarangaySummary') + [
             'items' => SupplyItem::where('status', 'active')->orderBy('name')->get(),
             'pending' => (int) $applicationCounts->get('submitted', 0), 'approved' => (int) $applicationCounts->get('approved', 0), 'rejected' => (int) $applicationCounts->get('rejected', 0), 'completed' => (int) $applicationCounts->get('completed', 0),
             'canCreate' => $request->user()->canModuleAction('aasms', 'create'),
@@ -108,6 +145,8 @@ class AASMSController extends Controller
             'canReject' => $request->user()->canModuleAction('aasms', 'reject'),
             'canDistribute' => $request->user()->canModuleAction('aasms', 'distribute'),
             'canExport' => $request->user()->canModuleAction('aasms', 'export'),
+            'distributionBarangayReady' => $distributionBarangayReady,
+            'distributionBarangaySummaryBasis' => $distributionBarangayReady ? 'at distribution' : 'current farmer record (historical location unavailable)',
             'canIntakeAssist' => $request->user()->canModuleAction('aasms', 'intake_assist'),
             'staffAssistedIntakeEnabled' => $intakePolicy->enabledForIsolatedQa(),
             'requirementsSchemaReady' => $requirementsReady,
@@ -354,17 +393,17 @@ class AASMSController extends Controller
         return back()->with('status', 'Application resubmitted for MAO review.');
     }
 
-    public function export(Request $request)
+    public function export(Request $request, BongabongGeography $geography)
     {
         $this->staff($request, 'export');
-        $rows = $this->filters($request)->latest()->get();
+        $rows = $this->filters($request, $geography->barangays())->latest()->get();
         $safe = fn ($v) => (preg_match('/^[=+\-@]/', (string) $v) ? chr(39) : '').$v;
 
         return response()->streamDownload(function () use ($rows, $safe) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Reference', 'Application', 'Farmer', 'Program', 'Supply item', 'Quantity', 'Processed at']);
+            fputcsv($out, ['Reference', 'Application', 'Farmer', 'Current farmer barangay', 'Farmer barangay at distribution', 'Program', 'Supply item', 'Quantity', 'Processed at']);
             foreach ($rows as $d) {
-                fputcsv($out, [$safe($d->reference), $d->application_id, $safe($d->application->farmer->user->name), $safe($d->application->program->name), $safe($d->batch->item->name), $d->quantity, $d->distributed_at]);
+                fputcsv($out, [$safe($d->reference), $d->application_id, $safe($d->application->farmer->user->name), $safe($d->application->farmer->barangay ?? ''), $safe($d->farmer_barangay_at_distribution ?? ''), $safe($d->application->program->name), $safe($d->batch->item->name), $d->quantity, $d->distributed_at]);
             }fclose($out);
         }, 'aasms-distributions.csv', ['Content-Type' => 'text/csv']);
     }

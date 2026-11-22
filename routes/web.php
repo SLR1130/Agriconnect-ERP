@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AASMSClaimTicketController;
 use App\Http\Controllers\AASMSController;
 use App\Http\Controllers\AASMSHandoverController;
 use App\Http\Controllers\AASMSIntakeController;
@@ -7,17 +8,17 @@ use App\Http\Controllers\ABPMSController;
 use App\Http\Controllers\AEAMSController;
 use App\Http\Controllers\AISMSController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\APMSController;
 use App\Http\Controllers\ApplicationAcknowledgmentController;
 use App\Http\Controllers\AssistanceApplicationDocumentController;
-use App\Http\Controllers\APMSController;
 use App\Http\Controllers\Auth\AccountSetupController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ERP\AdministrationController;
 use App\Http\Controllers\ERP\DashboardController;
-use App\Http\Controllers\FarmerExperienceController;
 use App\Http\Controllers\FarmerClaimTicketController;
-use App\Http\Controllers\AASMSClaimTicketController;
+use App\Http\Controllers\FarmerExperienceController;
 use App\Http\Controllers\FarmerPortalController;
+use App\Http\Controllers\FarmLocationSearchController;
 use App\Http\Controllers\FarmerProductionController;
 use App\Http\Controllers\FFRMSController;
 use App\Http\Controllers\ProductionReviewController;
@@ -43,6 +44,9 @@ Route::get('/account/setup/{token}', [AccountSetupController::class, 'create'])-
 Route::post('/account/setup', [AccountSetupController::class, 'store'])->middleware('throttle:6,1')->name('account.setup.store');
 Route::get('/register', [FarmerPortalController::class, 'create'])->name('farmer.register');
 Route::post('/register', [FarmerPortalController::class, 'store'])->middleware('throttle:6,1')->name('farmer.register.store');
+Route::post('/farm-location/search', FarmLocationSearchController::class)
+    ->middleware('throttle:6,1')
+    ->name('farm-location.search');
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
@@ -50,6 +54,7 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/admin/dashboard', [DashboardController::class, 'admin'])->name('admin.dashboard');
+    Route::get('/mao', fn () => redirect()->route('mao.dashboard'))->name('mao');
     Route::get('/mao/dashboard', [DashboardController::class, 'mao'])->name('mao.dashboard');
     Route::get('/overview', [DashboardController::class, 'overview'])->name('overview');
     Route::post('/assistance/programs/{program}/apply', [AASMSController::class, 'apply'])->middleware('throttle:10,1')->name('farmer.assistance.apply');

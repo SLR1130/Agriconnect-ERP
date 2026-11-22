@@ -14,7 +14,7 @@ return new class extends Migration {
 
     public function up(): void
     {
-        $this->assertIsolatedTarget();
+        $this->assertActivationTarget();
 
         // Laravel's --pretend mode simulates every query, including schema
         // introspection, so hasTable()/count() would report false negatives.
@@ -106,21 +106,25 @@ return new class extends Migration {
         Schema::dropIfExists('assistance_claim_tickets');
     }
 
-    private function assertIsolatedTarget(): void
+    private function assertActivationTarget(): void
     {
-        if (! app()->environment(['local', 'testing'])) {
-            throw new LogicException('Claim-ticket schema may only be installed on an isolated local/testing database.');
-        }
-
         $connectionName = (string) config('database.default');
         $connectionConfig = config('database.connections.'.$connectionName, []);
         if (filled($connectionConfig['url'] ?? null)) {
-            throw new LogicException('A database URL is not accepted for isolated claim-ticket migration.');
+            throw new LogicException('A DB URL is not accepted for claim-ticket schema activation.');
         }
 
         $connection = DB::connection($connectionName);
         $driver = $connection->getDriverName();
         $database = (string) $connection->getDatabaseName();
+
+        if ($this->liveActivationAllowed($driver, $database)) {
+            return;
+        }
+
+        if (! app()->environment(['local', 'testing'])) {
+            throw new LogicException('Claim-ticket schema may only be installed on an explicitly approved operational database or isolated local/testing database.');
+        }
 
         if ($driver === 'sqlite'
             && app()->environment('testing')
@@ -153,5 +157,27 @@ return new class extends Migration {
         }
 
         throw new LogicException('Unsupported claim-ticket migration database driver.');
+    }
+
+    private function liveActivationAllowed(string $driver, string $database): bool
+    {
+        $expectedDatabase = (string) config('agricultural_claim_tickets.live_database');
+        $expectedHash = strtolower((string) config('agricultural_claim_tickets.live_backup_sha256'));
+        $backupPath = realpath((string) config('agricultural_claim_tickets.live_backup_path'));
+        $projectPath = realpath(base_path());
+
+        return $driver === 'mysql'
+            && config('agricultural_claim_tickets.mode') === 'operational'
+            && (bool) config('agricultural_claim_tickets.enabled')
+            && (bool) config('agricultural_claim_tickets.live_enabled')
+            && (bool) config('agricultural_claim_tickets.live_schema_activation_approved')
+            && $database !== ''
+            && $database === $expectedDatabase
+            && preg_match('/\A[a-f0-9]{64}\z/i', $expectedHash) === 1
+            && $backupPath !== false
+            && is_file($backupPath)
+            && $projectPath !== false
+            && ! str_starts_with(strtolower($backupPath), strtolower($projectPath.DIRECTORY_SEPARATOR))
+            && hash_equals($expectedHash, strtolower((string) hash_file('sha256', $backupPath)));
     }
 };

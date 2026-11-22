@@ -7,14 +7,14 @@ use App\Models\AssistanceApplication;
 use App\Models\AssistanceProgram;
 use App\Models\EquipmentRequest;
 use App\Models\Farmer;
-use App\Services\AgriculturalBusinessCalendar;
 use App\Services\AgriculturalAnnouncementPresenter;
-use App\Services\AssistanceProgramCatalogService;
-use App\Services\FarmerActivityFeedService;
-use App\Services\ProgramEligibilityService;
+use App\Services\AgriculturalBusinessCalendar;
 use App\Services\AgriculturalSchemaCapabilities;
 use App\Services\AssistanceApplicationDocumentService;
+use App\Services\AssistanceProgramCatalogService;
 use App\Services\ClaimTicketFeatureGate;
+use App\Services\FarmerActivityFeedService;
+use App\Services\ProgramEligibilityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -183,8 +183,7 @@ class FarmerExperienceController extends Controller
                     ->orWhere('activity_type', 'like', $term)
                     ->orWhere('event_status', 'like', $term)
                     ->orWhere('event_notes', 'like', $term));
-            })
-            ;
+            });
 
         $paginatedActivities = $activityQuery->paginate(15)->withQueryString();
         $paginatedActivities->setCollection($feed->present($paginatedActivities->getCollection()));

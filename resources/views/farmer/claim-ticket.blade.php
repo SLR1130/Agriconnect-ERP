@@ -55,21 +55,22 @@
 
             <section class="farmer-card">
                 <div class="farmer-section-heading"><div><h2>Pickup information</h2><p>Follow any official instructions provided to you by the MAO.</p></div></div>
-                @if(config('agricultural_claim_tickets.pickup_instructions'))<p class="mt-3">{{ config('agricultural_claim_tickets.pickup_instructions') }}</p>@else<p class="mt-3 text-sm text-slate-600">No pickup instructions are configured for this QA ticket. Contact the municipal agriculture office through its existing official channels before visiting.</p>@endif
+                @if(config('agricultural_claim_tickets.pickup_instructions'))<p class="mt-3">{{ config('agricultural_claim_tickets.pickup_instructions') }}</p>@else<p class="mt-3 text-sm text-slate-600">No pickup instructions are configured. Contact the municipal agriculture office through its existing official channels before visiting.</p>@endif
                 @if(config('agricultural_claim_tickets.office_name'))<p class="mt-2 font-semibold">{{ config('agricultural_claim_tickets.office_name') }}</p>@endif
                 @if(config('agricultural_claim_tickets.office_address'))<p class="text-sm text-slate-600">{{ config('agricultural_claim_tickets.office_address') }}</p>@endif
             </section>
 
             @if($effectiveStatus === 'redeemed' && $ticket->redemptionDistribution && $ticket->handoverAcknowledgment)
                 <section class="farmer-card" aria-labelledby="ticket-distribution-heading">
-                    <div class="farmer-section-heading"><div><h2 id="ticket-distribution-heading">Distribution recorded</h2><p>The ticket was redeemed as part of an authorized QA handover transaction.</p></div><x-ui.icon name="success" size="lg" /></div>
+                    @php($operationalRecord = $ticket->handoverAcknowledgment->confirmation_method === \App\Models\AssistanceIdentityConfirmation::IN_PERSON_METHOD)
+                    <div class="farmer-section-heading"><div><h2 id="ticket-distribution-heading">Distribution recorded</h2><p>The ticket was redeemed as part of an authorized {{ $operationalRecord ? 'MAO handover' : 'QA handover' }} transaction.</p></div><x-ui.icon name="success" size="lg" /></div>
                     <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                         <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Item</dt><dd class="mt-1 font-semibold">{{ $ticket->redemptionDistribution->batch?->item?->name }}</dd></div>
                         <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Quantity</dt><dd class="mt-1 font-semibold">{{ number_format((float) $ticket->redemptionDistribution->quantity, 2) }}</dd></div>
                         <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Handover date</dt><dd class="mt-1">{{ $ticket->redemptionDistribution->distributed_at?->timezone(config('agriculture.business_timezone'))->format('M d, Y g:i A') }}</dd></div>
                         <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Distribution reference</dt><dd class="mt-1 font-mono font-semibold">{{ $ticket->redemptionDistribution->reference }}</dd></div>
                     </dl>
-                    <div class="farmer-message farmer-message-warning mt-4">{{ $ticket->handoverAcknowledgment->environment_label }}. The synthetic QA record does not prove real-world physical receipt.</div>
+                    <div class="farmer-message farmer-message-warning mt-4">{{ $ticket->handoverAcknowledgment->environment_label }}. {{ $operationalRecord ? 'This is the MAO staff-recorded distribution acknowledgment.' : 'The synthetic QA record does not prove real-world physical receipt.' }}</div>
                     <a class="farmer-button mt-4" href="{{ route('farmer.handovers.acknowledgment', $ticket->handoverAcknowledgment) }}">View / print distribution acknowledgment</a>
                 </section>
             @else

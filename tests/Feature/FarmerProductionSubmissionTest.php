@@ -89,6 +89,126 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->assertDatabaseCount('livestock_records', 0);
     }
 
+    public function test_registered_farm_links_to_an_owner_scoped_seasonal_report_with_the_farm_selected(): void
+    {
+        $owner = $this->farmer();
+        $owner['farm']->update(['categories' => ['palay', 'tilapia']]);
+        $reportUrl = route('farmer.production', [
+            'section' => 'crops',
+            'farm_id' => $owner['farm']->id,
+            'report' => 1,
+        ]);
+
+        $this->actingAs($owner['user'])->get('/farmer/farms')
+            ->assertOk()
+            ->assertSee('Usual farm products')
+            ->assertSee('Palay, Tilapia')
+            ->assertSee("Report this season's production", false)
+            ->assertSee(e($reportUrl.'#production-report-form'), false);
+
+        $this->actingAs($owner['user'])->get($reportUrl)
+            ->assertOk()
+            ->assertSee('id="production-report-form"', false)
+            ->assertSee('Report crop production for this season')
+            ->assertSee('<select id="crop-type" name="crop_type"', false)
+            ->assertSee('<option value="Palay"', false)
+            ->assertSee('Other, enter below')
+            ->assertSee('<option value="'.$owner['farm']->id.'" selected>Owner farm', false)
+            ->assertSee('Send to MAO for review');
+
+        $this->actingAs($owner['user'])->get('/farmer/production?section=livestock')
+            ->assertOk()
+            ->assertSee('<select id="livestock-animal" name="animal_type"', false)
+            ->assertSee('Native chicken')
+            ->assertSee('Other, enter below');
+
+        $this->actingAs($owner['user'])->get('/farmer/production?section=fisheries')
+            ->assertOk()
+            ->assertSee('<select id="fishery-species" name="species"', false)
+            ->assertSee('Tilapia');
+
+        $other = $this->farmer();
+        $other['farm']->update(['name' => 'Another farmer farm']);
+        $foreignUrl = route('farmer.production', [
+            'section' => 'crops',
+            'farm_id' => $other['farm']->id,
+            'report' => 1,
+        ]);
+
+        $this->actingAs($owner['user'])->get($foreignUrl)
+            ->assertOk()
+            ->assertDontSee('Other farm')
+            ->assertDontSee('<option value="'.$other['farm']->id.'" selected', false)
+            ->assertDontSee('id="production-report-form" class="farmer-disclosure mb-5 rounded-xl bg-sage p-4" open', false);
+    }
+
+    public function test_registered_farm_products_are_available_as_category_choices_without_replacing_other_options(): void
+    {
+        $owner = $this->farmer();
+        $owner['farm']->update(['categories' => ['rice', 'tilapia', 'native chicken']]);
+
+        $this->actingAs($owner['user'])->get('/farmer/production?section=crops&farm_id='.$owner['farm']->id.'&report=1')
+            ->assertOk()
+            ->assertSee('From this farm profile')
+            ->assertSee('<option value="rice"', false)
+            ->assertSee('<option value="Palay"', false)
+            ->assertSee('Other, enter below');
+
+        $this->actingAs($owner['user'])->get('/farmer/production?section=livestock&farm_id='.$owner['farm']->id.'&report=1')
+            ->assertOk()
+            ->assertSee('<option value="native chicken"', false)
+            ->assertSee('Choose livestock');
+
+        $this->actingAs($owner['user'])->get('/farmer/production?section=fisheries&farm_id='.$owner['farm']->id.'&report=1')
+            ->assertOk()
+            ->assertSee('<option value="tilapia"', false)
+            ->assertSee('Tilapia');
+    }
+
+    public function test_unverified_farmer_cannot_open_a_seasonal_submission_form_from_a_farm_link(): void
+    {
+        $pending = $this->farmer('pending');
+        $url = route('farmer.production', [
+            'section' => 'crops',
+            'farm_id' => $pending['farm']->id,
+            'report' => 1,
+        ]);
+
+        $this->actingAs($pending['user'])->get($url)
+            ->assertOk()
+            ->assertSee('after the MAO verifies your farmer registration')
+            ->assertDontSee('id="production-report-form"', false);
+    }
+
+    public function test_other_crop_livestock_and_fishery_choices_are_saved_as_the_entered_type(): void
+    {
+        $owner = $this->farmer();
+        $key = fn () => (string) Str::uuid();
+        $common = ['farm_id' => $owner['farm']->id];
+
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/crop', $common + [
+            'crop_type' => '__other__', 'crop_type_other' => 'Dragon fruit', 'planted_on' => '2026-10-01',
+            'area_planted' => '0.5', 'area_unit' => 'hectare', 'yield_unit' => 'kilogram', 'status' => 'growing',
+            'idempotency_key' => $key(),
+        ])->assertRedirect();
+
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/livestock', $common + [
+            'animal_type' => '__other__', 'animal_type_other' => 'Native pig', 'quantity' => 2,
+            'recorded_on' => '2026-10-30', 'idempotency_key' => $key(),
+        ])->assertRedirect();
+
+        $this->actingAs($owner['user'])->post('/farmer/production/submissions/fishery', $common + [
+            'fishery_type' => 'Pond', 'species' => '__other__', 'species_other' => 'Mud crab',
+            'production_quantity' => '4', 'production_unit' => 'kilogram', 'recorded_on' => '2026-10-30',
+            'idempotency_key' => $key(),
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('production_submissions', 3);
+        $this->assertSame('Dragon fruit', ProductionSubmission::where('category', 'crop')->firstOrFail()->payload['crop_type']);
+        $this->assertSame('Native pig', ProductionSubmission::where('category', 'livestock')->firstOrFail()->payload['animal_type']);
+        $this->assertSame('Mud crab', ProductionSubmission::where('category', 'fishery')->firstOrFail()->payload['species']);
+    }
+
     public function test_farmer_home_surfaces_pending_and_returned_production_actions_only_for_the_owner(): void
     {
         $owner = $this->farmer();
@@ -166,6 +286,110 @@ class FarmerProductionSubmissionTest extends TestCase
         $this->actingAs($owner['user'])->post('/farmer/production/submissions/crop', $harvestedWithoutDate)
             ->assertSessionHasErrors('harvested_on');
         $this->assertDatabaseCount('production_submissions', 1);
+    }
+
+    public function test_crop_submission_area_cannot_exceed_registered_farm_area_across_units(): void
+    {
+        $owner = $this->farmer();
+        $owner['farm']->update(['area' => 7, 'area_unit' => 'hectare']);
+        $cropSubmission = fn (string $area, string $unit): array => [
+            'farm_id' => $owner['farm']->id,
+            'crop_type' => 'Rice',
+            'planted_on' => today()->subDays(10)->toDateString(),
+            'area_planted' => $area,
+            'area_unit' => $unit,
+            'yield_unit' => 'kilogram',
+            'status' => 'growing',
+            'idempotency_key' => (string) Str::uuid(),
+        ];
+
+        $this->actingAs($owner['user'])
+            ->from(route('farmer.production', [
+                'section' => 'crops',
+                'farm_id' => $owner['farm']->id,
+                'report' => 1,
+            ]))
+            ->followingRedirects()
+            ->post('/farmer/production/submissions/crop', $cropSubmission('8', 'hectare'))
+            ->assertOk()
+            ->assertSee('aria-invalid="true"', false)
+            ->assertSee('The crop area (8 hectares) cannot exceed this farm&#039;s registered area (7 hectares).', false);
+        $this->assertDatabaseCount('production_submissions', 0);
+
+        $this->actingAs($owner['user'])
+            ->post('/farmer/production/submissions/crop', $cropSubmission('7', 'hectare'))
+            ->assertRedirect();
+        $this->actingAs($owner['user'])
+            ->post('/farmer/production/submissions/crop', $cropSubmission('70000', 'square_meter'))
+            ->assertRedirect();
+        $this->actingAs($owner['user'])
+            ->post('/farmer/production/submissions/crop', $cropSubmission('70001', 'square_meter'))
+            ->assertSessionHasErrors('area_planted');
+
+        $owner['farm']->update(['area' => 70000, 'area_unit' => 'square_meter']);
+        $this->actingAs($owner['user'])
+            ->post('/farmer/production/submissions/crop', $cropSubmission('7', 'hectare'))
+            ->assertRedirect();
+        $this->actingAs($owner['user'])
+            ->post('/farmer/production/submissions/crop', $cropSubmission('7.01', 'hectare'))
+            ->assertSessionHasErrors('area_planted');
+
+        $this->assertDatabaseCount('production_submissions', 3);
+    }
+
+    public function test_crop_resubmission_cannot_exceed_the_current_registered_farm_area(): void
+    {
+        $owner = $this->farmer();
+        $owner['farm']->update(['area' => 7, 'area_unit' => 'hectare']);
+        $submission = ProductionSubmission::create([
+            'farmer_id' => $owner['farmer']->id,
+            'farm_id' => $owner['farm']->id,
+            'category' => 'crop',
+            'payload' => ['crop_type' => 'Rice', 'area_planted' => 6, 'area_unit' => 'hectare'],
+            'status' => 'returned',
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+
+        $this->actingAs($owner['user'])
+            ->post('/farmer/production/submissions/'.$submission->id.'/resubmit', [
+                'farm_id' => $owner['farm']->id,
+                'crop_type' => 'Rice',
+                'planted_on' => today()->subDays(10)->toDateString(),
+                'area_planted' => 8,
+                'area_unit' => 'hectare',
+                'yield_unit' => 'kilogram',
+                'status' => 'growing',
+            ])
+            ->assertSessionHasErrors('area_planted');
+
+        $this->assertDatabaseHas('production_submissions', ['id' => $submission->id, 'status' => 'returned']);
+        $this->assertSame(6, $submission->fresh()->payload['area_planted']);
+    }
+
+    public function test_mao_cannot_approve_a_crop_submission_that_exceeds_the_registered_farm_area(): void
+    {
+        $owner = $this->farmer();
+        $owner['farm']->update(['area' => 7, 'area_unit' => 'hectare']);
+        $staff = $this->reviewer();
+        $submission = ProductionSubmission::create([
+            'farmer_id' => $owner['farmer']->id,
+            'farm_id' => $owner['farm']->id,
+            'category' => 'crop',
+            'payload' => ['crop_type' => 'Rice', 'planted_on' => today()->subDays(10)->toDateString(), 'area_planted' => 8, 'area_unit' => 'hectare', 'yield_unit' => 'kilogram', 'status' => 'growing'],
+            'status' => 'pending',
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+
+        $this->actingAs($staff)
+            ->post('/modules/apms/submissions/'.$submission->id.'/review', ['decision' => 'approved'])
+            ->assertSessionHasErrors('area_planted');
+
+        $this->assertDatabaseHas('production_submissions', ['id' => $submission->id, 'status' => 'pending', 'reviewed_by' => null]);
+        $this->assertDatabaseCount('crop_production_records', 0);
+        $this->assertDatabaseMissing('production_submission_histories', [
+            'production_submission_id' => $submission->id,
+            'to_status' => 'approved',
+        ]);
     }
 
     public function test_return_resubmit_reject_and_invalid_review_transitions(): void
@@ -271,7 +495,9 @@ class FarmerProductionSubmissionTest extends TestCase
 
         $this->actingAs($owner['user'])->get('/farmer')->assertOk()->assertDontSee('All notices');
         $this->actingAs($owner['user'])->get('/farmer/services')->assertOk()->assertDontSee('All notices');
-        $this->actingAs($owner['user'])->get('/farmer/production')->assertOk()->assertDontSee('Send crop information');
+        $this->actingAs($owner['user'])->get('/farmer/production')->assertOk()
+            ->assertDontSee('Send crop information')
+            ->assertSee('Seasonal production reporting is unavailable right now.');
         $this->actingAs($owner['user'])->get('/farmer/activities')->assertOk();
     }
 

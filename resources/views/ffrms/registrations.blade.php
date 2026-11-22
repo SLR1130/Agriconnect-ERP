@@ -62,13 +62,14 @@
 
                     <section class="ffrms-map-card" aria-labelledby="ffrms-registry-map-title">
                         <div class="ffrms-map-heading"><div><p class="erp-page-eyebrow">Farm locations</p><h3 id="ffrms-registry-map-title" class="erp-section-title">Registration map</h3><p>{{ number_format($farmMapPoints->count()) }} pinned {{ \Illuminate\Support\Str::plural('farm', $farmMapPoints->count()) }} in the current filtered page</p></div></div>
-                        <div class="ffrms-registry-map" data-ffrms-map data-ffrms-map-points="{{ $farmMapPoints->toJson() }}" tabindex="0" role="region" aria-label="Map of farm locations in the current registration results"></div>
+                        <div class="ffrms-registry-map" data-ffrms-map data-google-key="{{ config('services.google_maps.browser_key') }}" data-ffrms-map-points="{{ $farmMapPoints->toJson() }}" tabindex="0" role="region" aria-label="Google satellite map of farm locations in the current registration results"></div>
+                        <p class="ffrms-map-note ffrms-map-message" data-ffrms-map-message role="status" aria-live="polite">Loading Google Maps satellite view...</p>
                         @if(! $farmLocationsReady)
                             <p class="ffrms-map-note" role="status">Pin locations will appear after the farm-coordinate database update is applied.</p>
                         @else
                             <p class="ffrms-map-note" data-ffrms-map-empty role="status" @if($farmMapPoints->isNotEmpty()) hidden @endif>No farm pins are recorded on this page yet. Farmers can add a pin while registering or editing their farm.</p>
                         @endif
-                        <p class="ffrms-map-attribution">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</p>
+                        <p class="ffrms-map-attribution">Google Maps provides the map and satellite imagery. Select a marker to view its farm and barangay details.</p>
                     </section>
 
                     <div class="ffrms-table-wrap">

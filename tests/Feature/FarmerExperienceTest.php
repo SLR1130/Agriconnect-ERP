@@ -58,6 +58,23 @@ class FarmerExperienceTest extends TestCase
         $this->assertDatabaseCount('assistance_applications', 0);
     }
 
+    public function test_farmer_service_directory_makes_equipment_borrowing_a_clear_service(): void
+    {
+        $data = $this->farmer();
+
+        $this->actingAs($data['user'])->get('/farmer/services')
+            ->assertOk()
+            ->assertSee('Borrow MAO equipment')
+            ->assertSee('Borrow equipment')
+            ->assertSee(route('farmer.equipment'), false);
+
+        $this->actingAs($data['user'])->get('/farmer')
+            ->assertOk()
+            ->assertSee('Borrow MAO equipment')
+            ->assertSee('Open equipment borrowing')
+            ->assertSee(route('farmer.equipment'), false);
+    }
+
     public function test_service_discovery_filters_programs_by_application_dates_and_shows_profile_eligibility(): void
     {
         $data = $this->farmer('pending');

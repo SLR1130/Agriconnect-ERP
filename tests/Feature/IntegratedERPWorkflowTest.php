@@ -75,8 +75,13 @@ class IntegratedERPWorkflowTest extends TestCase
                 'password' => 'integration-password',
                 'password_confirmation' => 'integration-password',
                 'barangay' => 'San Isidro',
+                'farm_name' => 'Registered Integration Farm',
+                'farm_barangay' => 'Poblacion',
+                'latitude' => '12.7464200',
+                'longitude' => '121.4874100',
+                'location_source' => 'manual',
             ])
-            ->assertRedirect('/farmer');
+            ->assertRedirect('/farmer/farms');
         $registeredUser = User::where('email', 'registered.integration@example.test')->firstOrFail();
         $registeredFarmer = $registeredUser->farmer;
 
@@ -133,7 +138,7 @@ class IntegratedERPWorkflowTest extends TestCase
             'farm_id' => $farm->id,
             'crop_type' => 'Rice',
         ]);
-        $this->assertSame(1, Farm::where('farmer_id', $registeredFarmer->id)->count());
+        $this->assertSame(2, Farm::where('farmer_id', $registeredFarmer->id)->count());
     }
 
     public function test_verified_farmer_assistance_approval_and_distribution_update_shared_inventory_once(): void

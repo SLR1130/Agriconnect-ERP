@@ -52,11 +52,11 @@
             <section class="farmer-card">
                 <div class="farmer-section-heading"><div><h2>Request details</h2><p>{{ $equipmentRequest->asset->category->name ?? 'Agricultural equipment' }}</p></div></div>
                 <dl class="farmer-equipment-details">
-                    <div><dt>Requested schedule</dt><dd>{{ $equipmentRequest->schedule_start?->format('M d, Y · h:i A') }} to {{ $equipmentRequest->schedule_end?->format('M d, Y · h:i A') }}</dd></div>
+                    <div><dt>Requested schedule</dt><dd>{{ $equipmentRequest->schedule_start?->timezone(config('agriculture.business_timezone'))->format('M d, Y · h:i A') }} to {{ $equipmentRequest->schedule_end?->timezone(config('agriculture.business_timezone'))->format('M d, Y · h:i A') }} Philippine time</dd></div>
                     <div><dt>Agricultural use</dt><dd>{{ $equipmentRequest->intended_use }}</dd></div>
                     @if($equipmentRequest->review_notes)<div><dt>MAO feedback</dt><dd>{{ $equipmentRequest->review_notes }}</dd></div>@endif
-                    @if($equipmentRequest->issued_at)<div><dt>Issued</dt><dd>{{ $equipmentRequest->issued_at->format('M d, Y · h:i A') }}</dd></div>@endif
-                    @if($equipmentRequest->returned_at)<div><dt>Returned</dt><dd>{{ $equipmentRequest->returned_at->format('M d, Y · h:i A') }}</dd></div>@endif
+                    @if($equipmentRequest->issued_at)<div><dt>Issued</dt><dd>{{ $equipmentRequest->issued_at->timezone(config('agriculture.business_timezone'))->format('M d, Y · h:i A') }} Philippine time</dd></div>@endif
+                    @if($equipmentRequest->returned_at)<div><dt>Returned</dt><dd>{{ $equipmentRequest->returned_at->timezone(config('agriculture.business_timezone'))->format('M d, Y · h:i A') }} Philippine time</dd></div>@endif
                 </dl>
             </section>
         </div>

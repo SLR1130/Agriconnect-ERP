@@ -16,8 +16,8 @@
         @if(session('status'))<div class="erp-alert erp-alert-success" role="status">{{ session('status') }}</div>@endif
 
         <header class="apms-submission-detail-header erp-surface">
-            <div><p class="apms-kicker">{{ ucfirst($submission->category) }} production submission</p><h2>{{ $submission->farmer->user->name }}</h2><p>{{ $submission->farm->name }} · {{ $submission->farm->barangay ?: 'Barangay not recorded' }}</p></div>
-            <div class="apms-submission-detail-status"><span class="erp-pill {{ $statusTone }}">{{ ucfirst($submission->status) }}</span><span>Submitted {{ $submission->created_at?->format('M j, Y · g:i A') }}</span></div>
+            <div><p class="apms-kicker">{{ str($submission->category)->headline() }} production submission</p><h2>{{ $submission->farmer->user->name }}</h2><p>{{ $submission->farm->name }} · {{ $submission->farm->barangay ?: 'Barangay not recorded' }}</p></div>
+            <div class="apms-submission-detail-status"><span class="erp-pill {{ $statusTone }}">{{ str($submission->status)->replace('_', ' ')->headline() }}</span><span>Submitted {{ $submission->created_at?->format('M j, Y · g:i A') }}</span></div>
         </header>
 
         <div class="apms-submission-detail-grid">
@@ -40,7 +40,7 @@
                 <section class="erp-surface apms-submission-history" aria-labelledby="apms-submission-history-title">
                     <div class="apms-submission-section-heading"><div><p class="apms-kicker">Decision record</p><h3 id="apms-submission-history-title">Review history</h3></div></div>
                     @forelse($submission->history as $entry)
-                        <article class="apms-submission-history-entry"><span class="apms-submission-history-marker" aria-hidden="true"></span><div><div class="apms-submission-history-heading"><strong>{{ ucfirst($entry->to_status) }}</strong><time datetime="{{ $entry->created_at?->toIso8601String() }}">{{ $entry->created_at?->format('M j, Y · g:i A') }}</time></div><span class="apms-submission-history-actor">{{ $entry->actor?->name ?: 'System' }}</span><p>{{ $entry->notes ?: 'No review note recorded.' }}</p></div></article>
+                        <article class="apms-submission-history-entry"><span class="apms-submission-history-marker" aria-hidden="true"></span><div><div class="apms-submission-history-heading"><strong>{{ str($entry->to_status)->replace('_', ' ')->headline() }}</strong><time datetime="{{ $entry->created_at?->toIso8601String() }}">{{ $entry->created_at?->format('M j, Y · g:i A') }}</time></div><span class="apms-submission-history-actor">{{ $entry->actor?->name ?: 'System' }}</span><p>{{ $entry->notes ?: 'No review note recorded.' }}</p></div></article>
                     @empty
                         <div class="apms-submission-empty"><strong>No review decisions yet</strong><p>This submission is waiting for its first MAO review.</p></div>
                     @endforelse
@@ -68,7 +68,7 @@
                 @elseif($submission->status === 'pending')
                     <section class="erp-surface apms-submission-decision apms-submission-readonly"><p class="apms-kicker">Read-only review</p><h3>Decision controls unavailable</h3><p>This account can inspect the submission but does not have permission to change its status.</p></section>
                 @else
-                    <section class="erp-surface apms-submission-decision apms-submission-readonly"><p class="apms-kicker">Current outcome</p><h3>{{ ucfirst($submission->status) }}</h3><p>This submission is no longer awaiting a decision. Its review history and feedback remain available above.</p></section>
+                    <section class="erp-surface apms-submission-decision apms-submission-readonly"><p class="apms-kicker">Current outcome</p><h3>{{ str($submission->status)->replace('_', ' ')->headline() }}</h3><p>This submission is no longer awaiting a decision. Its review history and feedback remain available above.</p></section>
                 @endif
             </aside>
         </div>

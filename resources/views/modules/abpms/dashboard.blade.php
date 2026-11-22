@@ -1,5 +1,5 @@
 ﻿<x-layouts.app>
-    <x-slot name="header">Budget &amp; Procurement Management</x-slot>
+    <x-slot name="header">Budget & Procurement Management</x-slot>
     <x-slot name="description">Plan agricultural budgets, control procurement, and receive approved goods into the shared ERP records.</x-slot>
 
     <style>
@@ -25,7 +25,8 @@
         .ab-row-disclosure>summary::-webkit-details-marker{display:none}
         .ab-row-disclosure>summary:focus-visible{outline:2px solid #26865c;outline-offset:3px}
         .ab-row-disclosure-body{margin-top:.5rem;min-width:200px}
-        @media(max-width:900px){.ab-two,.ab-forms{grid-template-columns:1fr!important}.ab-table-wrap{overflow-x:auto}.ab-table{min-width:900px}}
+        .ab-action-desk{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr));gap:.75rem;padding:1rem}.ab-action-intro{padding:.35rem}.ab-action-intro h2{margin:.25rem 0;color:#153d2b;font-size:1.1rem;font-weight:850}.ab-action-intro p{margin:0;color:#5e7064;font-size:.78rem;line-height:1.5}.ab-action-card{display:flex;min-width:0;flex-direction:column;gap:.4rem;padding:.85rem;background:#f8faf7;border:1px solid #dfe9e1;border-radius:.8rem}.ab-action-card strong{color:#153d2b;font-size:.8rem}.ab-action-card span{color:#62736a;font-size:.72rem;line-height:1.45}.ab-action-card .ab-btn{margin-top:auto}.ab-action-empty{align-self:center;padding:.8rem;background:#edf6ef;border-radius:.7rem;color:#365d45;font-size:.76rem;font-weight:700}
+        @media(max-width:900px){.ab-two,.ab-forms{grid-template-columns:1fr!important}.ab-action-desk{grid-template-columns:repeat(2,minmax(0,1fr))}.ab-action-intro{grid-column:1/-1}.ab-table-wrap{overflow-x:auto}.ab-table{min-width:900px}}@media(max-width:640px){.ab-action-desk{grid-template-columns:minmax(0,1fr);padding:.85rem}.ab-action-intro{grid-column:auto}.ab-action-card .ab-btn{width:100%}}
     </style>
 
     @php
@@ -59,6 +60,32 @@
                 </div>
             @endforeach
         </div>
+
+        <x-ui.workflow-strip
+            label="Procurement control flow"
+            description="Budget authorization precedes purchasing; only physical receiving changes AISMS stock or creates AEAMS acquisition records."
+            :steps="['Budget', 'Request', 'Purchase order', 'Physical receipt', 'AISMS or AEAMS']"
+        />
+
+        <section class="ab-card ab-action-desk" aria-labelledby="procurement-next-actions-title">
+            <div class="ab-action-intro">
+                <p class="text-xs font-bold uppercase tracking-wider text-emerald-green">Procurement desk</p>
+                <h2 id="procurement-next-actions-title">Move each request through the control points.</h2>
+                <p>Budget creates authority, review creates accountability, and physical receiving is the only step that updates inventory or equipment records.</p>
+            </div>
+            @if($canManage)
+                <article class="ab-action-card"><strong>Budget authority</strong><span>Open or allocate the budget period that will fund a request.</span><a class="ab-btn ab-primary" href="{{ route('modules.abpms.dashboard', ['workspace' => 'budget']) }}">Open budget workspace</a></article>
+            @endif
+            @if($canReview || $canApprove)
+                <article class="ab-action-card"><strong>{{ $stats['pending_requests'] }} requests need review</strong><span>Check purpose, items, and allocation before approval creates a purchase-order path.</span><a class="ab-btn ab-gold" href="{{ route('modules.abpms.dashboard', ['workspace' => 'procurement', 'request_status' => 'submitted']) }}">Review requests</a></article>
+            @endif
+            @if($canUpdate)
+                <article class="ab-action-card"><strong>{{ $stats['open_orders'] }} orders in progress</strong><span>Mark approved orders ordered, then record the physical delivery against its line.</span><a class="ab-btn ab-muted" href="{{ route('modules.abpms.dashboard', ['workspace' => 'orders']) }}">Open receiving</a></article>
+            @endif
+            @unless($canManage || $canReview || $canApprove || $canUpdate)
+                <p class="ab-action-empty">Read-only access: financial and procurement changes are restricted to authorized personnel.</p>
+            @endunless
+        </section>
 
         <div class="erp-workspace" data-erp-workspace data-workspace-param="workspace" data-workspace-default="budget" data-workspace-initial="{{ old('_erp_workspace', request('workspace', 'budget')) }}">
             <div class="erp-workspace-tabs" role="tablist" aria-label="Budget and procurement workspaces">
@@ -109,6 +136,7 @@
                     </div>
                 @endif
             </div>
+            @if($canManage)<p class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Purchase-order approvals reserve funds as commitments. The general expenditure form is for standalone payments and does not reconcile a PO payment or release its commitment. Do not post a PO payment here, or it will be counted in addition to the commitment.</p>@endif
             <div class="ab-table-wrap mt-5"><table class="ab-table"><thead><tr><th>Reference</th><th>Period / program</th><th>Authorized</th><th>Committed</th><th>Actual</th><th>Available</th>@if($canManage)<th>Ledger action</th>@endif</tr></thead><tbody>
                 @forelse($allocations as $allocation)
                     @php($summary = $budgetSummaries[$allocation->id] ?? [])
@@ -127,10 +155,10 @@
                                 </form>
                                 <form method="POST" action="{{ route('modules.abpms.allocations.expenditure', $allocation) }}" class="mt-2 flex flex-wrap gap-2">
                                     @csrf
-                                    <input class="ab-input !w-24" name="amount" type="number" min=".01" step=".01" placeholder="Spent" required>
-                                    <input class="ab-input" name="reference" placeholder="Expenditure ref" required>
-                                    <input class="ab-input" name="description" placeholder="Description" required>
-                                    <button class="ab-btn ab-gold" type="submit">Post expense</button>
+                                    <input class="ab-input !w-24" name="amount" type="number" min=".01" step=".01" placeholder="Paid amount" aria-label="Standalone paid amount" required>
+                                    <input class="ab-input" name="reference" placeholder="Payment or voucher reference" aria-label="Standalone payment or voucher reference" required>
+                                    <input class="ab-input" name="description" placeholder="Standalone expense description" aria-label="Standalone expense description" required>
+                                    <button class="ab-btn ab-gold" type="submit">Post standalone expense</button>
                                 </form>
                             </td>
                         @endif
@@ -165,7 +193,8 @@
                         </div>
                         <input class="ab-input" name="purpose" placeholder="Purpose" required>
                         <textarea class="ab-input" name="justification" rows="2" placeholder="Justification"></textarea>
-                        <input class="ab-input" name="idempotency_key" placeholder="Optional retry key (recommended for API/retry clients)">
+                        <input type="hidden" name="idempotency_key" value="{{ old('_abpms_form') === 'request' ? old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) : (string) \Illuminate\Support\Str::uuid() }}">
+                        <p class="text-xs text-slate-500">A secure retry reference is added automatically to prevent duplicate submissions if the page is retried.</p>
                         <div class="rounded-xl border border-sage bg-off-white p-3">
                             <div class="mb-2 flex items-center justify-between"><b class="text-sm text-forest-green">Requested item</b><button type="button" class="ab-btn ab-muted text-xs" id="add-procurement-item">Add item</button></div>
                             <div id="procurement-items" class="space-y-2">
@@ -211,7 +240,8 @@
             <input type="hidden" name="_abpms_form" value="purchase_order"><input type="hidden" name="procurement_request_id" value="{{ $procurementRequest->id }}">
             <label class="ab-label">Supplier<select class="ab-input" name="supplier_id" required><option value="">Select supplier</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->name }}</option>@endforeach</select></label>
             <label class="ab-label">Expected delivery<input class="ab-input" name="expected_delivery_on" type="date"></label>
-            <label class="ab-label">Retry key <span class="font-normal normal-case tracking-normal">(optional)</span><input class="ab-input" name="idempotency_key" placeholder="Enter a unique retry key"></label>
+            <input type="hidden" name="idempotency_key" value="{{ old('_abpms_form') === 'purchase_order' && (string) old('procurement_request_id') === (string) $procurementRequest->id ? old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) : (string) \Illuminate\Support\Str::uuid() }}">
+            <p class="text-xs text-slate-500">A retry reference is generated automatically for this purchase order.</p>
             <label class="ab-label">Purchase order notes<textarea class="ab-input" name="notes" rows="2"></textarea></label>
             <button class="ab-btn ab-primary" type="submit">Create purchase order</button>
         </form>

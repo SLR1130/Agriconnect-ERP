@@ -25,22 +25,29 @@ class AssistanceHandoverService
         private readonly AssistanceClaimTicketService $tickets,
     ) {}
 
-    public function confirmSyntheticIdentity(
+    public function confirmIdentity(
         AssistanceClaimTicket $ticket,
         int $verificationEventId,
         string $outcome,
         User $actor,
+        bool $staffAttestation = false,
     ): AssistanceIdentityConfirmation {
         $this->feature->requireEnabled();
         $this->authorizeIdentityConfirmation($actor);
 
         if (! in_array($outcome, ['confirmed', 'not_confirmed'], true)) {
-            throw ValidationException::withMessages(['outcome' => 'Choose a supported synthetic QA confirmation result.']);
+            throw ValidationException::withMessages(['outcome' => 'Choose whether the in-person identity check was confirmed.']);
+        }
+        if ($this->feature->operational() && ! $staffAttestation) {
+            throw ValidationException::withMessages(['identity_attestation' => 'The staff member must attest that the farmer and ticket were checked in person.']);
         }
 
         return DB::transaction(function () use ($ticket, $verificationEventId, $outcome, $actor): AssistanceIdentityConfirmation {
             $this->feature->requireEnabled();
             $this->authorizeIdentityConfirmation($actor);
+
+            $method = $this->identityMethod();
+            $scenario = $this->identityScenario($outcome);
 
             $application = AssistanceApplication::query()->lockForUpdate()->findOrFail($ticket->application_id);
             $lockedTicket = AssistanceClaimTicket::query()->lockForUpdate()->findOrFail($ticket->id);
@@ -66,18 +73,18 @@ class AssistanceHandoverService
                     'application_id' => $application->id,
                     'claim_ticket_id' => $lockedTicket->id,
                     'staff_actor_id' => $actor->id,
-                    'method' => AssistanceIdentityConfirmation::QA_METHOD,
+                    'method' => $method,
                     'outcome' => $outcome,
                     'confirmed_at' => $outcome === 'confirmed' ? now('UTC') : null,
                     'allocation_snapshot_sha256' => $lockedTicket->allocation_snapshot_sha256,
-                    'evidence_metadata' => ['scenario' => $outcome === 'confirmed' ? 'synthetic_qa_match' : 'synthetic_qa_no_match'],
+                    'evidence_metadata' => ['scenario' => $scenario],
                 ],
             );
 
             if ((int) $confirmation->application_id !== (int) $application->id
                 || (int) $confirmation->claim_ticket_id !== (int) $lockedTicket->id
                 || $confirmation->outcome !== $outcome
-                || $confirmation->method !== AssistanceIdentityConfirmation::QA_METHOD) {
+                || $confirmation->method !== $method) {
                 throw ValidationException::withMessages(['verification' => 'This verification event already has a conflicting immutable identity-confirmation record.']);
             }
 
@@ -87,16 +94,26 @@ class AssistanceHandoverService
                     'claim_ticket_id' => $lockedTicket->id,
                     'identity_confirmation_id' => $confirmation->id,
                     'actor_id' => $actor->id,
-                    'event_type' => 'synthetic_identity_confirmation',
+                    'event_type' => $this->feature->operational() ? 'in_person_identity_confirmation' : 'synthetic_identity_confirmation',
                     'outcome' => $outcome,
-                    'reason_code' => 'qa_only_no_real_id_or_signature',
-                    'safe_metadata' => ['method' => AssistanceIdentityConfirmation::QA_METHOD],
+                    'reason_code' => $this->feature->operational() ? 'staff_attested_ticket_and_identity_check' : 'qa_only_no_real_id_or_signature',
+                    'safe_metadata' => ['method' => $method],
                     'occurred_at' => now('UTC'),
                 ]);
             }
 
             return $confirmation;
         }, 3);
+    }
+
+    /** Backward-compatible QA test entry point. */
+    public function confirmSyntheticIdentity(
+        AssistanceClaimTicket $ticket,
+        int $verificationEventId,
+        string $outcome,
+        User $actor,
+    ): AssistanceIdentityConfirmation {
+        return $this->confirmIdentity($ticket, $verificationEventId, $outcome, $actor);
     }
 
     /**
@@ -158,14 +175,14 @@ class AssistanceHandoverService
                     ->where('application_id', $lockedApplication->id)
                     ->where('claim_ticket_id', $lockedTicket->id)
                     ->where('outcome', 'confirmed')
-                    ->where('method', AssistanceIdentityConfirmation::QA_METHOD)
+                    ->where('method', $this->identityMethod())
                     ->first();
                 if (! $identity || ! $identity->confirmed_at
                     || ! hash_equals($lockedTicket->allocation_snapshot_sha256, (string) $identity->allocation_snapshot_sha256)) {
                     throw ValidationException::withMessages(['identity_confirmation' => 'A successful identity confirmation for this exact ticket and allocation is required.']);
                 }
                 if ($identity->confirmed_at->lt(now('UTC')->subMinutes(10))) {
-                    throw ValidationException::withMessages(['identity_confirmation' => 'The synthetic confirmation has expired. Revalidate the current ticket and record a fresh QA confirmation.']);
+                    throw ValidationException::withMessages(['identity_confirmation' => 'The identity confirmation has expired. Revalidate the current ticket and record a fresh confirmation.']);
                 }
 
                 $verification = AssistanceClaimTicketEvent::query()
@@ -265,8 +282,8 @@ class AssistanceHandoverService
                     'item_name_snapshot' => (string) $batch->item->name,
                     'batch_reference_snapshot' => (string) $batch->batch_number,
                     'quantity' => $approvedQuantity,
-                    'confirmation_method' => AssistanceIdentityConfirmation::QA_METHOD,
-                    'environment_label' => (string) config('agricultural_claim_handover.qa_label'),
+                    'confirmation_method' => $this->identityMethod(),
+                    'environment_label' => $this->handoverLabel(),
                     'distributed_at' => $distributedAt,
                     'acknowledged_at' => $distributedAt,
                 ]);
@@ -279,7 +296,7 @@ class AssistanceHandoverService
                     'actor_id' => $actor->id,
                     'event_type' => 'physical_handover_committed',
                     'outcome' => 'success',
-                    'reason_code' => 'synthetic_qa_only_no_actual_receipt_claim',
+                    'reason_code' => $this->feature->operational() ? 'authorized_physical_assistance_handover' : 'synthetic_qa_only_no_actual_receipt_claim',
                     'safe_metadata' => ['acknowledgment_reference' => $acknowledgment->reference, 'distribution_reference' => $distribution->reference],
                     'occurred_at' => $distributedAt,
                 ]);
@@ -444,6 +461,29 @@ class AssistanceHandoverService
             return false;
         }
         return number_format((float) $requested, 2, '.', '') === number_format((float) $approved, 2, '.', '');
+    }
+
+    private function identityMethod(): string
+    {
+        return $this->feature->operational()
+            ? AssistanceIdentityConfirmation::IN_PERSON_METHOD
+            : AssistanceIdentityConfirmation::QA_METHOD;
+    }
+
+    private function identityScenario(string $outcome): string
+    {
+        if ($this->feature->operational()) {
+            return $outcome === 'confirmed' ? 'in_person_match' : 'in_person_not_confirmed';
+        }
+
+        return $outcome === 'confirmed' ? 'synthetic_qa_match' : 'synthetic_qa_no_match';
+    }
+
+    private function handoverLabel(): string
+    {
+        return $this->feature->operational()
+            ? (string) config('agricultural_claim_handover.operational_label')
+            : (string) config('agricultural_claim_handover.qa_label');
     }
 
     private function newAcknowledgmentReference(): string

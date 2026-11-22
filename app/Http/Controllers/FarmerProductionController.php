@@ -11,6 +11,7 @@ use App\Models\FisheryRecord;
 use App\Models\LivestockRecord;
 use App\Models\PestDiseaseIncident;
 use App\Models\ProductionSubmission;
+use App\Services\CropAreaLimit;
 use App\Services\ProductionSubmissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,13 +26,26 @@ class FarmerProductionController extends Controller
     {
         abort_unless($request->user()->hasRole('farmer'), 403);
         $farmer = $request->user()->farmer()->with('farms')->firstOrFail();
-        $section = $request->string('section')->toString();
+        $section = $request->string('section')->toString() ?: 'crops';
         abort_unless(in_array($section, ['', 'crops', 'livestock', 'fisheries', 'monitoring', 'incidents'], true), 404);
-        $submissionsAvailable = Schema::hasTable('production_submissions');
+        $submissionsAvailable = Schema::hasTable('production_submissions')
+            && Schema::hasTable('production_submission_histories');
+        $requestedFarmId = $request->integer('farm_id');
+        $selectedFarmId = $requestedFarmId > 0
+            ? $farmer->farms->firstWhere('id', $requestedFarmId)?->id
+            : null;
+        $reportSection = in_array($section, ['crops', 'livestock', 'fisheries'], true);
+        $openReportForm = $request->boolean('report')
+            && $submissionsAvailable
+            && $farmer->isVerified()
+            && $selectedFarmId !== null
+            && $reportSection;
 
         return view('farmer.production', [
             'farmer' => $farmer,
-            'section' => $section ?: 'crops',
+            'section' => $section,
+            'selectedFarmId' => $selectedFarmId,
+            'openReportForm' => $openReportForm,
             'crops' => CropProductionRecord::query()->with('farm')->where('farmer_id', $farmer->id)->latest()->paginate(10, ['*'], 'crops_page')->withQueryString(),
             'livestock' => LivestockRecord::query()->with('farm')->where('farmer_id', $farmer->id)->latest()->paginate(10, ['*'], 'livestock_page')->withQueryString(),
             'fisheries' => FisheryRecord::query()->with('farm')->where('farmer_id', $farmer->id)->latest()->paginate(10, ['*'], 'fisheries_page')->withQueryString(),
@@ -57,23 +71,23 @@ class FarmerProductionController extends Controller
         ]);
     }
 
-    public function storeSubmission(Request $request, string $category, ProductionSubmissionService $service): RedirectResponse
+    public function storeSubmission(Request $request, string $category, ProductionSubmissionService $service, CropAreaLimit $cropAreaLimit): RedirectResponse
     {
         $farmer = $this->farmer($request);
         abort_unless($farmer->isVerified(), 403);
-        $data = $this->submissionData($request, $farmer, $category);
+        $data = $this->submissionData($request, $farmer, $category, $cropAreaLimit);
         $submission = $service->submit($farmer, $request->user(), $category, (int) $data['farm_id'],
             collect($data)->except(['farm_id', 'idempotency_key'])->all(), $data['idempotency_key']);
 
         return redirect()->route('farmer.production.submissions.show', $submission)->with('status', 'Your information was sent to the MAO for review.');
     }
 
-    public function resubmitSubmission(Request $request, ProductionSubmission $submission, ProductionSubmissionService $service): RedirectResponse
+    public function resubmitSubmission(Request $request, ProductionSubmission $submission, ProductionSubmissionService $service, CropAreaLimit $cropAreaLimit): RedirectResponse
     {
         $farmer = $this->farmer($request);
         abort_unless((int) $submission->farmer_id === (int) $farmer->id, 404);
         abort_unless($farmer->isVerified(), 403);
-        $data = $this->submissionData($request, $farmer, $submission->category, false);
+        $data = $this->submissionData($request, $farmer, $submission->category, $cropAreaLimit, false);
         $service->resubmit($submission, $request->user(), (int) $data['farm_id'], collect($data)->except('farm_id')->all());
 
         return redirect()->route('farmer.production.submissions.show', $submission)->with('status', 'Your corrected information was resubmitted.');
@@ -86,9 +100,20 @@ class FarmerProductionController extends Controller
         return $request->user()->farmer()->firstOrFail();
     }
 
-    private function submissionData(Request $request, Farmer $farmer, string $category, bool $requireKey = true): array
+    private function submissionData(Request $request, Farmer $farmer, string $category, CropAreaLimit $cropAreaLimit, bool $requireKey = true): array
     {
         abort_unless(in_array($category, ['crop', 'livestock', 'fishery'], true), 404);
+        $customTypeField = match ($category) {
+            'crop' => 'crop_type',
+            'livestock' => 'animal_type',
+            'fishery' => 'species',
+        };
+        if ($request->input($customTypeField) === '__other__') {
+            $request->merge([
+                $customTypeField => trim((string) $request->input($customTypeField.'_other')),
+            ]);
+        }
+
         $common = ['farm_id' => ['required', 'integer', Rule::exists('farms', 'id')->where('farmer_id', $farmer->id)]];
         if ($requireKey) {
             $common['idempotency_key'] = ['required', 'uuid', 'max:100'];
@@ -115,7 +140,17 @@ class FarmerProductionController extends Controller
             ],
         };
 
-        return $request->validate($common + $rules);
+        $data = $request->validate($common + $rules);
+
+        if ($category === 'crop') {
+            $cropAreaLimit->assertWithinFarm(
+                $farmer->farms()->findOrFail($data['farm_id']),
+                $data['area_planted'],
+                $data['area_unit'],
+            );
+        }
+
+        return $data;
     }
 
     public function reportIncident(Request $request): RedirectResponse

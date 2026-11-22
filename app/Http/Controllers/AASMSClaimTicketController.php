@@ -62,6 +62,7 @@ class AASMSClaimTicketController extends Controller
             'verification' => $verification,
             'verificationTicket' => $verificationTicket,
             'handoverEnabled' => app(\App\Services\AssistanceHandoverFeatureGate::class)->enabled(),
+            'operationalMode' => $feature->operational(),
             'canConfirmIdentity' => $request->user()->canErp('modules.aasms.identity_confirm'),
             'canHandover' => $request->user()->canModuleAction('aasms', 'distribute')
                 && $request->user()->canModuleAction('aisms', 'release')
@@ -88,6 +89,7 @@ class AASMSClaimTicketController extends Controller
 
         return view('modules.aasms.claim-tickets.show', [
             'ticket' => $ticket,
+            'operationalMode' => $feature->operational(),
             'canRevoke' => $request->user()->canErp('modules.aasms.claim_ticket_revoke'),
             'canReissue' => $request->user()->canErp('modules.aasms.claim_ticket_reissue'),
             'canHistory' => $canHistory,

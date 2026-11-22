@@ -18,7 +18,7 @@ class ErpCoreTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('Empowering Agriculture Through Connected Digital Services')
-            ->assertSee('Agricultural Services')
+            ->assertSee('Agricultural services')
             ->assertDontSee('Database Setup');
     }
 

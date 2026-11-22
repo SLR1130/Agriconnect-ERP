@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'nominatim' => [
+        'search_url' => env('NOMINATIM_SEARCH_URL', 'https://nominatim.openstreetmap.org/search'),
+    ],
+
+    'google_maps' => [
+        'browser_key' => env('GOOGLE_MAPS_API_KEY', is_file(storage_path('app/private/google-maps-key')) ? trim(file_get_contents(storage_path('app/private/google-maps-key'))) : ''),
+    ],
+
+
 ];

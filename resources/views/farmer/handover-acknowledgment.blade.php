@@ -4,7 +4,8 @@
     <div class="mb-4"><a class="farmer-text-link" href="{{ route('farmer.applications.show', $acknowledgment->application) }}"><x-ui.icon name="back" size="sm"/> Back to assistance application</a></div>
     <article class="farmer-card mx-auto max-w-3xl">
         <div class="farmer-section-heading"><div><p class="text-xs font-bold uppercase tracking-wide text-emerald-800">Assistance distribution</p><h2>Handover acknowledgment</h2><p class="font-mono">{{ $acknowledgment->reference }}</p></div><x-ui.icon name="check" size="lg" /></div>
-        <div class="farmer-message farmer-message-warning mt-4"><strong>{{ $acknowledgment->environment_label }}</strong><br>This is a synthetic QA record, not evidence of actual physical receipt or a farmer signature.</div>
+        @php($operationalRecord = $acknowledgment->confirmation_method === \App\Models\AssistanceIdentityConfirmation::IN_PERSON_METHOD)
+        <div class="farmer-message farmer-message-warning mt-4"><strong>{{ $acknowledgment->environment_label }}</strong><br>{{ $operationalRecord ? 'This is the MAO staff-recorded distribution acknowledgment. It does not capture a biometric or stored farmer signature.' : 'This is a synthetic QA record, not evidence of actual physical receipt or a farmer signature.' }}</div>
         <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
             <div><dt class="font-semibold text-slate-500">Application</dt><dd class="mt-1 font-bold">{{ $acknowledgment->application_reference_snapshot ?: 'Application #'.$acknowledgment->application_id }}</dd></div>
             <div><dt class="font-semibold text-slate-500">Program</dt><dd class="mt-1 font-bold">{{ $acknowledgment->program_name_snapshot }}</dd></div>

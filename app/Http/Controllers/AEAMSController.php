@@ -35,6 +35,7 @@ class AEAMSController extends Controller
 
             return view('farmer.equipment', [
                 'farmer' => $farmer,
+                'equipmentTotal' => EquipmentAsset::count(),
                 'assets' => EquipmentAsset::query()->with('category')
                     ->where('availability_status', 'available')
                     ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
@@ -103,6 +104,7 @@ class AEAMSController extends Controller
             'canReturn' => $canReturn,
             'canMaintenance' => $canMaintenance,
             'canExport' => $this->canStaff($user, 'export'),
+            'canViewFarmerRegistry' => $user->canModuleAction('ffrms', 'view'),
             'farmer' => $farmer,
             'stats' => [
                 'assets' => EquipmentAsset::count(),
@@ -233,7 +235,7 @@ class AEAMSController extends Controller
         $data = $request->validate([
             'equipment_asset_id' => ['required', 'exists:equipment_assets,id'],
             'intended_use' => ['required', 'string', 'max:2000'],
-            'schedule_start' => ['required', 'date', 'after:now'],
+            'schedule_start' => ['required', 'date'],
             'schedule_end' => ['required', 'date', 'after:schedule_start'],
             'idempotency_key' => ['nullable', 'string', 'max:100'],
         ]);

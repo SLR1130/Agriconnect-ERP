@@ -12,6 +12,12 @@
     <x-slot name="header">{{ $roleContext['dashboard_title'] }}</x-slot>
     <x-slot name="description">{{ $roleContext['description'] }}</x-slot>
 
+    <x-ui.workflow-strip
+        label="Connected MAO workflow"
+        description="Farmer records are the starting point. Production information guides planning, while approved assistance and procurement movements remain traceable in the same ERP."
+        :steps="['Verify farmer records', 'Monitor production', 'Approve services', 'Release resources']"
+    />
+
     <form method="GET" action="{{ route($dashboardRoute) }}" class="erp-dashboard-filter erp-surface mb-5" aria-label="Filter dashboard reporting period">
         <div class="erp-dashboard-filter-intro"><p class="erp-page-eyebrow">Reporting period</p><p>Choose a date range to refresh the operational summaries.</p></div>
         <div class="erp-dashboard-filter-fields">

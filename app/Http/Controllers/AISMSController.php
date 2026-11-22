@@ -63,7 +63,7 @@ class AISMSController extends Controller
             ->whereDate('expires_on', '<', today())
             ->get();
         $movements = $this->filteredMovements($request)
-            ->with(['batch.item', 'batch.location', 'user'])
+            ->with(['batch.item', 'batch.location', 'user', 'procurementReceiptItem.receipt', 'assistanceDistribution.application'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'movements_page')
@@ -104,6 +104,8 @@ class AISMSController extends Controller
             'canRelease' => $request->user()->canModuleAction('aisms', 'release'),
             'canAdjust' => $request->user()->canModuleAction('aisms', 'adjust'),
             'canExport' => $request->user()->canModuleAction('aisms', 'export'),
+            'canViewAasms' => $request->user()->canModuleAction('aasms', 'view'),
+            'canViewAbpms' => $request->user()->canModuleAction('abpms', 'view'),
         ]);
     }
 

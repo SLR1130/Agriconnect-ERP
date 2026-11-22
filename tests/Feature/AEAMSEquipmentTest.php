@@ -9,6 +9,7 @@ use App\Models\EquipmentRequest;
 use App\Models\Farmer;
 use App\Models\Role;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -96,6 +97,8 @@ class AEAMSEquipmentTest extends TestCase
             ->get('/modules/aeams')
             ->assertOk()
             ->assertSee('Equipment catalog')
+            ->assertSee("Today's equipment desk", false)
+            ->assertSee('Review requests')
             ->assertSee('PUMP-002');
     }
 
@@ -140,6 +143,83 @@ class AEAMSEquipmentTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_equipment_schedule_uses_philippine_input_and_is_stored_as_utc(): void
+    {
+        $data = $this->setupData();
+        Carbon::setTestNow(Carbon::create(2026, 11, 22, 0, 0, 0, 'Asia/Manila')->utc());
+
+        try {
+            $this->actingAs($data['farmerUser'])->get('/farmer/equipment')
+                ->assertOk()
+                ->assertSee('Philippine time');
+
+            $this->submitRequest([
+                'schedule_start' => '2026-11-24 08:00:00',
+                'schedule_end' => '2026-11-24 10:00:00',
+            ], $data['farmerUser'], $data['asset'], 'ph-time-request')->assertRedirect();
+
+            $request = EquipmentRequest::where('idempotency_key', 'ph-time-request')->firstOrFail();
+            $this->assertSame('2026-11-24 08:00', $request->schedule_start->timezone('Asia/Manila')->format('Y-m-d H:i'));
+            $this->assertSame('2026-11-24 00:00', $request->schedule_start->utc()->format('Y-m-d H:i'));
+            $this->actingAs($data['farmerUser'])->get('/farmer/equipment')
+                ->assertOk()
+                ->assertSee('Nov 24, 2026 08:00 AM')
+                ->assertSee('Philippine time');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_farmer_equipment_page_uses_one_shared_request_form(): void
+    {
+        $data = $this->setupData();
+
+        $response = $this->actingAs($data['farmerUser'])->get('/farmer/equipment')->assertOk();
+
+        $this->assertSame(1, substr_count($response->getContent(), 'name="equipment_asset_id"'));
+        $response->assertSee('Borrow equipment from MAO');
+        $response->assertSee('Choose equipment');
+        $response->assertSee('MAO confirms the schedule');
+        $response->assertSee('Request a borrowing schedule');
+        $response->assertSee('Request this equipment');
+        $response->assertSee('data-open-disclosure="equipment-request-form"', false);
+    }
+
+    public function test_farmer_sees_when_the_mao_has_not_registered_any_equipment(): void
+    {
+        $data = $this->setupData();
+        EquipmentAsset::query()->delete();
+
+        $this->actingAs($data['farmerUser'])
+            ->get('/farmer/equipment')
+            ->assertOk()
+            ->assertSee('The MAO equipment catalog is not set up yet.')
+            ->assertSee('Once the MAO registers an asset and marks it available');
+    }
+
+    public function test_equipment_request_links_to_ffrms_only_when_personnel_can_view_farmer_records(): void
+    {
+        $data = $this->setupData();
+        $this->submitRequest($this->window(), $data['farmerUser'], $data['asset'], 'ffrms-traceability-link')->assertRedirect();
+        $this->actingAs($data['staff'])->get('/modules/aeams?workspace=requests')
+            ->assertOk()
+            ->assertSee($data['farmerUser']->name)
+            ->assertDontSee('Open FFRMS record for', false);
+
+        $ffrmsViewer = Role::create([
+            'name' => 'FFRMS Viewer',
+            'slug' => 'aeams_ffrms_history_viewer',
+            'permissions' => ['modules.ffrms.view'],
+            'is_active' => true,
+        ]);
+        $data['staff']->roles()->attach($ffrmsViewer);
+
+        $this->actingAs($data['staff'])->get('/modules/aeams?workspace=requests')
+            ->assertOk()
+            ->assertSee('record='.$data['farmer']->id)
+            ->assertSee('Open FFRMS record for '.$data['farmerUser']->name);
+    }
+
     public function test_overlapping_active_reservation_is_rejected(): void
     {
         $data = $this->setupData();
@@ -161,6 +241,27 @@ class AEAMSEquipmentTest extends TestCase
 
         $this->assertDatabaseCount('equipment_requests', 1);
         $this->assertSame('pending', EquipmentRequest::firstOrFail()->status);
+    }
+
+    public function test_equipment_request_retry_rejects_changed_details(): void
+    {
+        $data = $this->setupData();
+        $payload = [
+            'equipment_asset_id' => $data['asset']->id,
+            'intended_use' => 'Land preparation',
+            ...$this->window(),
+            'idempotency_key' => 'equipment-retry-details',
+        ];
+        $this->actingAs($data['farmerUser'])->post('/modules/aeams/requests', $payload)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($data['farmerUser'])->post('/modules/aeams/requests', $payload)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($data['farmerUser'])->post('/modules/aeams/requests', array_replace($payload, ['intended_use' => 'Different purpose']))
+            ->assertSessionHasErrors('idempotency_key');
+        $this->actingAs($data['farmerUser'])->post('/modules/aeams/requests', array_replace($payload, $this->window(4, 5)))
+            ->assertSessionHasErrors('idempotency_key');
+        $this->assertDatabaseCount('equipment_requests', 1);
+        $this->assertDatabaseHas('equipment_requests', ['idempotency_key' => 'equipment-retry-details', 'intended_use' => 'Land preparation']);
     }
 
     public function test_staff_can_approve_or_reject_pending_requests_with_history(): void
@@ -271,7 +372,7 @@ class AEAMSEquipmentTest extends TestCase
         $outsider = User::factory()->create();
 
         $this->actingAs($outsider)->get('/modules/aeams')->assertForbidden();
-        $this->actingAs($data['farmerUser'])->get('/modules/aeams')->assertOk()->assertSee('Request equipment');
+        $this->actingAs($data['farmerUser'])->get('/modules/aeams')->assertOk()->assertSee('Borrow equipment from MAO');
         $this->actingAs($data['farmerUser'])
             ->post('/modules/aeams/equipment', [
                 'asset_code' => 'NOPE-001',

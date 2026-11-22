@@ -41,6 +41,12 @@ class FarmerRegistrationService
                 'registration_status' => 'pending',
             ]);
 
+            if (! isset($data['farm']) || ! is_array($data['farm'])) {
+                throw new RuntimeException('A first farm record is required for farmer portal registration.');
+            }
+
+            $farmer->farms()->create($data['farm']);
+
             FarmerRegistrationHistory::create([
                 'farmer_id' => $farmer->id,
                 'to_status' => 'pending',

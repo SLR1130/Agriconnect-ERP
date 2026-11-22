@@ -38,6 +38,13 @@ class RoleDashboardTest extends TestCase
         $this->actingAs($u)->get('/mao/dashboard')->assertOk()->assertSee('MAO Operations Dashboard');
     }
 
+    public function test_mao_workspace_alias_opens_the_authorized_dashboard(): void
+    {
+        $u = $this->user('mao_admin', ['dashboard.view']);
+
+        $this->actingAs($u)->get('/mao')->assertRedirect('/mao/dashboard');
+    }
+
     public function test_mao_admin_login_redirects_to_mao_dashboard(): void
     {
         $u = $this->user('mao_admin', ['dashboard.view', 'settings.manage']);

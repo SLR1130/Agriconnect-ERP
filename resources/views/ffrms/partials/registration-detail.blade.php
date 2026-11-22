@@ -49,7 +49,7 @@
                             <div class="erp-field"><label for="ffrms-edit-name">Full name</label><input id="ffrms-edit-name" class="erp-input" name="name" value="{{ old('registry_form') === 'farmer' ? old('name', $farmer->user->name) : $farmer->user->name }}" maxlength="255" required></div>
                             <div class="erp-field"><label for="ffrms-edit-email">Email address</label><input id="ffrms-edit-email" class="erp-input" type="email" name="email" value="{{ old('registry_form') === 'farmer' ? old('email', $farmer->user->email) : $farmer->user->email }}" maxlength="255" required></div>
                             <div class="erp-field"><label for="ffrms-edit-phone">Phone</label><input id="ffrms-edit-phone" class="erp-input" name="phone" value="{{ old('registry_form') === 'farmer' ? old('phone', $farmer->phone) : $farmer->phone }}" maxlength="30"></div>
-                            <div class="erp-field"><label for="ffrms-edit-barangay">Barangay</label><input id="ffrms-edit-barangay" class="erp-input" name="barangay" value="{{ old('registry_form') === 'farmer' ? old('barangay', $farmer->barangay) : $farmer->barangay }}" maxlength="100" required></div>
+                            <div class="erp-field"><label for="ffrms-edit-barangay">Barangay in Bongabong</label><select id="ffrms-edit-barangay" class="erp-input" name="barangay" required>@foreach(array_unique([$farmer->barangay, ...$barangays]) as $barangay)<option value="{{ $barangay }}" @selected((old('registry_form') === 'farmer' ? old('barangay', $farmer->barangay) : $farmer->barangay) === $barangay)>{{ $barangay }}</option>@endforeach</select></div>
                             <div class="erp-field ffrms-edit-wide"><label for="ffrms-edit-address">Address</label><input id="ffrms-edit-address" class="erp-input" name="address" value="{{ old('registry_form') === 'farmer' ? old('address', $farmer->address) : $farmer->address }}" maxlength="255"></div>
                             <div class="ffrms-form-actions ffrms-edit-wide"><button class="erp-button erp-button-primary" type="submit">Save audited correction</button><button class="erp-button erp-button-secondary" type="button" data-ffrms-close-edit>Cancel</button></div>
                         </form>
@@ -67,9 +67,10 @@
                             <div><dt>Tenure</dt><dd>{{ ucfirst($farm->ownership_type) }}@if($farm->tenancy_details) · {{ $farm->tenancy_details }} @endif</dd></div>
                             <div><dt>Classification</dt><dd>{{ $farm->classification ?: 'Not recorded' }}</dd></div>
                             <div><dt>Soil / irrigation</dt><dd>{{ $farm->soil_type ?: 'Not recorded' }} · {{ $farm->irrigation_type ?: 'Not recorded' }}</dd></div>
-                            <div class="ffrms-farm-fact-wide"><dt>Agricultural activities</dt><dd>{{ count($farm->agricultural_activities ?: []) ? implode(', ', $farm->agricultural_activities) : 'Not recorded' }}</dd></div>
-                            <div class="ffrms-farm-fact-wide"><dt>Farm categories</dt><dd>{{ count($farm->categories ?: []) ? implode(', ', $farm->categories) : 'Not recorded' }}</dd></div>
-                            <div class="ffrms-farm-fact-wide"><dt>Farm map pin</dt><dd>@if(! $farmLocationsReady)Waiting for database activation @elseif($farm->latitude !== null && $farm->longitude !== null){{ $farm->latitude }}, {{ $farm->longitude }} <span class="ffrms-muted-note">· farmer-provided, not MAO-verified</span> <a href="https://www.openstreetmap.org/?mlat={{ $farm->latitude }}&amp;mlon={{ $farm->longitude }}#map=17/{{ $farm->latitude }}/{{ $farm->longitude }}" target="_blank" rel="noopener noreferrer">Open map</a>@else Not recorded @endif</dd></div>
+                            <div class="ffrms-farm-fact-wide"><dt>Farm activities</dt><dd>{{ count($farm->agricultural_activities ?: []) ? implode(', ', $farm->agricultural_activities) : 'Not recorded' }}</dd></div>
+                            <div class="ffrms-farm-fact-wide"><dt>Usual farm products</dt><dd>{{ count($farm->categories ?: []) ? collect($farm->categories)->map(fn ($value) => str($value)->replace('_', ' ')->title())->implode(', ') : 'Not recorded' }}</dd></div>
+                            <div class="ffrms-farm-fact-wide"><dt>Farm map pin</dt><dd>@if(! $farmLocationsReady)Waiting for database activation @elseif($farm->latitude !== null && $farm->longitude !== null){{ $farm->latitude }}, {{ $farm->longitude }} <span class="ffrms-muted-note">· farmer-provided, not MAO-verified</span> <a href="https://www.google.com/maps/search/?api=1&amp;query={{ $farm->latitude }},{{ $farm->longitude }}" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>@else Not recorded @endif</dd></div>
+                            <div class="ffrms-farm-fact-wide"><dt>Farm outline</dt><dd>{{ count($farm->boundary_coordinates ?? []) >= 3 ? 'Farmer-provided outline, not a surveyed boundary' : 'Not recorded' }}</dd></div>
                         </dl>
                         @if($farmLocationsReady)
                             @php($farmMapPoint = $farm->latitude !== null && $farm->longitude !== null ? [[
@@ -81,11 +82,12 @@
                                 'barangay' => $farm->barangay,
                             ]] : [])
                             <div class="ffrms-farm-map-panel">
-                                <div class="ffrms-farm-map" data-ffrms-map data-ffrms-map-points="{{ json_encode($farmMapPoint) }}" tabindex="0" role="region" aria-label="Map for {{ $farm->name }}"></div>
+                                <div class="ffrms-farm-map" data-ffrms-map data-google-key="{{ config('services.google_maps.browser_key') }}" data-ffrms-map-points="{{ json_encode($farmMapPoint) }}" data-ffrms-map-outline="{{ json_encode($farm->boundary_coordinates ?? []) }}" tabindex="0" role="region" aria-label="Google satellite map for {{ $farm->name }}"></div>
+                                <p class="ffrms-map-note ffrms-map-message" data-ffrms-map-message role="status" aria-live="polite">Loading Google Maps satellite view...</p>
                                 @if($farmMapPoint === [])
                                     <p class="ffrms-map-note" data-ffrms-map-empty role="status">No location pin is recorded for this farm.</p>
                                 @endif
-                                <p class="ffrms-map-attribution">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</p>
+                                <p class="ffrms-map-attribution">Google Maps provides the map and satellite imagery. Saved outlines are farmer-provided planning shapes, not surveyed boundaries.</p>
                             </div>
                         @endif
                         @if($canUpdate)
@@ -98,7 +100,7 @@
                                     <input type="hidden" name="registry_status" value="{{ request('status') }}">
                                     <input type="hidden" name="registry_page" value="{{ request('page') }}">
                                     <div class="erp-field"><label for="farm-name-{{ $farm->id }}">Farm name</label><input id="farm-name-{{ $farm->id }}" class="erp-input" name="name" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('name', $farm->name) : $farm->name }}" maxlength="255" required></div>
-                                    <div class="erp-field"><label for="farm-barangay-{{ $farm->id }}">Barangay</label><input id="farm-barangay-{{ $farm->id }}" class="erp-input" name="barangay" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('barangay', $farm->barangay) : $farm->barangay }}" maxlength="100" required></div>
+                                    <div class="erp-field"><label for="farm-barangay-{{ $farm->id }}">Barangay in Bongabong</label><select id="farm-barangay-{{ $farm->id }}" class="erp-input" name="barangay" required>@foreach(array_unique([$farm->barangay, ...$barangays]) as $barangay)<option value="{{ $barangay }}" @selected((old('registry_form') === 'farm-'.$farm->id ? old('barangay', $farm->barangay) : $farm->barangay) === $barangay)>{{ $barangay }}</option>@endforeach</select></div>
                                     <div class="erp-field"><label for="farm-location-{{ $farm->id }}">Location details</label><input id="farm-location-{{ $farm->id }}" class="erp-input" name="location_details" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('location_details', $farm->location_details) : $farm->location_details }}" maxlength="255"></div>
                                     @if($farmLocationsReady)
                                         <div class="erp-field"><label for="farm-latitude-{{ $farm->id }}">Latitude</label><input id="farm-latitude-{{ $farm->id }}" class="erp-input" name="latitude" type="number" step="0.0000001" min="-90" max="90" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('latitude', $farm->latitude) : $farm->latitude }}"></div>
@@ -114,8 +116,8 @@
                                     <div class="erp-field"><label for="farm-tenancy-{{ $farm->id }}">Tenancy details</label><input id="farm-tenancy-{{ $farm->id }}" class="erp-input" name="tenancy_details" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('tenancy_details', $farm->tenancy_details) : $farm->tenancy_details }}" maxlength="255"></div>
                                     <div class="erp-field"><label for="farm-soil-{{ $farm->id }}">Soil type</label><input id="farm-soil-{{ $farm->id }}" class="erp-input" name="soil_type" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('soil_type', $farm->soil_type) : $farm->soil_type }}" maxlength="100"></div>
                                     <div class="erp-field"><label for="farm-irrigation-{{ $farm->id }}">Irrigation</label><input id="farm-irrigation-{{ $farm->id }}" class="erp-input" name="irrigation_type" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('irrigation_type', $farm->irrigation_type) : $farm->irrigation_type }}" maxlength="100"></div>
-                                    <div class="erp-field ffrms-edit-wide"><label for="farm-activities-{{ $farm->id }}">Agricultural activities (comma separated)</label><input id="farm-activities-{{ $farm->id }}" class="erp-input" name="agricultural_activities" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('agricultural_activities', implode(', ', $farm->agricultural_activities ?: [])) : implode(', ', $farm->agricultural_activities ?: []) }}" maxlength="1000"></div>
-                                    <div class="erp-field ffrms-edit-wide"><label for="farm-categories-{{ $farm->id }}">Categories (comma separated)</label><input id="farm-categories-{{ $farm->id }}" class="erp-input" name="categories" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('categories', implode(', ', $farm->categories ?: [])) : implode(', ', $farm->categories ?: []) }}" maxlength="1000"></div>
+                                    <div class="erp-field ffrms-edit-wide"><label for="farm-activities-{{ $farm->id }}">Farm activities (comma separated)</label><input id="farm-activities-{{ $farm->id }}" class="erp-input" name="agricultural_activities" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('agricultural_activities', implode(', ', $farm->agricultural_activities ?: [])) : implode(', ', $farm->agricultural_activities ?: []) }}" maxlength="1000"></div>
+                                    <div class="erp-field ffrms-edit-wide"><label for="farm-categories-{{ $farm->id }}">Usual farm products (comma separated)</label><input id="farm-categories-{{ $farm->id }}" class="erp-input" name="categories" value="{{ old('registry_form') === 'farm-'.$farm->id ? old('categories', implode(', ', $farm->categories ?: [])) : implode(', ', $farm->categories ?: []) }}" maxlength="1000"></div>
                                     <div class="ffrms-form-actions ffrms-edit-wide"><button class="erp-button erp-button-primary" type="submit">Save farm record</button><button class="erp-button erp-button-secondary" type="button" data-ffrms-close-edit>Cancel</button></div>
                                 </form>
                             </details>
@@ -125,6 +127,32 @@
                     <div class="erp-empty">No farms are linked to this farmer record.</div>
                 @endforelse
             </section>
+
+            @if($assistanceHistory !== null)
+                <section class="erp-surface ffrms-detail-section" aria-labelledby="ffrms-assistance-history-heading">
+                    <h3 id="ffrms-assistance-history-heading" class="erp-section-title">Assistance received</h3>
+                    <p class="ffrms-muted-note">Completed distributions for this farmer.</p>
+                    @forelse($assistanceHistory as $distribution)
+                        <article class="ffrms-history-entry"><div><strong>{{ $distribution->application->program->name }}</strong><p>{{ $distribution->batch->item->name }} · {{ $distribution->quantity }} · {{ $distribution->distributed_at?->format('M j, Y') ?: 'Date not recorded' }}</p><span>Reference: {{ $distribution->reference }}</span><br><a href="{{ route('modules.aasms.applications.show', $distribution->application_id) }}">View application</a></div></article>
+                    @empty
+                        <p class="ffrms-muted-note">No completed distributions are recorded for this farmer.</p>
+                    @endforelse
+                    {{ $assistanceHistory->links() }}
+                </section>
+            @endif
+
+            @if($equipmentHistory !== null)
+                <section class="erp-surface ffrms-detail-section" aria-labelledby="ffrms-equipment-history-heading">
+                    <h3 id="ffrms-equipment-history-heading" class="erp-section-title">Equipment borrowing history</h3>
+                    <p class="ffrms-muted-note">Requests, issued equipment and returns for this farmer.</p>
+                    @forelse($equipmentHistory as $equipmentRequest)
+                        <article class="ffrms-history-entry"><div><strong>{{ $equipmentRequest->asset?->name ?: 'Equipment unavailable' }}</strong><p>{{ ucfirst($equipmentRequest->status) }} · Reference: {{ $equipmentRequest->reference }}</p><p>Issued: {{ $equipmentRequest->issued_at?->format('M j, Y') ?: 'Not issued' }} · Returned: {{ $equipmentRequest->returned_at?->format('M j, Y') ?: 'Not returned' }}</p></div></article>
+                    @empty
+                        <p class="ffrms-muted-note">No equipment requests are recorded for this farmer.</p>
+                    @endforelse
+                    {{ $equipmentHistory->links() }}
+                </section>
+            @endif
 
             <section class="erp-surface ffrms-detail-section" aria-labelledby="ffrms-associations-heading">
                 <div class="erp-section-header"><div><p class="erp-page-eyebrow">Membership records</p><h3 id="ffrms-associations-heading" class="erp-section-title">Farmer associations</h3></div><span class="erp-pill">{{ number_format($farmer->associations->count()) }} memberships</span></div>

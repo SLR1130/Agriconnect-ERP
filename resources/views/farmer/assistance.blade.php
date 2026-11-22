@@ -35,7 +35,7 @@
                         @endforeach
                     </div>
                     <div class="farmer-application-actions">
-                        <span class="farmer-pill {{ $application->status === 'rejected' ? 'farmer-pill-bad' : (in_array($application->status, ['returned', 'pending'], true) ? 'farmer-pill-warn' : '') }}">{{ ucfirst($application->status) }}</span>
+                        <span class="farmer-pill {{ $application->status === 'rejected' ? 'farmer-pill-bad' : (in_array($application->status, ['returned', 'pending'], true) ? 'farmer-pill-warn' : '') }}">{{ str($application->status)->replace('_', ' ')->headline() }}</span>
                         <a class="farmer-button farmer-button-light" href="{{ route('farmer.applications.show', $application) }}">View status and history <x-ui.icon name="next" size="sm" /></a>
                         @if($application->acknowledgment)<a class="farmer-text-link" href="{{ route('farmer.applications.acknowledgment', $application) }}">Open acknowledgment</a>@endif
                     </div>

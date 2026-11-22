@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 use LogicException;
 
 class AssistanceDistribution extends Model
@@ -17,6 +18,12 @@ class AssistanceDistribution extends Model
                 && (! app()->bound('aasms.handover.commit_ticket_id')
                     || (int) app('aasms.handover.commit_ticket_id') !== (int) $distribution->claim_ticket_id)) {
                 throw new LogicException('Ticket-linked assistance distributions must be created by the atomic handover service.');
+            }
+
+            if (Schema::hasColumn('assistance_distributions', 'farmer_barangay_at_distribution')) {
+                $distribution->farmer_barangay_at_distribution = AssistanceApplication::query()
+                    ->with('farmer:id,barangay')
+                    ->findOrFail($distribution->application_id)->farmer?->barangay;
             }
         });
     }

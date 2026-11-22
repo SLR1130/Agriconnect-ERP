@@ -11,6 +11,7 @@ use App\Models\Farmer;
 use App\Models\User;
 use App\Notifications\EquipmentRequestStatusChanged;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -101,8 +102,15 @@ class EquipmentService
             ]);
         }
 
-        $start = Carbon::parse($data['schedule_start']);
-        $end = Carbon::parse($data['schedule_end']);
+        $businessTimezone = config('agriculture.business_timezone', 'Asia/Manila');
+        $start = Carbon::parse($data['schedule_start'], $businessTimezone);
+        $end = Carbon::parse($data['schedule_end'], $businessTimezone);
+
+        if ($start->lessThanOrEqualTo(now($businessTimezone))) {
+            throw ValidationException::withMessages([
+                'schedule_start' => 'Choose a future pickup time in Philippine time.',
+            ]);
+        }
 
         if ($end->lessThanOrEqualTo($start)) {
             throw ValidationException::withMessages([
@@ -110,44 +118,45 @@ class EquipmentService
             ]);
         }
 
-        return DB::transaction(function () use ($farmer, $actor, $data, $start, $end) {
-            if (! empty($data['idempotency_key'])) {
-                $existing = EquipmentRequest::query()
-                    ->where('idempotency_key', $data['idempotency_key'])
-                    ->first();
+        $start = $start->copy()->utc();
+        $end = $end->copy()->utc();
+        $key = trim((string) ($data['idempotency_key'] ?? ''));
 
-                if ($existing) {
-                    if ((int) $existing->requested_by !== (int) $actor->id) {
-                        throw ValidationException::withMessages([
-                            'idempotency_key' => 'This request key belongs to another account.',
-                        ]);
-                    }
-
-                    return $existing;
+        try {
+            return DB::transaction(function () use ($farmer, $actor, $data, $start, $end, $key) {
+                if ($key !== '' && ($existing = EquipmentRequest::query()->where('idempotency_key', $key)->first())) {
+                    return $this->assertSameRequest($existing, $farmer, $actor, $data, $start, $end);
                 }
+
+                $asset = EquipmentAsset::query()->lockForUpdate()->findOrFail($data['equipment_asset_id']);
+                $this->ensureServiceable($asset);
+                $this->ensureNoConflict($asset->id, $start, $end);
+
+                $request = EquipmentRequest::create([
+                    'reference' => $this->reference(),
+                    'farmer_id' => $farmer->id,
+                    'requested_by' => $actor->id,
+                    'equipment_asset_id' => $asset->id,
+                    'intended_use' => $data['intended_use'],
+                    'schedule_start' => $start,
+                    'schedule_end' => $end,
+                    'status' => 'pending',
+                    'idempotency_key' => $key !== '' ? $key : null,
+                ]);
+
+                $this->record($asset, $request, 'requested', $actor, null, 'Equipment request submitted.');
+                ActivityLog::log('created', 'Equipment request '.$request->reference.' submitted.', $request->reference, $actor->id, 'aeams');
+
+                return $request->load('asset');
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            $existing = $key !== '' ? EquipmentRequest::query()->where('idempotency_key', $key)->first() : null;
+            if (! $existing) {
+                throw $exception;
             }
 
-            $asset = EquipmentAsset::query()->lockForUpdate()->findOrFail($data['equipment_asset_id']);
-            $this->ensureServiceable($asset);
-            $this->ensureNoConflict($asset->id, $start, $end);
-
-            $request = EquipmentRequest::create([
-                'reference' => $this->reference(),
-                'farmer_id' => $farmer->id,
-                'requested_by' => $actor->id,
-                'equipment_asset_id' => $asset->id,
-                'intended_use' => $data['intended_use'],
-                'schedule_start' => $start,
-                'schedule_end' => $end,
-                'status' => 'pending',
-                'idempotency_key' => $data['idempotency_key'] ?? null,
-            ]);
-
-            $this->record($asset, $request, 'requested', $actor, null, 'Equipment request submitted.');
-            ActivityLog::log('created', 'Equipment request '.$request->reference.' submitted.', $request->reference, $actor->id, 'aeams');
-
-            return $request->load('asset');
-        });
+            return $this->assertSameRequest($existing, $farmer, $actor, $data, $start, $end);
+        }
     }
 
     public function review(EquipmentRequest $equipmentRequest, string $status, ?string $notes, User $actor): EquipmentRequest
@@ -388,6 +397,22 @@ class EquipmentService
                 'schedule_start' => 'This equipment already has an overlapping active reservation.',
             ]);
         }
+    }
+
+    private function assertSameRequest(EquipmentRequest $existing, Farmer $farmer, User $actor, array $data, Carbon $start, Carbon $end): EquipmentRequest
+    {
+        if ((int) $existing->requested_by !== (int) $actor->id
+            || (int) $existing->farmer_id !== (int) $farmer->id
+            || (int) $existing->equipment_asset_id !== (int) $data['equipment_asset_id']
+            || ! $existing->schedule_start->equalTo($start)
+            || ! $existing->schedule_end->equalTo($end)
+            || trim((string) $existing->intended_use) !== trim((string) $data['intended_use'])) {
+            throw ValidationException::withMessages([
+                'idempotency_key' => 'This request key was already used for different equipment request details.',
+            ]);
+        }
+
+        return $existing;
     }
 
     private function reference(): string

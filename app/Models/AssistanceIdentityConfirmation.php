@@ -9,6 +9,7 @@ use LogicException;
 class AssistanceIdentityConfirmation extends Model
 {
     public const QA_METHOD = 'synthetic_qa_test_only';
+    public const IN_PERSON_METHOD = 'in_person_ticket_identity_check';
 
     protected $guarded = ['id'];
     protected $casts = ['confirmed_at' => 'immutable_datetime', 'evidence_metadata' => 'array'];
@@ -16,11 +17,15 @@ class AssistanceIdentityConfirmation extends Model
     protected static function booted(): void
     {
         static::creating(static function (self $confirmation): void {
-            $allowedScenario = $confirmation->outcome === 'confirmed' ? 'synthetic_qa_match' : 'synthetic_qa_no_match';
-            if ($confirmation->method !== self::QA_METHOD
+            $allowedScenario = match ($confirmation->method) {
+                self::QA_METHOD => $confirmation->outcome === 'confirmed' ? 'synthetic_qa_match' : 'synthetic_qa_no_match',
+                self::IN_PERSON_METHOD => $confirmation->outcome === 'confirmed' ? 'in_person_match' : 'in_person_not_confirmed',
+                default => null,
+            };
+            if ($allowedScenario === null
                 || ! in_array($confirmation->outcome, ['confirmed', 'not_confirmed'], true)
                 || data_get($confirmation->evidence_metadata, 'scenario') !== $allowedScenario) {
-                throw new LogicException('Only a labeled synthetic QA identity-confirmation event may be stored in this foundation.');
+                throw new LogicException('Identity-confirmation evidence must use a supported method and immutable outcome.');
             }
         });
         static::updating(static fn () => throw new LogicException('Identity-confirmation evidence is append-only.'));

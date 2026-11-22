@@ -51,12 +51,12 @@
             <p class="mt-1 text-sm text-slate-700">Checks token status, expiry, revocation, and whether the approved allocation still matches.</p>
         </article>
         <article class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p class="text-xs font-bold uppercase tracking-wide text-amber-900">{{ $handoverEnabled ? 'Synthetic QA only' : 'Policy pending' }}</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-amber-900">{{ $handoverEnabled ? ($operationalMode ? 'Operational procedure' : 'Synthetic QA only') : 'Policy pending' }}</p>
             <h3 class="mt-1 font-bold text-[#153d2b]">2. Beneficiary identity confirmation</h3>
             <p class="mt-1 text-sm text-slate-700">A QR token or reference alone is not identity evidence. Real-world verification method and evidence rules require MAO policy approval.</p>
         </article>
         <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p class="text-xs font-bold uppercase tracking-wide text-slate-600">{{ $handoverEnabled ? 'Isolated QA only' : 'Not enabled' }}</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-600">{{ $handoverEnabled ? ($operationalMode ? 'Authorized staff only' : 'Isolated QA only') : 'Not enabled' }}</p>
             <h3 class="mt-1 font-bold text-[#153d2b]">3. Physical distribution</h3>
             <p class="mt-1 text-sm text-slate-700">A separate review and final confirmation are required. No operation occurs automatically after ticket validation.</p>
         </article>
@@ -106,22 +106,23 @@
                     <form class="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4" method="POST" action="{{ route('modules.aasms.claim-tickets.identity-confirm', $verificationTicket) }}">
                         @csrf
                         <input type="hidden" name="verification_event_id" value="{{ $verification['verification_event_id'] }}">
-                        <p class="font-bold text-amber-950">Synthetic QA identity-confirmation foundation</p>
-                        <p class="mt-1 text-sm leading-6 text-amber-950">This records only a synthetic QA match/no-match scenario. It does not verify legal identity, constitute consent, use biometrics, or capture a signature. Do not use this action for real beneficiaries.</p>
+                        <p class="font-bold text-amber-950">{{ $operationalMode ? 'In-person identity confirmation' : 'Synthetic QA identity-confirmation foundation' }}</p>
+                        <p class="mt-1 text-sm leading-6 text-amber-950">{{ $operationalMode ? 'Confirm only after comparing the valid private ticket with the farmer present at the MAO counter and the office-approved identity procedure. This is a staff attestation; the system does not store an ID image, biometric data, or signature.' : 'This records only a synthetic QA match/no-match scenario. It does not verify legal identity, constitute consent, use biometrics, or capture a signature. Do not use this action for real beneficiaries.' }}</p>
                         <fieldset class="mt-3 flex flex-wrap gap-4 text-sm text-slate-800">
                             <legend class="sr-only">Synthetic identity scenario</legend>
-                            <label class="inline-flex min-h-11 items-center gap-2"><input type="radio" name="outcome" value="confirmed" required> Synthetic QA match</label>
-                            <label class="inline-flex min-h-11 items-center gap-2"><input type="radio" name="outcome" value="not_confirmed" required> Synthetic QA no match</label>
+                            <label class="inline-flex min-h-11 items-center gap-2"><input type="radio" name="outcome" value="confirmed" required> {{ $operationalMode ? 'Farmer identity confirmed in person' : 'Synthetic QA match' }}</label>
+                            <label class="inline-flex min-h-11 items-center gap-2"><input type="radio" name="outcome" value="not_confirmed" required> {{ $operationalMode ? 'Identity not confirmed' : 'Synthetic QA no match' }}</label>
                         </fieldset>
-                        <button class="ct-button ct-primary mt-3" type="submit">Record QA identity result</button>
+                        @if($operationalMode)<label class="mt-3 flex items-start gap-2 text-sm text-amber-950"><input class="mt-1" type="checkbox" name="identity_attestation" value="1" required> I personally checked the farmer and valid ticket under the MAO identity procedure.</label>@endif
+                        <button class="ct-button ct-primary mt-3" type="submit">{{ $operationalMode ? 'Record identity confirmation' : 'Record QA identity result' }}</button>
                     </form>
                 @endif
             @endif
 
             @if($identityConfirmation && $identityConfirmation->outcome === 'confirmed')
                 <div class="mt-5 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950" role="status">
-                    <p class="font-bold">Synthetic QA confirmation recorded for this ticket.</p>
-                    <p class="mt-1">It is recent, ticket-specific QA evidence only. No stock has changed yet.</p>
+                    <p class="font-bold">{{ $operationalMode ? 'In-person identity confirmation recorded for this ticket.' : 'Synthetic QA confirmation recorded for this ticket.' }}</p>
+                    <p class="mt-1">{{ $operationalMode ? 'The record is ticket-specific and time-limited. No stock has changed yet.' : 'It is recent, ticket-specific QA evidence only. No stock has changed yet.' }}</p>
                     @if($canHandover)
                         <a class="ct-button ct-primary mt-3" href="{{ route('modules.aasms.handovers.review', ['ticket' => $verificationTicket, 'confirmation' => $identityConfirmation->id]) }}">Continue to authorized handover review</a>
                     @else

@@ -181,8 +181,12 @@ class ABPMSProcurementTest extends TestCase
             ->get('/modules/abpms')
             ->assertOk()
             ->assertSee('Budget allocations')
+            ->assertSee('Procurement desk')
+            ->assertSee('Move each request through the control points.')
             ->assertSee('BA-2026-001')
-            ->assertSee('New procurement request');
+            ->assertSee('New procurement request')
+            ->assertSee('does not reconcile a PO payment')
+            ->assertSee('type="hidden" name="idempotency_key"', false);
 
         $this->actingAs($data['manager'])
             ->post('/modules/abpms/periods', [
@@ -233,7 +237,7 @@ class ABPMSProcurementTest extends TestCase
             ->post('/modules/abpms/allocations/'.$data['allocation']->id.'/expenditure', [
                 'amount' => '125',
                 'reference' => 'EXP-ABPMS-001',
-                'description' => 'Retry of the same approved office expenditure.',
+                'description' => 'Approved office expenditure.',
             ])
             ->assertRedirect();
 
@@ -249,10 +253,64 @@ class ABPMSProcurementTest extends TestCase
 
         $this->actingAs($data['creator'])->post('/modules/abpms/requests', $payload)->assertRedirect();
         $this->actingAs($data['creator'])->post('/modules/abpms/requests', $payload)->assertRedirect();
+        $this->actingAs($data['creator'])->post('/modules/abpms/requests', array_replace($payload, ['purpose' => 'Different purchase purpose']))
+            ->assertSessionHasErrors('idempotency_key');
+        $this->actingAs($data['manager'])->post('/modules/abpms/requests', $payload)
+            ->assertSessionHasErrors('idempotency_key');
 
         $this->assertDatabaseCount('procurement_requests', 1);
         $this->assertDatabaseCount('procurement_request_items', 1);
         $this->assertDatabaseHas('procurement_requests', ['idempotency_key' => 'request-idempotent', 'status' => 'submitted']);
+    }
+
+    public function test_purchase_order_retry_key_requires_the_same_request_supplier_details_and_creator(): void
+    {
+        $data = $this->setupAbpms();
+        $requestPayload = $this->requestPayload($data, 'po-idempotency-request');
+        $this->actingAs($data['creator'])->post('/modules/abpms/requests', $requestPayload)->assertRedirect();
+        $request = ProcurementRequest::where('idempotency_key', 'po-idempotency-request')->firstOrFail();
+        $this->actingAs($data['manager'])->post('/modules/abpms/requests/'.$request->id.'/review', ['status' => 'approved'])->assertRedirect();
+        $this->actingAs($data['creator'])->get('/modules/abpms')
+            ->assertOk()
+            ->assertSee('A retry reference is generated automatically for this purchase order.')
+            ->assertSee('type="hidden" name="idempotency_key"', false);
+        $payload = [
+            'supplier_id' => $data['supplier']->id,
+            'expected_delivery_on' => '2026-12-10',
+            'notes' => 'Quoted delivery confirmed.',
+            'idempotency_key' => 'po-idempotency-key',
+        ];
+
+        $this->actingAs($data['creator'])->post('/modules/abpms/requests/'.$request->id.'/purchase-orders', $payload)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($data['creator'])->post('/modules/abpms/requests/'.$request->id.'/purchase-orders', $payload)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($data['creator'])->post('/modules/abpms/requests/'.$request->id.'/purchase-orders', array_replace($payload, ['notes' => 'Different delivery terms.']))
+            ->assertSessionHasErrors('idempotency_key');
+        $this->actingAs($data['manager'])->post('/modules/abpms/requests/'.$request->id.'/purchase-orders', $payload)
+            ->assertSessionHasErrors('idempotency_key');
+
+        $this->assertDatabaseCount('purchase_orders', 1);
+        $this->assertDatabaseHas('purchase_orders', [
+            'idempotency_key' => 'po-idempotency-key',
+            'created_by' => $data['creator']->id,
+            'notes' => 'Quoted delivery confirmed.',
+        ]);
+    }
+
+    public function test_expenditure_reference_cannot_be_reused_for_a_different_amount(): void
+    {
+        $data = $this->setupAbpms();
+        $url = '/modules/abpms/allocations/'.$data['allocation']->id.'/expenditure';
+        $payload = ['amount' => '125', 'reference' => 'EXP-RETRY-CHECK', 'description' => 'Approved expenditure'];
+        $this->actingAs($data['manager'])->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($data['manager'])->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($data['manager'])->post($url, array_replace($payload, ['amount' => '250']))
+            ->assertSessionHasErrors('reference');
+        $this->actingAs($data['manager'])->post($url, array_replace($payload, ['description' => 'Different expense']))
+            ->assertSessionHasErrors('reference');
+        $this->assertDatabaseCount('budget_transactions', 1);
+        $this->assertDatabaseHas('budget_transactions', ['reference' => 'EXP-RETRY-CHECK', 'amount' => '125.00']);
     }
 
     public function test_viewer_can_read_but_cannot_create_or_change_budget_records(): void
@@ -394,6 +452,13 @@ class ABPMSProcurementTest extends TestCase
         $this->assertDatabaseHas('supply_batches', ['batch_number' => 'ABPMS-BATCH-001', 'quantity_available' => '2.00']);
         $this->assertDatabaseHas('purchase_order_items', ['id' => $item->id, 'received_quantity' => '2.00']);
         $this->assertDatabaseCount('inventory_movements', 1);
+
+        $inventoryViewer = Role::create(['name' => 'AISMS History Viewer', 'slug' => 'abpms_inventory_history_viewer', 'permissions' => ['modules.aisms.view'], 'is_active' => true]);
+        $data['manager']->roles()->attach($inventoryViewer);
+        $this->actingAs($data['manager'])->get('/modules/aisms')
+            ->assertOk()
+            ->assertSee('Open ABPMS receipt')
+            ->assertSee('Physical receipt: Oct 29, 2026');
     }
 
     public function test_equipment_link_requires_receipt_and_reuses_existing_aeams_asset(): void
@@ -531,7 +596,10 @@ class ABPMSProcurementTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', ['id' => $order->id, 'status' => 'partially_received']);
         $this->assertSame('1.00', (string) SupplyBatch::where('batch_number', 'PARTIAL-ABPMS')->value('quantity_available'));
 
-        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', array_merge($basePayload, ['idempotency_key' => 'partial-two']))->assertRedirect();
+        $secondReceipt = array_merge($basePayload, ['received_on' => '2026-10-30', 'idempotency_key' => 'partial-two']);
+        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', $secondReceipt)->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($data['manager'])->post('/modules/abpms/receipts', $secondReceipt)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('2026-10-30', \App\Models\InventoryMovement::query()->where('movement_type', 'receipt')->latest('id')->firstOrFail()->received_on->toDateString());
         $this->assertDatabaseHas('purchase_order_items', ['id' => $item->id, 'received_quantity' => '2.00']);
         $this->assertDatabaseHas('purchase_orders', ['id' => $order->id, 'status' => 'received']);
         $this->assertSame('2.00', (string) SupplyBatch::where('batch_number', 'PARTIAL-ABPMS')->value('quantity_available'));

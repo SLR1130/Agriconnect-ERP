@@ -72,7 +72,7 @@
             <span class="farmer-service-kicker">Your next step</span>
             <h2 id="program-next-step-title">Application status</h2>
             @if($application)
-                <p>You already applied to this program. Your recorded status is <strong>{{ ucfirst($application->status) }}</strong>.</p>
+                <p>You already applied to this program. Your recorded status is <strong>{{ str($application->status)->replace('_', ' ')->headline() }}</strong>.</p>
                 <a class="farmer-button farmer-button-gold" href="{{ route('farmer.applications.show', $application) }}">Track application <x-ui.icon name="next" size="sm" /></a>
             @elseif(!$program->isAvailableOn($businessDate))
                 <p class="farmer-program-state-note">

@@ -28,13 +28,16 @@ class AASMSHandoverController extends Controller
         $data = $request->validate([
             'verification_event_id' => ['required', 'integer', 'min:1'],
             'outcome' => ['required', 'in:confirmed,not_confirmed'],
+            'identity_attestation' => ['sometimes', 'accepted'],
         ]);
-        $confirmation = $handover->confirmSyntheticIdentity(
+        $confirmation = $handover->confirmIdentity(
             $ticket,
             (int) $data['verification_event_id'],
             $data['outcome'],
             $request->user(),
+            (bool) ($data['identity_attestation'] ?? false),
         );
+        $operational = $feature->operational();
 
         $request->session()->flash('claim_ticket_verification', [
             'outcome' => 'valid',
@@ -43,8 +46,12 @@ class AASMSHandoverController extends Controller
             'verification_event_id' => $confirmation->verification_event_id,
             'identity_confirmation_id' => $confirmation->id,
             'message' => $confirmation->outcome === 'confirmed'
-                ? 'Synthetic QA identity confirmation recorded. This is not legal identification, consent, a biometric check, or a farmer signature.'
-                : 'Synthetic QA identity did not match. No physical handover is authorized.',
+                ? ($operational
+                    ? 'In-person identity check recorded by authorized MAO staff. This is an operational staff attestation, not a biometric record or stored identification document.'
+                    : 'Synthetic QA identity confirmation recorded. This is not legal identification, consent, a biometric check, or a farmer signature.')
+                : ($operational
+                    ? 'The in-person identity check was not confirmed. No physical handover is authorized.'
+                    : 'Synthetic QA identity did not match. No physical handover is authorized.'),
         ]);
 
         if ($confirmation->outcome === 'confirmed'
@@ -54,13 +61,17 @@ class AASMSHandoverController extends Controller
             return redirect()->route('modules.aasms.handovers.review', [
                 'ticket' => $ticket,
                 'confirmation' => $confirmation->id,
-            ])->with('status', 'Synthetic QA identity confirmation recorded. Review the allocation and selected batch before any QA handover.');
+            ])->with('status', $operational
+                ? 'Identity confirmation recorded. Review the allocation and selected batch before the authorized handover.'
+                : 'Synthetic QA identity confirmation recorded. Review the allocation and selected batch before any QA handover.');
         }
 
         return redirect()->route('modules.aasms.claim-tickets.verify-form')
             ->with('status', $confirmation->outcome === 'confirmed'
-                ? 'Synthetic confirmation is recorded. A staff member with both distribution permissions and the exact handover grant must continue. No stock has changed.'
-                : 'Identity was not confirmed in the synthetic QA scenario. No stock was changed.');
+                ? ($operational
+                    ? 'Identity confirmation is recorded. A staff member with both distribution permissions and the exact handover grant must continue. No stock has changed.'
+                    : 'Synthetic confirmation is recorded. A staff member with both distribution permissions and the exact handover grant must continue. No stock has changed.')
+                : ($operational ? 'Identity was not confirmed. No stock was changed.' : 'Identity was not confirmed in the synthetic QA scenario. No stock was changed.'));
     }
 
     public function review(
@@ -82,7 +93,9 @@ class AASMSHandoverController extends Controller
             ->where('application_id', $ticket->application_id)
             ->where('claim_ticket_id', $ticket->id)
             ->where('outcome', 'confirmed')
-            ->where('method', AssistanceIdentityConfirmation::QA_METHOD)
+            ->where('method', $feature->operational()
+                ? AssistanceIdentityConfirmation::IN_PERSON_METHOD
+                : AssistanceIdentityConfirmation::QA_METHOD)
             ->firstOrFail();
 
         $batches = SupplyBatch::query()
@@ -100,7 +113,10 @@ class AASMSHandoverController extends Controller
             'application' => $ticket->application,
             'confirmation' => $confirmation,
             'batches' => $batches,
-            'qaLabel' => config('agricultural_claim_handover.qa_label'),
+            'handoverLabel' => $feature->operational()
+                ? config('agricultural_claim_handover.operational_label')
+                : config('agricultural_claim_handover.qa_label'),
+            'operationalMode' => $feature->operational(),
         ]);
     }
 
@@ -131,7 +147,9 @@ class AASMSHandoverController extends Controller
         );
 
         return redirect()->route('modules.aasms.handovers.acknowledgment', $distribution->acknowledgment)
-            ->with('status', 'QA handover committed atomically. One AISMS movement and one distribution are recorded; this is not evidence of actual farmer receipt.');
+            ->with('status', $feature->operational()
+                ? 'Authorized handover committed atomically. One AISMS movement and one assistance distribution are recorded.'
+                : 'QA handover committed atomically. One AISMS movement and one distribution are recorded; this is not evidence of actual farmer receipt.');
     }
 
     public function staffAcknowledgment(
@@ -145,7 +163,10 @@ class AASMSHandoverController extends Controller
 
         return view('modules.aasms.claim-tickets.acknowledgment', [
             'acknowledgment' => $acknowledgment->load(['application', 'ticket', 'distribution.batch', 'distributor']),
-            'qaLabel' => config('agricultural_claim_handover.qa_label'),
+            'handoverLabel' => $feature->operational()
+                ? config('agricultural_claim_handover.operational_label')
+                : config('agricultural_claim_handover.qa_label'),
+            'operationalMode' => $feature->operational(),
         ]);
     }
 

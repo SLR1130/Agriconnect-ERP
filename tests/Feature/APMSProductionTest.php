@@ -89,7 +89,16 @@ class APMSProductionTest extends TestCase
             ->assertSee('Field visit')
             ->assertSee('data-apms-monitoring-type-choice', false)
             ->assertSee('name="monitoring_type"', false)
-            ->assertSee('Field visit');
+            ->assertSee('Field visit')
+            ->assertSee('Who does what?')
+            ->assertSee('Farmer registration, seasonal reporting and MAO monitoring are related, but they are different steps.')
+            ->assertSee('Crop or livestock categories describe usual farm activities. They are not a seasonal harvest report.')
+            ->assertSee('After verification, the farmer chooses their registered farm')
+            ->assertSee('Approve to create the linked official record')
+            ->assertSee('not an offer or guarantee that the government will buy it')
+            ->assertSee('Review farmer production reports')
+            ->assertSee('Official production register')
+            ->assertSee('Farm visits & incident follow-up');
     }
 
     public function test_apms_workspace_keeps_the_selected_area_and_filters_production_records(): void
@@ -358,6 +367,65 @@ class APMSProductionTest extends TestCase
             ->assertSee('data-error-form="crop"', false)
             ->assertSee('The farmer id field is required.')
             ->assertSee('The crop type field is required.');
+    }
+
+    public function test_apms_crop_create_and_edit_cannot_exceed_the_registered_farm_area(): void
+    {
+        $role = Role::create([
+            'name' => 'APMS Area Personnel',
+            'slug' => 'apms_area_personnel',
+            'permissions' => ['modules.apms.*'],
+            'is_active' => true,
+        ]);
+        $staff = User::factory()->create();
+        $staff->roles()->attach($role);
+        $farmerUser = User::factory()->create();
+        $farmer = Farmer::create([
+            'user_id' => $farmerUser->id,
+            'farmer_code' => 'APMS-AREA-001',
+            'registration_status' => 'verified',
+        ]);
+        $farm = Farm::create([
+            'farmer_id' => $farmer->id,
+            'name' => 'Seven Hectare Farm',
+            'barangay' => 'Demo Barangay',
+            'area' => 7,
+            'area_unit' => 'hectare',
+            'ownership_type' => 'owner',
+            'status' => 'active',
+        ]);
+        $crop = [
+            'farmer_id' => $farmer->id,
+            'farm_id' => $farm->id,
+            'crop_type' => 'Rice',
+            'planted_on' => today()->subDays(10)->toDateString(),
+            'area_planted' => 8,
+            'area_unit' => 'hectare',
+            'yield_unit' => 'kilogram',
+            'status' => 'growing',
+        ];
+
+        $this->actingAs($staff)
+            ->from('/modules/apms?tab=production&record_type=crops')
+            ->post('/modules/apms/crops', $crop)
+            ->assertSessionHasErrors('area_planted');
+        $this->assertDatabaseCount('crop_production_records', 0);
+
+        $this->actingAs($staff)
+            ->post('/modules/apms/crops', array_replace($crop, ['area_planted' => 7]))
+            ->assertRedirect();
+        $record = CropProductionRecord::firstOrFail();
+
+        $this->actingAs($staff)
+            ->from('/modules/apms?tab=production&record_type=crops')
+            ->patch('/modules/apms/crops/'.$record->id, array_replace($crop, [
+                'area_planted' => 70001,
+                'area_unit' => 'square_meter',
+            ]))
+            ->assertSessionHasErrors('area_planted');
+
+        $this->assertSame('7.00', $record->fresh()->area_planted);
+        $this->assertSame('hectare', $record->fresh()->area_unit);
     }
 
     public function test_existing_active_season_edit_form_preserves_and_persists_its_status(): void

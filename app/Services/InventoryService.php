@@ -8,6 +8,7 @@ use App\Models\SupplyBatch;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class InventoryService
@@ -67,6 +68,15 @@ class InventoryService
                     throw ValidationException::withMessages(['batch_number' => 'Stock cannot be added to a batch that is not available.']);
                 }
 
+                $receiptDatesReady = Schema::hasColumn('inventory_movements', 'received_on');
+                if (! $receiptDatesReady && $batch->received_on?->toDateString() !== $receivedOn) {
+                    throw ValidationException::withMessages(['received_on' => 'This batch is already recorded with a different receipt date. Use a separate batch record for this delivery.']);
+                }
+
+                if ($batch->expires_on?->toDateString() !== $expiresOn) {
+                    throw ValidationException::withMessages(['expires_on' => 'This batch already has a different expiration date. Use the existing date or a different batch number.']);
+                }
+
                 $batch->update([
                     'quantity_received' => $this->money($this->decimalCents($batch->quantity_received) + $quantityCents),
                     'quantity_available' => $this->money($this->decimalCents($batch->quantity_available) + $quantityCents),
@@ -80,7 +90,7 @@ class InventoryService
                     'quantity' => $this->money($quantityCents),
                     'idempotency_key' => $data['idempotency_key'] ?? null,
                     'notes' => $data['notes'] ?? null,
-                ]);
+                ] + ($receiptDatesReady ? ['received_on' => $receivedOn] : []));
             });
         } catch (UniqueConstraintViolationException $exception) {
             return $this->recoverDuplicate($exception, $data['idempotency_key'] ?? null, fn (InventoryMovement $movement) => $this->assertSameReceipt($movement, $data, $userId));
@@ -209,7 +219,7 @@ class InventoryService
             && (int) $batch?->location_id === (int) ($data['location_id'] ?? 0)
             && (string) $batch?->batch_number === (string) ($data['batch_number'] ?? '')
             && $this->decimalCents($movement->quantity) === $this->decimalCents($data['quantity'] ?? null)
-            && optional($batch?->received_on)->toDateString() === Carbon::parse($data['received_on'])->toDateString()
+            && ($movement->received_on?->toDateString() ?? $batch?->received_on?->toDateString()) === Carbon::parse($data['received_on'])->toDateString()
             && optional($batch?->expires_on)->toDateString() === (filled($data['expires_on'] ?? null) ? Carbon::parse($data['expires_on'])->toDateString() : null)
             && $this->normalizedText($movement->notes) === $this->normalizedText($data['notes'] ?? null);
 

@@ -33,13 +33,13 @@ class ProcurementService
 
     public function createRequest(array $data, User $actor): ProcurementRequest
     {
-        return DB::transaction(function () use ($data, $actor) {
-            if (! empty($data['idempotency_key'])) {
-                $existing = ProcurementRequest::where('idempotency_key', $data['idempotency_key'])->first();
-                if ($existing) {
-                    return $existing->load('items');
+        $key = trim((string) ($data['idempotency_key'] ?? ''));
+
+        try {
+            return DB::transaction(function () use ($data, $actor, $key) {
+                if ($key !== '' && ($existing = ProcurementRequest::query()->where('idempotency_key', $key)->first())) {
+                    return $this->assertSameRequest($existing->load('items'), $data, $actor);
                 }
-            }
 
             $items = array_values(array_filter($data['items'] ?? [], fn ($item) => filled($item['description'] ?? null)));
             if ($items === []) {
@@ -80,10 +80,11 @@ class ProcurementService
                 'justification' => $data['justification'] ?? null,
                 'estimated_total' => $this->budget->money($totalCents),
                 'status' => 'submitted',
-                'idempotency_key' => $data['idempotency_key'] ?? null,
+                'idempotency_key' => $key !== '' ? $key : null,
             ]);
 
             foreach ($items as $item) {
+                $itemType = $item['item_type'] ?? (! empty($item['supply_item_id']) ? 'supply' : 'equipment');
                 ProcurementRequestItem::create([
                     'procurement_request_id' => $procurementRequest->id,
                     'supply_item_id' => $item['supply_item_id'] ?? null,
@@ -99,7 +100,15 @@ class ProcurementService
             ActivityLog::log('created', 'Procurement request '.$procurementRequest->request_number.' submitted.', $procurementRequest->request_number, $actor->id, 'abpms');
 
             return $procurementRequest->load('items');
-        });
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            $existing = $key !== '' ? ProcurementRequest::query()->with('items')->where('idempotency_key', $key)->first() : null;
+            if (! $existing) {
+                throw $exception;
+            }
+
+            return $this->assertSameRequest($existing, $data, $actor);
+        }
     }
 
     public function reviewRequest(ProcurementRequest $procurementRequest, string $status, ?string $notes, User $actor): ProcurementRequest
@@ -140,17 +149,18 @@ class ProcurementService
 
     public function createPurchaseOrder(ProcurementRequest $procurementRequest, array $data, User $actor): PurchaseOrder
     {
-        return DB::transaction(function () use ($procurementRequest, $data, $actor) {
-            $request = ProcurementRequest::query()->lockForUpdate()->with('items')->findOrFail($procurementRequest->id);
-            if ($request->status !== 'approved') {
-                throw ValidationException::withMessages(['procurement_request_id' => 'Only approved requests may create purchase orders.']);
-            }
-            if (! empty($data['idempotency_key'])) {
-                $existing = PurchaseOrder::where('idempotency_key', $data['idempotency_key'])->first();
-                if ($existing) {
-                    return $existing->load('items');
+        $key = trim((string) ($data['idempotency_key'] ?? ''));
+
+        try {
+            return DB::transaction(function () use ($procurementRequest, $data, $actor, $key) {
+                if ($key !== '' && ($existing = PurchaseOrder::query()->where('idempotency_key', $key)->first())) {
+                    return $this->assertSamePurchaseOrder($existing->load('items'), $procurementRequest->id, $data, $actor);
                 }
-            }
+
+                $request = ProcurementRequest::query()->lockForUpdate()->with('items')->findOrFail($procurementRequest->id);
+                if ($request->status !== 'approved') {
+                    throw ValidationException::withMessages(['procurement_request_id' => 'Only approved requests may create purchase orders.']);
+                }
             if ($request->purchaseOrders()->whereNotIn('status', ['cancelled'])->exists()) {
                 throw ValidationException::withMessages(['procurement_request_id' => 'An active purchase order already exists for this request.']);
             }
@@ -165,7 +175,7 @@ class ProcurementService
                 'expected_delivery_on' => $data['expected_delivery_on'] ?? null,
                 'status' => 'draft',
                 'notes' => $data['notes'] ?? null,
-                'idempotency_key' => $data['idempotency_key'] ?? null,
+                'idempotency_key' => $key !== '' ? $key : null,
             ]);
 
             foreach ($request->items as $item) {
@@ -184,7 +194,15 @@ class ProcurementService
             $this->purchaseOrderHistory($purchaseOrder, null, 'draft', $actor, 'Purchase order drafted.');
 
             return $purchaseOrder->load('items');
-        });
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            $existing = $key !== '' ? PurchaseOrder::query()->with('items')->where('idempotency_key', $key)->first() : null;
+            if (! $existing) {
+                throw $exception;
+            }
+
+            return $this->assertSamePurchaseOrder($existing, $procurementRequest->id, $data, $actor);
+        }
     }
 
     public function approvePurchaseOrder(PurchaseOrder $purchaseOrder, User $actor): PurchaseOrder
@@ -544,6 +562,60 @@ class ProcurementService
         }
 
         return $receipt;
+    }
+
+    private function assertSameRequest(ProcurementRequest $existing, array $data, User $actor): ProcurementRequest
+    {
+        $items = array_values(array_filter($data['items'] ?? [], fn ($item) => filled($item['description'] ?? null)));
+        $existingItems = $existing->items->map(fn (ProcurementRequestItem $item) => [
+            'item_type' => $item->item_type,
+            'supply_item_id' => $item->supply_item_id === null ? null : (int) $item->supply_item_id,
+            'description' => trim((string) $item->description),
+            'quantity' => $this->budget->cents($item->quantity),
+            'estimated_unit_price' => $this->budget->cents($item->estimated_unit_price),
+        ])->sortBy(fn (array $item) => json_encode($item))->values()->all();
+        $submittedItems = collect($items)->map(fn (array $item) => [
+            'item_type' => $item['item_type'] ?? (! empty($item['supply_item_id']) ? 'supply' : 'equipment'),
+            'supply_item_id' => empty($item['supply_item_id']) ? null : (int) $item['supply_item_id'],
+            'description' => trim((string) $item['description']),
+            'quantity' => $this->budget->cents($item['quantity']),
+            'estimated_unit_price' => $this->budget->cents($item['estimated_unit_price']),
+        ])->sortBy(fn (array $item) => json_encode($item))->values()->all();
+
+        $same = (int) $existing->requester_id === (int) $actor->id
+            && (int) $existing->budget_allocation_id === (int) ($data['budget_allocation_id'] ?? 0)
+            && trim((string) $existing->requesting_office) === trim((string) ($data['requesting_office'] ?? ''))
+            && trim((string) $existing->purpose) === trim((string) ($data['purpose'] ?? ''))
+            && $this->normalizedText($existing->justification) === $this->normalizedText($data['justification'] ?? null)
+            && $existingItems === $submittedItems;
+
+        if (! $same) {
+            throw ValidationException::withMessages(['idempotency_key' => 'This retry key was already used for a different procurement request.']);
+        }
+
+        return $existing;
+    }
+
+    private function assertSamePurchaseOrder(PurchaseOrder $existing, int $requestId, array $data, User $actor): PurchaseOrder
+    {
+        $same = (int) $existing->procurement_request_id === $requestId
+            && (int) $existing->created_by === (int) $actor->id
+            && (int) $existing->supplier_id === (int) ($data['supplier_id'] ?? 0)
+            && optional($existing->expected_delivery_on)->toDateString() === (filled($data['expected_delivery_on'] ?? null) ? Carbon::parse($data['expected_delivery_on'])->toDateString() : null)
+            && $this->normalizedText($existing->notes) === $this->normalizedText($data['notes'] ?? null);
+
+        if (! $same) {
+            throw ValidationException::withMessages(['idempotency_key' => 'This retry key was already used for a different purchase order.']);
+        }
+
+        return $existing;
+    }
+
+    private function normalizedText(mixed $value): ?string
+    {
+        $text = trim((string) ($value ?? ''));
+
+        return $text === '' ? null : $text;
     }
 
     private function assertSameEquipmentAcquisition(EquipmentAcquisition $existing, ProcurementReceiptItem $receiptItem, array $data, User $actor): EquipmentAcquisition

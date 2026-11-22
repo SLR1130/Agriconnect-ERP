@@ -16,6 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class ProductionSubmissionService
 {
+    public function __construct(private CropAreaLimit $cropAreaLimit)
+    {
+    }
+
     public function submit(Farmer $farmer, User $actor, string $category, int $farmId, array $payload, string $key): ProductionSubmission
     {
         try {
@@ -88,6 +92,14 @@ class ProductionSubmissionService
 
             $officialId = null;
             if ($decision === 'approved') {
+                if ($locked->category === 'crop') {
+                    $this->cropAreaLimit->assertWithinFarm(
+                        $locked->farm,
+                        $locked->payload['area_planted'] ?? null,
+                        $locked->payload['area_unit'] ?? null,
+                    );
+                }
+
                 $attributes = $locked->payload + ['farmer_id' => $locked->farmer_id, 'farm_id' => $locked->farm_id, 'recorded_by' => $reviewer->id];
                 $record = match ($locked->category) {
                     'crop' => CropProductionRecord::create($attributes),

@@ -11,6 +11,7 @@ use App\Models\FisheryRecord;
 use App\Models\LivestockRecord;
 use App\Models\PestDiseaseIncident;
 use App\Models\ProductionSubmission;
+use App\Services\CropAreaLimit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -179,22 +180,24 @@ class APMSController extends Controller
         return back()->with('status', 'Agricultural season updated.');
     }
 
-    public function crop(Request $request): RedirectResponse
+    public function crop(Request $request, CropAreaLimit $cropAreaLimit): RedirectResponse
     {
         $this->authorizeModule($request, 'create');
         $data = $this->cropData($request);
-        $this->validateFarmOwner($data['farmer_id'], $data['farm_id']);
+        $farm = $this->validateFarmOwner($data['farmer_id'], $data['farm_id']);
+        $cropAreaLimit->assertWithinFarm($farm, $data['area_planted'] ?? null, $data['area_unit']);
         $record = CropProductionRecord::create($data + ['recorded_by' => $request->user()->id]);
         ActivityLog::log('created', 'Crop production record created.', 'crop:'.$record->id, $request->user()->id, 'apms');
 
         return back()->with('status', 'Crop production record saved.');
     }
 
-    public function updateCrop(Request $request, CropProductionRecord $record): RedirectResponse
+    public function updateCrop(Request $request, CropProductionRecord $record, CropAreaLimit $cropAreaLimit): RedirectResponse
     {
         $this->authorizeModule($request, 'update');
         $data = $this->cropData($request);
-        $this->validateFarmOwner($data['farmer_id'], $data['farm_id']);
+        $farm = $this->validateFarmOwner($data['farmer_id'], $data['farm_id']);
+        $cropAreaLimit->assertWithinFarm($farm, $data['area_planted'] ?? null, $data['area_unit']);
         $old = $record->only(array_keys($data));
         $record->update($data);
         ActivityLog::log('updated', 'Crop production record updated.', 'crop:'.$record->id, $request->user()->id, 'apms', $old, $record->fresh()->only(array_keys($data)));
@@ -381,8 +384,10 @@ class APMSController extends Controller
             ->when($to, fn (Builder $builder) => $builder->whereDate($column, '<=', $to));
     }
 
-    private function validateFarmOwner(int $farmerId, int $farmId): void
+    private function validateFarmOwner(int $farmerId, int $farmId): Farm
     {
         abort_unless(Farm::query()->whereKey($farmId)->where('farmer_id', $farmerId)->whereHas('farmer', fn ($query) => $query->where('registration_status', 'verified'))->exists(), 422);
+
+        return Farm::query()->findOrFail($farmId);
     }
 }

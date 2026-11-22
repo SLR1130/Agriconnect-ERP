@@ -1,59 +1,25 @@
 <x-layouts.farmer>
-    <section class="farmer-hero relative overflow-hidden">
-        <!-- Enhanced Background Pattern -->
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-10 right-10 h-32 w-32 rounded-full bg-white/20 blur-3xl"></div>
-            <div class="absolute bottom-10 left-10 h-40 w-40 rounded-full bg-white/10 blur-3xl"></div>
-        </div>
-
-        <!-- Content -->
-        <div class="relative z-10">
-            <p
-                class="mb-3 inline-block rounded-full bg-yellow-400/20 px-3 py-1.5 text-xs font-bold uppercase tracking-[.17em] text-yellow-200 backdrop-blur-sm">
-                <svg class="mr-1.5 inline-block h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                        d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                </svg>
-                Your agriculture, connected
-            </p>
-
-            <h1 class="bg-gradient-to-br from-white to-emerald-100 bg-clip-text text-transparent">
-                Good day, {{ $farmer->user->name }}.
-            </h1>
-
-            <p class="mt-4 text-emerald-50/90">
-                Find local support, keep your farm information current, and follow your requests in one place.
-            </p>
-
-            <div class="relative mt-6 flex flex-wrap gap-3">
-                <a class="farmer-button farmer-button-gold group relative overflow-hidden transition-all hover:scale-105 hover:shadow-xl"
-                    href="{{ route('farmer.services') }}">
-                    <span class="relative z-10 flex items-center gap-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                        Explore programs and services
-                    </span>
-                </a>
-                <a class="farmer-button farmer-button-light group relative overflow-hidden backdrop-blur-sm transition-all hover:scale-105 hover:bg-white/30"
-                    href="{{ route('farmer.farms') }}">
-                    <span class="relative z-10 flex items-center gap-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                        Manage my farms
-                    </span>
-                </a>
+    <section class="farmer-home-hero" aria-labelledby="farmer-home-title">
+        <div>
+            <p class="farmer-eyebrow"><x-ui.icon name="home" size="sm" />Farmer services</p>
+            <h1 id="farmer-home-title">Good day, {{ $farmer->user->name }}.</h1>
+            <p>Use one place to keep farm details current, request municipal support, borrow available equipment, and follow every MAO decision.</p>
+            <div class="farmer-home-hero-actions">
+                <a class="farmer-button farmer-button-gold" href="{{ route('farmer.services') }}"><x-ui.icon name="services" size="sm" />Find a farm service</a>
+                <a class="farmer-button farmer-button-light" href="{{ route('farmer.farms') }}"><x-ui.icon name="farms" size="sm" />Manage my farms</a>
             </div>
         </div>
+        <aside class="farmer-home-hero-aside" aria-label="Your farmer record">
+            <p class="farmer-eyebrow">Your farmer record</p>
+            <strong>Registration {{ str($farmer->registration_status)->replace('_', ' ')->lower() }}</strong>
+            <span>{{ $farmer->farms->count() }} registered {{ $farmer->farms->count() === 1 ? 'farm' : 'farms' }}. Keep the pin, boundary, and agricultural activities current for MAO review.</span>
+        </aside>
     </section>
 
     @if (!$farmer->isVerified())
         <div class="farmer-message {{ $farmer->registration_status === 'rejected' ? 'farmer-message-error' : 'farmer-message-success' }} mt-5"
             role="status">
-            <strong>Registration {{ str_replace('_', ' ', $farmer->registration_status) }}.</strong>
+            <strong>Registration {{ str($farmer->registration_status)->replace('_', ' ')->lower() }}.</strong>
             @if ($farmer->registration_status === 'pending')
                 The MAO is reviewing your registration. You can explore services while you wait; applications and
                 equipment requests require verification.
@@ -66,52 +32,40 @@
         </div>
     @endif
 
+    @php
+        $nextAction = $needsAttention->isNotEmpty()
+            ? ['eyebrow' => 'Recommended next step', 'title' => 'Review a returned service item', 'copy' => 'The MAO sent feedback on one of your submissions. Open My activities to see what needs your attention.', 'label' => 'Open My activities', 'route' => route('farmer.activities'), 'icon' => 'action']
+            : (!$farmer->isVerified()
+                ? ['eyebrow' => 'Recommended next step', 'title' => 'Complete your farmer registration', 'copy' => 'Keep your farm details and map pin accurate so the MAO can verify your record.', 'label' => 'Open My farms', 'route' => route('farmer.farms'), 'icon' => 'location']
+                : ($unreadCount > 0
+                    ? ['eyebrow' => 'Recommended next step', 'title' => 'Read your latest updates', 'copy' => 'You have unread service or MAO messages that may contain your next action.', 'label' => 'Open notifications', 'route' => route('farmer.notifications'), 'icon' => 'notifications']
+                    : ['eyebrow' => 'Recommended next step', 'title' => 'Explore available agricultural services', 'copy' => 'Browse published assistance programs and choose a service when you are ready to proceed.', 'label' => 'Explore services', 'route' => route('farmer.services'), 'icon' => 'services']));
+    @endphp
+    <section class="farmer-section" aria-labelledby="farmer-next-action-title">
+        <div class="farmer-next-action">
+            <span class="farmer-next-action-icon" aria-hidden="true"><x-ui.icon :name="$nextAction['icon']" size="md" /></span>
+            <div class="min-w-0">
+                <p class="farmer-eyebrow">{{ $nextAction['eyebrow'] }}</p>
+                <h2 id="farmer-next-action-title">{{ $nextAction['title'] }}</h2>
+                <p>{{ $nextAction['copy'] }}</p>
+            </div>
+            <a class="farmer-button farmer-button-light" href="{{ $nextAction['route'] }}">{{ $nextAction['label'] }} <x-ui.icon name="next" size="sm" /></a>
+        </div>
+    </section>
+
     <section class="farmer-section" aria-labelledby="farmer-services-title">
         <div class="farmer-section-heading">
             <div>
-                <h2 id="farmer-services-title" class="flex items-center gap-2">
-                    <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    What can we help you with?
-                </h2>
-                <p class="text-slate-600">Choose a service to see requirements and your next step.</p>
+                <p class="farmer-eyebrow">Start a service</p>
+                <h2 id="farmer-services-title">What do you need to do today?</h2>
+                <p>Choose a clear task. Each page shows only your records and the next action you can take.</p>
             </div>
+            <a class="farmer-text-link" href="{{ route('farmer.services') }}">View all services</a>
         </div>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            @foreach ([
-        ['Assistance & subsidies', 'Discover open support programs and apply when eligible.', route('farmer.assistance'), 'assistance', 'from-emerald-500 to-teal-600'],
-        ['Equipment services', 'See available equipment and request a schedule.', route('farmer.equipment'), 'equipment', 'from-blue-500 to-cyan-600'],
-        ['My farms', 'View your registration and update farm records.', route('farmer.farms'), 'farms', 'from-green-500 to-emerald-600'],
-        ['Crop & livestock records', 'Send information for MAO review and view official records.', route('farmer.production'), 'crop', 'from-amber-500 to-orange-600'],
-        ['Fisheries', 'Send fishery information and review official records.', route('farmer.production', ['section' => 'fisheries']), 'fish', 'from-cyan-500 to-blue-600'],
-        ['Farm monitoring', 'Read MAO visits and report pests or disease.', route('farmer.production', ['section' => 'monitoring']), 'monitoring', 'from-purple-500 to-indigo-600'],
-        ['Market opportunities', 'See current MAO interest notices and offer available products for review.', route('farmer.market'), 'inventory', 'from-rose-500 to-pink-600'],
-    ] as [$name, $copy, $url, $icon, $gradient])
-                <a href="{{ $url }}"
-                    class="farmer-card group relative block overflow-hidden no-underline transition-all duration-300 hover:-translate-y-1 hover:border-emerald-400 hover:shadow-2xl">
-                    <div
-                        class="absolute inset-0 bg-gradient-to-br {{ $gradient }} opacity-0 transition-opacity duration-300 group-hover:opacity-5">
-                    </div>
-
-                    <div class="relative">
-                        <span
-                            class="mb-4 inline-grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br {{ $gradient }} text-white shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:shadow-lg"
-                            aria-hidden="true">
-                            <x-ui.icon :name="$icon" size="md" />
-                        </span>
-                        <h3 class="text-base font-bold text-slate-800 transition-colors group-hover:text-emerald-700">
-                            {{ $name }}</h3>
-                        <p class="mt-1 text-sm leading-6 text-slate-600">{{ $copy }}</p>
-                        <span
-                            class="mt-4 inline-flex items-center gap-1 text-sm font-bold text-emerald-700 transition-all group-hover:gap-2">
-                            Open service
-                            <x-ui.icon name="next" size="sm" />
-                        </span>
-                    </div>
-                </a>
-            @endforeach
+        <div class="farmer-home-service-grid">
+            <a class="farmer-home-service farmer-home-service-emphasis" href="{{ route('farmer.equipment') }}"><span aria-hidden="true"><x-ui.icon name="equipment" size="md" /></span><h3>Borrow MAO equipment</h3><p>Choose an available asset, request a schedule, and follow approval, issue, and return.</p><small>Open equipment borrowing <x-ui.icon name="next" size="sm" /></small></a>
+            <a class="farmer-home-service" href="{{ route('farmer.assistance') }}"><span aria-hidden="true"><x-ui.icon name="assistance" size="md" /></span><h3>Apply for assistance</h3><p>Review published programs and submit an application when you qualify.</p><small>Open assistance <x-ui.icon name="next" size="sm" /></small></a>
+            <a class="farmer-home-service" href="{{ route('farmer.production') }}"><span aria-hidden="true"><x-ui.icon name="crop" size="md" /></span><h3>Update farm production</h3><p>Send crop, livestock, or fishery information for MAO review.</p><small>Open production records <x-ui.icon name="next" size="sm" /></small></a>
         </div>
     </section>
 
@@ -230,9 +184,8 @@
         <div class="space-y-4">
             <div class="farmer-card">
                 <p class="farmer-eyebrow">Your registration</p>
-                <h2 class="mt-2 text-xl font-bold">{{ ucfirst($farmer->registration_status) }}</h2>
-                <p class="mt-2 text-sm text-slate-600">{{ $farmer->farmer_code }} · {{ $farmer->farms->count() }}
-                    registered {{ $farmer->farms->count() === 1 ? 'farm' : 'farms' }}</p><a
+                <h2 class="mt-2 text-xl font-bold">{{ str($farmer->registration_status)->replace('_', ' ')->headline() }}</h2>
+                <p class="mt-2 text-sm text-slate-600">{{ $farmer->farmer_code }} · {{ $farmer->farms->count() }} registered {{ $farmer->farms->count() === 1 ? 'farm' : 'farms' }}</p><a
                     class="mt-4 inline-block text-sm font-bold text-emerald-700 underline"
                     href="{{ route('farmer.farms') }}">View registration details</a>
             </div>

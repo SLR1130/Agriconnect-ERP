@@ -2,6 +2,16 @@
     <x-slot name="header">Official agricultural publications</x-slot>
     <x-slot name="description">Prepare accessible, photo-rich government notices and program announcements. Public changes require an explicit publisher permission.</x-slot>
     <a class="mb-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-700 underline" href="{{ route('modules.aasms.dashboard') }}"><x-ui.icon name="back" size="sm"/>Assistance workspace</a>
+    <section class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4" aria-label="Program authoring shortcut">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-forest-green text-white" aria-hidden="true"><x-ui.icon name="assistance" size="sm"/></span>
+            <div>
+                <strong class="block text-sm font-extrabold text-forest-green">Need to create an assistance program?</strong>
+                <p class="mt-1 max-w-2xl text-sm text-slate-600">Programs define the actual farmer service, eligibility rules, dates, allocation and linked supply. This page only publishes the public notice that explains a program.</p>
+            </div>
+        </div>
+        <a class="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-forest-green px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-green" href="{{ route('modules.aasms.dashboard', ['workspace' => 'programs']) }}">{{ $canCreate ? 'Create or manage programs' : 'View programs' }}<x-ui.icon name="next" size="sm"/></a>
+    </section>
     @if(session('status'))<div class="farmer-message farmer-message-success" role="status">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="farmer-message farmer-message-error" role="alert"><strong>Please correct the publication form.</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
 

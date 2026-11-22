@@ -15,8 +15,9 @@ use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
- * QA-only assistance claim-ticket lifecycle. This service deliberately never
- * calls AISMS/InventoryService and never reserves or changes stock.
+ * Claim-ticket lifecycle. A ticket is a private credential only: stock is
+ * never reserved or changed until the separately authorized handover service
+ * commits an AISMS release in the same database transaction.
  */
 class AssistanceClaimTicketService
 {
@@ -59,7 +60,9 @@ class AssistanceClaimTicketService
                         'first_ticket_id' => $ticket->id,
                         'enrolled_by' => $actor->id,
                         'enrolled_at' => CarbonImmutable::now('UTC'),
-                        'enrollment_reason' => 'ticket_issued_in_qa',
+                        'enrollment_reason' => app(ClaimTicketFeatureGate::class)->operational()
+                            ? 'ticket_issued_for_operational_handover'
+                            : 'ticket_issued_in_qa',
                     ],
                 );
 

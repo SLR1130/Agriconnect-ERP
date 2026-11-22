@@ -51,6 +51,9 @@ class AASMSClaimTicketTest extends TestCase
 
         config([
             'agricultural_claim_tickets.enabled' => true,
+            // Keep the in-memory RefreshDatabase fixtures isolated even when
+            // the local application is configured for operational MySQL mode.
+            'agricultural_claim_tickets.mode' => 'qa',
             'agricultural_claim_tickets.qa_sqlite_path' => storage_path('app/qa/agriconnect-phase6d1-qa.sqlite'),
             'agricultural_claim_tickets.qa_mysql_database' => null,
             'agricultural_claim_tickets.validity_days' => null,

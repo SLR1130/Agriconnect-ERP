@@ -1,5 +1,5 @@
 <x-layouts.app>
-    <x-slot name="header">Roles &amp; permissions</x-slot>
+    <x-slot name="header">Roles & permissions</x-slot>
     <x-slot name="description">Inspect the policy boundary applied to each role and compare it with legacy database grants without changing live assignments.</x-slot>
 
     @php

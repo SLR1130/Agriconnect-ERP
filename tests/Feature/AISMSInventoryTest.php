@@ -130,6 +130,74 @@ class AISMSInventoryTest extends TestCase
         $this->assertSame('4.00', (string) SupplyBatch::firstOrFail()->quantity_available);
     }
 
+    public function test_receiving_rejects_a_different_expiration_for_an_existing_batch(): void
+    {
+        $data = $this->setupInventory();
+        $payload = [
+            'supply_item_id' => $data['item']->id,
+            'location_id' => $data['location']->id,
+            'batch_number' => 'EXPIRY-CHECK',
+            'received_on' => today()->toDateString(),
+            'expires_on' => today()->addYear()->toDateString(),
+            'quantity' => 5,
+            'idempotency_key' => 'expiry-first',
+        ];
+        $service = app(InventoryService::class);
+        $service->receive($payload, $data['user']->id);
+
+        try {
+            $service->receive(array_replace($payload, ['expires_on' => today()->addYears(2)->toDateString(), 'idempotency_key' => 'expiry-second']), $data['user']->id);
+            $this->fail('A conflicting batch expiration must be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('expires_on', $exception->errors());
+        }
+
+        $this->assertSame('5.00', (string) SupplyBatch::where('batch_number', 'EXPIRY-CHECK')->firstOrFail()->quantity_available);
+        $this->assertDatabaseCount('inventory_movements', 1);
+    }
+
+    public function test_receipts_of_the_same_batch_on_different_dates_are_recorded_and_retried_once(): void
+    {
+        $data = $this->setupInventory();
+        $payload = [
+            'supply_item_id' => $data['item']->id,
+            'location_id' => $data['location']->id,
+            'batch_number' => 'DATE-CHECK',
+            'received_on' => today()->subDay()->toDateString(),
+            'quantity' => 5,
+            'idempotency_key' => 'date-first',
+        ];
+        $service = app(InventoryService::class);
+        $service->receive($payload, $data['user']->id);
+        $second = array_replace($payload, ['received_on' => today()->toDateString(), 'idempotency_key' => 'date-second']);
+        $movement = $service->receive($second, $data['user']->id);
+        $this->assertSame($movement->id, $service->receive($second, $data['user']->id)->id);
+        $this->assertSame(today()->toDateString(), $movement->received_on->toDateString());
+        $this->assertSame('10.00', (string) SupplyBatch::where('batch_number', 'DATE-CHECK')->firstOrFail()->quantity_available);
+        $this->assertDatabaseCount('inventory_movements', 2);
+    }
+
+    public function test_legacy_schema_rejects_a_different_receipt_date_without_changing_stock(): void
+    {
+        \Illuminate\Support\Facades\Schema::table('inventory_movements', fn ($table) => $table->dropColumn('received_on'));
+        $data = $this->setupInventory();
+        $payload = [
+            'supply_item_id' => $data['item']->id, 'location_id' => $data['location']->id,
+            'batch_number' => 'LEGACY-DATE', 'received_on' => today()->subDay()->toDateString(),
+            'quantity' => 5, 'idempotency_key' => 'legacy-date-first',
+        ];
+        $service = app(InventoryService::class);
+        $service->receive($payload, $data['user']->id);
+        try {
+            $service->receive(array_replace($payload, ['received_on' => today()->toDateString(), 'idempotency_key' => 'legacy-date-second']), $data['user']->id);
+            $this->fail('A legacy batch cannot safely record a different receipt date.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('received_on', $exception->errors());
+        }
+        $this->assertSame('5.00', (string) SupplyBatch::where('batch_number', 'LEGACY-DATE')->firstOrFail()->quantity_available);
+        $this->assertDatabaseCount('inventory_movements', 1);
+    }
+
     public function test_adjustment_retry_does_not_apply_stock_twice(): void
     {
         $data = $this->setupInventory();
@@ -285,6 +353,8 @@ class AISMSInventoryTest extends TestCase
             ->get('/modules/aisms')
             ->assertOk()
             ->assertSee('Agricultural Inventory')
+            ->assertSee('Inventory desk')
+            ->assertSee('Goods arrived')
             ->assertSee('name="idempotency_key"', false)
             ->assertSee('Mandatory reason', false)
             ->assertSee('Filter transactions');
