@@ -7,6 +7,19 @@ use Illuminate\Support\Facades\Schema;
 
 class ClaimTicketFeatureGate
 {
+    public static function stagingSchemaActivationAllowed(string $driver, string $database): bool
+    {
+        $expectedDatabase = (string) config('agricultural_claim_tickets.staging_database');
+        $liveDatabase = (string) config('agricultural_claim_tickets.live_database', 'agriconnect_erp');
+
+        return $driver === 'mysql'
+            && (bool) config('agricultural_claim_tickets.staging_schema_enabled')
+            && $database !== ''
+            && $database !== $liveDatabase
+            && $database === $expectedDatabase
+            && str_starts_with($database, 'agriconnect_staging');
+    }
+
     public function operational(): bool
     {
         return config('agricultural_claim_tickets.mode') === 'operational';

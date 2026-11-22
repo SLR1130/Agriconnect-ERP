@@ -29,6 +29,12 @@ return [
     'qa_mysql_server_uuid' => env('AGRICULTURAL_CLAIM_TICKETS_QA_MYSQL_SERVER_UUID'),
     'qa_mysql_backup_sha256' => env('AGRICULTURAL_CLAIM_TICKETS_QA_BACKUP_SHA256'),
 
+    // A hosted staging database may receive the claim-ticket schema only when
+    // its exact database name is explicitly configured and opted in. This is
+    // separate from operational activation and never accepts agric onnect_erp.
+    'staging_schema_enabled' => (bool) env('AGRICULTURAL_CLAIM_TICKETS_STAGING_SCHEMA_ENABLED', false),
+    'staging_database' => env('AGRICULTURAL_CLAIM_TICKETS_STAGING_DATABASE'),
+
     // No validity period is assumed until MAO adopts one.
     'validity_days' => env('AGRICULTURAL_CLAIM_TICKETS_VALIDITY_DAYS') !== null
         ? (int) env('AGRICULTURAL_CLAIM_TICKETS_VALIDITY_DAYS')

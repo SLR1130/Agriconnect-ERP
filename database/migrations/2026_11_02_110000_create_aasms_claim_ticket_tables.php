@@ -122,6 +122,10 @@ return new class extends Migration {
             return;
         }
 
+        if (App\Services\ClaimTicketFeatureGate::stagingSchemaActivationAllowed($driver, $database)) {
+            return;
+        }
+
         if (! app()->environment(['local', 'testing'])) {
             throw new LogicException('Claim-ticket schema may only be installed on an explicitly approved operational database or isolated local/testing database.');
         }

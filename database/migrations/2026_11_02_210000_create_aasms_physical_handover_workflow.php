@@ -231,6 +231,10 @@ return new class extends Migration
             return 'operational';
         }
 
+        if (ClaimTicketFeatureGate::stagingSchemaActivationAllowed($driver, $database)) {
+            return 'qa';
+        }
+
         if (! app()->environment(['local', 'testing'])) {
             throw new LogicException('Phase 6E handover schema is restricted to an explicitly approved operational database or isolated local/testing database.');
         }

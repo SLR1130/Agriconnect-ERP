@@ -45,6 +45,24 @@ class AASMSClaimTicketTest extends TestCase
         }
     }
 
+    public function test_hosted_staging_schema_activation_requires_exact_explicit_opt_in_and_never_accepts_live_database(): void
+    {
+        config([
+            'agricultural_claim_tickets.staging_schema_enabled' => false,
+            'agricultural_claim_tickets.staging_database' => 'agriconnect_staging',
+            'agricultural_claim_tickets.live_database' => 'agriconnect_erp',
+        ]);
+
+        $this->assertFalse(ClaimTicketFeatureGate::stagingSchemaActivationAllowed('mysql', 'agriconnect_staging'));
+
+        config(['agricultural_claim_tickets.staging_schema_enabled' => true]);
+
+        $this->assertTrue(ClaimTicketFeatureGate::stagingSchemaActivationAllowed('mysql', 'agriconnect_staging'));
+        $this->assertFalse(ClaimTicketFeatureGate::stagingSchemaActivationAllowed('mysql', 'agriconnect_erp'));
+        $this->assertFalse(ClaimTicketFeatureGate::stagingSchemaActivationAllowed('mysql', 'other_database'));
+        $this->assertFalse(ClaimTicketFeatureGate::stagingSchemaActivationAllowed('sqlite', 'agriconnect_staging'));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

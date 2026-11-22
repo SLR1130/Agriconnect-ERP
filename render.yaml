@@ -35,3 +35,7 @@ services:
         value: local
       - key: LOG_CHANNEL
         value: stderr
+      - key: AGRICULTURAL_CLAIM_TICKETS_STAGING_SCHEMA_ENABLED
+        value: "false"
+      - key: AGRICULTURAL_CLAIM_TICKETS_STAGING_DATABASE
+        value: agriconnect_staging
